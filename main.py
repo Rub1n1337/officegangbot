@@ -281,6 +281,35 @@ class BrawlStarsBot(commands.Bot):
 
 bot = BrawlStarsBot()
 
+# Register setup_done command
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def setup_done(ctx):
+    """Verify and save channel setup"""
+    if ctx.author != ctx.guild.owner:
+        await ctx.send("❌ Only the server owner can complete the setup!")
+        return
+
+    required_channels = {
+        "punishments": None,
+        "bot-setup": None
+    }
+
+    # Verify channels exist
+    for channel in ctx.guild.channels:
+        if channel.name in required_channels:
+            required_channels[channel.name] = channel.id
+
+    # Check if any channels are missing
+    missing = [name for name, id in required_channels.items() if id is None]
+    if missing:
+        await ctx.send(f"❌ Missing required channels: {', '.join(missing)}\nPlease create them and try again.")
+        return
+
+    # Save channel IDs
+    bot.server_settings.set_server_channels(ctx.guild.id, required_channels)
+    await ctx.send("✅ Setup completed successfully! Bot is now fully configured for this server.")
+
 @bot.event
 async def on_raw_reaction_add(payload):
     if payload.message_id != REACTION_MESSAGE_ID:
