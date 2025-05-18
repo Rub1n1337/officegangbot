@@ -1,3 +1,4 @@
+
 import discord
 from discord.ext import commands
 from webserver import keep_alive
@@ -10,7 +11,8 @@ from datetime import datetime
 
 logging.basicConfig(filename='logging.log', level=logging.INFO)
 
-bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event
 async def on_ready():
@@ -23,7 +25,6 @@ async def on_ready():
     if base:
         print('Database connected successfully.')
 
-# Add role on reaction
 @bot.event
 async def on_raw_reaction_add(payload):
     if payload.message_id == 874752473405988874:
@@ -42,7 +43,6 @@ async def on_raw_reaction_add(payload):
         else:
             print("Role not found.")
 
-# Remove role on reaction remove
 @bot.event
 async def on_raw_reaction_remove(payload):
     if payload.message_id == 874752473405988874:
@@ -59,7 +59,6 @@ async def on_raw_reaction_remove(payload):
                 log_channel = bot.get_channel(1085966600051642568)
                 await log_channel.send(log_message)
 
-# Welcome message
 @bot.event
 async def on_member_join(member):
     await member.send('Welcome to the server!')
@@ -67,7 +66,6 @@ async def on_member_join(member):
         if ch.name == 'велкам-👋':
             await bot.get_channel(ch.id).send(f'Welcome {member.mention}!')
 
-# Mute command
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def mute(ctx, member: discord.Member, time: int, reason):
@@ -92,7 +90,6 @@ async def mute(ctx, member: discord.Member, time: int, reason):
     await member.add_roles(memberrole)
     await channel.send(embed=embunmute)
 
-# Unmute command
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def unmute(ctx, member: discord.Member):
@@ -108,7 +105,6 @@ async def unmute(ctx, member: discord.Member):
     await member.add_roles(memberrole)
     await channel.send(embed=emb)
 
-# Kick command
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def kick(ctx, member: discord.Member, *, reason):
@@ -118,17 +114,15 @@ async def kick(ctx, member: discord.Member, *, reason):
     emb.add_field(name="✅ Kicked", value=f"{member.mention} has been kicked.")
     await channel.send(embed=emb)
 
-# Ban command
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def ban(ctx, member: discord.Member, *, days, reason):
+async def ban(ctx, member: discord.Member, *, reason):
     channel = bot.get_channel(876507449362898974)
     await member.ban(reason=reason)
     emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
     emb.add_field(name="✅ Banned", value=f"{member.mention} has been banned.")
     await channel.send(embed=emb)
 
-# Unban command
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def unban(ctx, *, member):
@@ -144,7 +138,6 @@ async def unban(ctx, *, member):
             await channel.send(embed=emb)
             return
 
-# Warn command
 @bot.command()
 async def warn(ctx, member: discord.Member, *, reason):
     guild_name = "PocoSUltojBrawlStars"
@@ -174,13 +167,11 @@ async def warn(ctx, member: discord.Member, *, reason):
         await channel.send(embed=embed)
         await member.ban(reason=reason)
 
-# Clear messages
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def clear(ctx, amount=100):
     await ctx.channel.purge(limit=amount)
 
-# User info
 @bot.command()
 async def info(ctx, member: discord.Member):
     emb = discord.Embed(title="✅ User Information", color=discord.Colour.from_rgb(225, 225, 0))
@@ -192,7 +183,6 @@ async def info(ctx, member: discord.Member):
     emb.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
     await ctx.send(embed=emb)
 
-# Test command
 @bot.command()
 async def test(ctx):
     await ctx.send('Test command executed successfully.')
