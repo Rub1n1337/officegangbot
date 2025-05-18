@@ -446,7 +446,12 @@ async def unban(ctx, *, member):
 @bot.command()
 async def warn(ctx, member: discord.Member, *, reason):
     guild_name = "PocoSUltojBrawlStars"
-    channel = ctx.guild.get_channel(LOG_CHANNEL_ID)
+    channel = discord.utils.get(ctx.guild.channels, name='punishments')
+    if not channel:
+        channel = ctx.guild.get_channel(LOG_CHANNEL_ID)
+    if not channel:
+        await ctx.send("Error: No logging channel found. Please set up the 'punishments' channel.")
+        return
 
     db_path = bot.db_path
     with sqlite3.connect(db_path) as db:
