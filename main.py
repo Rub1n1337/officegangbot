@@ -5,7 +5,9 @@ import config
 import sqlite3
 import asyncio
 import logging
+import json
 from datetime import datetime
+from pathlib import Path
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -22,11 +24,34 @@ LOG_CHANNEL_ID = 876507449362898974
 WELCOME_CHANNEL_NAME = 'велкам-👋'
 REACTION_MESSAGE_ID = 874752473405988874
 
+class ServerSettings:
+    def __init__(self, file_path='server_setups.json'):
+        self.file_path = Path(file_path)
+        self.settings = self._load_settings()
+
+    def _load_settings(self):
+        if self.file_path.exists():
+            with open(self.file_path, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def save_settings(self):
+        with open(self.file_path, 'w') as f:
+            json.dump(self.settings, f, indent=2)
+
+    def set_server_channels(self, guild_id, channels):
+        self.settings[str(guild_id)] = channels
+        self.save_settings()
+
+    def get_server_channels(self, guild_id):
+        return self.settings.get(str(guild_id), {})
+
 class BrawlStarsBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
         super().__init__(command_prefix='!', intents=intents)
         self.db_path = 'Pocosultoj.db'
+        self.server_settings = ServerSettings()
 
     async def setup_hook(self):
         self.init_database()
@@ -103,11 +128,7 @@ class BrawlStarsBot(commands.Bot):
         return embed
 
     async def send_welcome_message(self, guild):
-        # Try system channel first
         target_channel = guild.system_channel
-
-        # If system channel doesn't exist or bot can't send messages there,
-        # find first available text channel
         if not target_channel or not target_channel.permissions_for(guild.me).send_messages:
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).send_messages:
@@ -116,11 +137,73 @@ class BrawlStarsBot(commands.Bot):
 
         if target_channel:
             try:
-                welcome_embed = self.generate_help_embed()
-                await target_channel.send("👋 **Hello! I'm your new moderation bot!**", embed=welcome_embed)
+                setup_embed = discord.Embed(
+                    title="🔧 Server Setup Guide",
+                    description="Welcome! Please follow these setup instructions carefully.",
+                    color=discord.Color.blue()
+                )
+                
+                required_channels = {
+                    "punishments": "Logs all moderation actions (mutes, kicks, bans, etc.)",
+                    "bot-setup": "Configuration channel for bot settings (admin-only)"
+                }
+                
+                channels_text = "\n".join(f"• `{name}`: {desc}" for name, desc in required_channels.items())
+                setup_embed.add_field(
+                    name="Required Channels",
+                    value=f"{channels_text}\n\n**Note:** Only server owner should perform the setup!",
+                    inline=False
+                )
+                
+                setup_embed.add_field(
+                    name="Setup Instructions",
+                    value="1. Create the required channels listed above\n"
+                          "2. Make sure bot has permissions to send messages\n"
+                          "3. Run `!setup_done` when channels are ready",
+                    inline=False
+                )
+
+                help_embed = self.generate_help_embed()
+                
+                await target_channel.send("👋 **Hello! I'm your new moderation bot!**")
+                await target_channel.send(embed=setup_embed)
+                await target_channel.send("📚 **Available Commands:**", embed=help_embed)
+                
                 logger.info(f"Sent welcome message to {guild.name} in #{target_channel.name}")
             except Exception as e:
                 logger.error(f"Failed to send welcome message in {guild.name}: {e}")
+
+    def get_channel_id(self, guild_id, channel_name):
+        channels = self.server_settings.get_server_channels(guild_id)
+        return channels.get(channel_name)
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def setup_done(self, ctx):
+        """Verify and save channel setup"""
+        if ctx.author != ctx.guild.owner:
+            await ctx.send("❌ Only the server owner can complete the setup!")
+            return
+
+        required_channels = {
+            "punishments": None,
+            "bot-setup": None
+        }
+
+        # Verify channels exist
+        for channel in ctx.guild.channels:
+            if channel.name in required_channels:
+                required_channels[channel.name] = channel.id
+
+        # Check if any channels are missing
+        missing = [name for name, id in required_channels.items() if id is None]
+        if missing:
+            await ctx.send(f"❌ Missing required channels: {', '.join(missing)}\nPlease create them and try again.")
+            return
+
+        # Save channel IDs
+        self.server_settings.set_server_channels(ctx.guild.id, required_channels)
+        await ctx.send("✅ Setup completed successfully! Bot is now fully configured for this server.")
 
     async def on_guild_join(self, guild):
         try:
