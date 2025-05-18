@@ -1,2 +1,3 @@
 
-TOKEN = 'your-bot-token-here'  # Get this from Discord Developer Portal
+import os
+TOKEN = os.getenv('DISCORD_TOKEN')  # Get token from environment variables
