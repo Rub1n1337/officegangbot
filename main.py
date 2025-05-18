@@ -48,8 +48,34 @@ class BrawlStarsBot(commands.Bot):
         print(f'Bot logged in as {self.user}')
 
     async def on_guild_join(self, guild):
-        await self.create_punishments_channel(guild)
-        await self.create_bot_setup_channel(guild)
+        try:
+            # Check if bot has necessary permissions
+            if not guild.me.guild_permissions.manage_channels:
+                if guild.system_channel:
+                    await guild.system_channel.send("I need 'Manage Channels' permission to create required channels!")
+                return
+
+            # Create channels
+            await self.create_punishments_channel(guild)
+            await self.create_bot_setup_channel(guild)
+            
+            # Notify about successful creation
+            if guild.system_channel:
+                await guild.system_channel.send("Required channels have been created!")
+                
+        except Exception as e:
+            logger.error(f"Error in on_guild_join for {guild.name}: {e}")
+            if guild.system_channel:
+                await guild.system_channel.send("Failed to create required channels. Please check bot permissions.")
+
+    # Force create channels command
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def setup_channels(self, ctx):
+        """Force create/check required channels"""
+        await self.create_punishments_channel(ctx.guild)
+        await self.create_bot_setup_channel(ctx.guild)
+        await ctx.send("Channels setup completed!")
 
     async def create_punishments_channel(self, guild):
         existing_channel = discord.utils.get(guild.channels, name="punishments")
