@@ -47,6 +47,54 @@ class BrawlStarsBot(commands.Bot):
         logger.info(f'Bot logged in as {self.user}')
         print(f'Bot logged in as {self.user}')
 
+    async def on_guild_join(self, guild):
+        await self.create_punishments_channel(guild)
+        await self.create_bot_setup_channel(guild)
+
+    async def create_punishments_channel(self, guild):
+        existing_channel = discord.utils.get(guild.channels, name="punishments")
+        if not existing_channel:
+            try:
+                await guild.create_text_channel("punishments")
+                logger.info(f"Created 'punishments' channel in {guild.name}")
+            except discord.Forbidden:
+                logger.error(f"Missing permissions to create 'punishments' channel in {guild.name}")
+            except discord.HTTPException as e:
+                logger.error(f"Failed to create 'punishments' channel in {guild.name}: {e}")
+        else:
+            logger.info(f"'punishments' channel already exists in {guild.name}")
+
+    async def create_bot_setup_channel(self, guild):
+        channel_name = "bot setup"
+        existing_channel = discord.utils.get(guild.channels, name=channel_name)
+        channel_number = 1
+
+        while existing_channel:
+            channel_name = f"bot setup {channel_number}"
+            existing_channel = discord.utils.get(guild.channels, name=channel_name)
+            channel_number += 1
+
+        try:
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                guild.owner: discord.PermissionOverwrite(read_messages=True),
+                guild.me: discord.PermissionOverwrite(read_messages=True)
+            }
+
+            # Give administrator role permissions
+            for role in guild.roles:
+                if role.permissions.administrator:
+                     overwrites[role] = discord.PermissionOverwrite(read_messages=True)
+
+            channel = await guild.create_text_channel(channel_name, overwrites=overwrites)
+            logger.info(f"Created '{channel_name}' channel in {guild.name}")
+
+        except discord.Forbidden:
+            logger.error(f"Missing permissions to create '{channel_name}' channel in {guild.name}")
+        except discord.HTTPException as e:
+            logger.error(f"Failed to create '{channel_name}' channel in {guild.name}: {e}")
+
+
 bot = BrawlStarsBot()
 
 @bot.event
@@ -95,9 +143,9 @@ async def on_member_join(member):
 async def mute(ctx, member: discord.Member, time: int, reason: str):
     mute_role = discord.utils.get(ctx.guild.roles, id=MUTE_ROLE_ID)
     member_role = discord.utils.get(ctx.guild.roles, id=MEMBER_ROLE_ID)
-    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
 
-    if not all([mute_role, member_role, log_channel]):
+    if not all([mute_role, member_role, channel]):
         await ctx.send("Configuration error: Missing roles or channels")
         return
 
@@ -111,14 +159,14 @@ async def mute(ctx, member: discord.Member, time: int, reason: str):
 
     await member.remove_roles(member_role)
     await member.add_roles(mute_role)
-    await log_channel.send(embed=embed)
+    await channel.send(embed=embed)
 
     await asyncio.sleep(time * 60)
 
     if mute_role in member.roles:
         await member.remove_roles(mute_role)
         await member.add_roles(member_role)
-        await log_channel.send(embed=create_unmute_embed(member))
+        await channel.send(embed=create_unmute_embed(member))
 
 def create_embed(title, member_mention, admin_mention, reason, duration=None):
     embed = discord.Embed(color=discord.Color.yellow())
@@ -137,7 +185,7 @@ def create_unmute_embed(member):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def unmute(ctx, member: discord.Member):
-    channel = bot.get_channel(LOG_CHANNEL_ID)
+    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
     muterole = discord.utils.get(ctx.guild.roles, id=MUTE_ROLE_ID)
     memberrole = discord.utils.get(ctx.guild.roles, id=MEMBER_ROLE_ID)
 
@@ -152,7 +200,7 @@ async def unmute(ctx, member: discord.Member):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def kick(ctx, member: discord.Member, *, reason):
-    channel = bot.get_channel(LOG_CHANNEL_ID)
+    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
     await member.kick(reason=reason)
     emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
     emb.add_field(name="✅ Kicked", value=f"{member.mention} has been kicked.")
@@ -161,7 +209,7 @@ async def kick(ctx, member: discord.Member, *, reason):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def ban(ctx, member: discord.Member, *, reason):
-    channel = bot.get_channel(LOG_CHANNEL_ID)
+    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
     await member.ban(reason=reason)
     emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
     emb.add_field(name="✅ Banned", value=f"{member.mention} has been banned.")
@@ -170,7 +218,7 @@ async def ban(ctx, member: discord.Member, *, reason):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def unban(ctx, *, member):
-    channel = bot.get_channel(LOG_CHANNEL_ID)
+    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
     banned_users = await ctx.guild.bans()
 
     for ban_entry in banned_users:
