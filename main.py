@@ -7,41 +7,51 @@ import asyncio
 import logging
 from datetime import datetime
 
-# Configure logging with more details
+# Enhanced logging configuration
 logging.basicConfig(
     filename='bot.log',
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 )
+logger = logging.getLogger('BrawlStarsBot')
 
-# Bot setup with all intents
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='!', intents=intents)
+# Constants
+MUTE_ROLE_ID = 876508795562504252
+MEMBER_ROLE_ID = 873196004718034964
+LOG_CHANNEL_ID = 876507449362898974
+WELCOME_CHANNEL_NAME = 'велкам-👋'
+REACTION_MESSAGE_ID = 874752473405988874
 
-# Database connection
-def get_db():
-    db = sqlite3.connect('Pocosultoj.db')
-    return db, db.cursor()
+class BrawlStarsBot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.all()
+        super().__init__(command_prefix='!', intents=intents)
+        self.db_path = 'Pocosultoj.db'
 
-@bot.event
-async def on_ready():
-    await bot.change_presence(
-        status=discord.Status.online,
-        activity=discord.Game('Brawl Stars')
-    )
-    logging.info(f'Bot logged in as {bot.user}')
-    print(f'Bot logged in as {bot.user}')
+    async def setup_hook(self):
+        self.init_database()
+        logger.info('Database initialized')
 
-    # Initialize database
-    db, cur = get_db()
-    cur.execute('''CREATE TABLE IF NOT EXISTS warnings 
-                   (userid INTEGER, count INTEGER, guild_id INTEGER)''')
-    db.commit()
-    db.close()
+    def init_database(self):
+        with sqlite3.connect(self.db_path) as db:
+            cur = db.cursor()
+            cur.execute('''CREATE TABLE IF NOT EXISTS warnings 
+                          (userid INTEGER, count INTEGER, guild_id INTEGER)''')
+            db.commit()
+
+    async def on_ready(self):
+        await self.change_presence(
+            status=discord.Status.online,
+            activity=discord.Game('Brawl Stars')
+        )
+        logger.info(f'Bot logged in as {self.user}')
+        print(f'Bot logged in as {self.user}')
+
+bot = BrawlStarsBot()
 
 @bot.event
 async def on_raw_reaction_add(payload):
-    if payload.message_id != 874752473405988874:
+    if payload.message_id != REACTION_MESSAGE_ID:
         return
 
     guild = bot.get_guild(payload.guild_id)
@@ -49,61 +59,55 @@ async def on_raw_reaction_add(payload):
         return
 
     role_name = 'Member' if payload.emoji.name == '✅' else payload.emoji.name
-    role = discord.utils.get(guild.roles, name=role_name)
-
-    if role and payload.member:
+    if role := discord.utils.get(guild.roles, name=role_name):
         await payload.member.add_roles(role)
-        log_message = f"Role '{role.name}' added to {payload.member}"
-        logging.info(log_message)
-
-        if log_channel := bot.get_channel(1085966600051642568):
-            await log_channel.send(log_message)
+        await log_action(guild, f"Role '{role.name}' added to {payload.member}")
 
 @bot.event
 async def on_raw_reaction_remove(payload):
-    if payload.message_id != 874752473405988874:
+    if payload.message_id != REACTION_MESSAGE_ID:
         return
 
     guild = bot.get_guild(payload.guild_id)
-    if not guild:
+    if not guild or not (member := await guild.fetch_member(payload.user_id)):
         return
 
     role_name = 'Member' if payload.emoji.name == '✅' else payload.emoji.name
-    role = discord.utils.get(guild.roles, name=role_name)
+    if role := discord.utils.get(guild.roles, name=role_name):
+        await member.remove_roles(role)
+        await log_action(guild, f"Role '{role.name}' removed from {member}")
 
-    if role:
-        if member := await guild.fetch_member(payload.user_id):
-            await member.remove_roles(role)
-            log_message = f"Role '{role.name}' removed from {member}"
-            logging.info(log_message)
-
-            if log_channel := bot.get_channel(1085966600051642568):
-                await log_channel.send(log_message)
+async def log_action(guild, message):
+    if log_channel := bot.get_channel(LOG_CHANNEL_ID):
+        await log_channel.send(message)
+    logger.info(message)
 
 @bot.event
 async def on_member_join(member):
     welcome_message = f'Welcome {member.mention}!'
     await member.send('Welcome to the server!')
 
-    if welcome_channel := discord.utils.get(member.guild.channels, name='велкам-👋'):
+    if welcome_channel := discord.utils.get(member.guild.channels, name=WELCOME_CHANNEL_NAME):
         await welcome_channel.send(welcome_message)
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def mute(ctx, member: discord.Member, time: int, reason: str):
-    mute_role = discord.utils.get(ctx.guild.roles, id=876508795562504252)
-    member_role = discord.utils.get(ctx.guild.roles, id=873196004718034964)
-    log_channel = bot.get_channel(876507449362898974)
+    mute_role = discord.utils.get(ctx.guild.roles, id=MUTE_ROLE_ID)
+    member_role = discord.utils.get(ctx.guild.roles, id=MEMBER_ROLE_ID)
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
 
     if not all([mute_role, member_role, log_channel]):
         await ctx.send("Configuration error: Missing roles or channels")
         return
 
-    embed = discord.Embed(color=discord.Color.yellow())
-    embed.add_field(name="✅ Muted", value=f"{member.mention} has been muted")
-    embed.add_field(name="Administrator", value=ctx.author.mention, inline=False)
-    embed.add_field(name="Reason", value=reason, inline=False)
-    embed.add_field(name="Duration", value=f"{time} minutes", inline=False)
+    embed = create_embed(
+        "✅ Muted",
+        member.mention,
+        ctx.author.mention,
+        reason,
+        time
+    )
 
     await member.remove_roles(member_role)
     await member.add_roles(mute_role)
@@ -114,16 +118,28 @@ async def mute(ctx, member: discord.Member, time: int, reason: str):
     if mute_role in member.roles:
         await member.remove_roles(mute_role)
         await member.add_roles(member_role)
-        unmute_embed = discord.Embed(color=discord.Color.green())
-        unmute_embed.add_field(name="✅ Unmuted", value=f"{member.mention} has been unmuted")
-        await log_channel.send(embed=unmute_embed)
+        await log_channel.send(embed=create_unmute_embed(member))
+
+def create_embed(title, member_mention, admin_mention, reason, duration=None):
+    embed = discord.Embed(color=discord.Color.yellow())
+    embed.add_field(name=title, value=f"{member_mention} has been {title.lower()}")
+    embed.add_field(name="Administrator", value=admin_mention, inline=False)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    if duration:
+        embed.add_field(name="Duration", value=f"{duration} minutes", inline=False)
+    return embed
+
+def create_unmute_embed(member):
+    embed = discord.Embed(color=discord.Color.green())
+    embed.add_field(name="✅ Unmuted", value=f"{member.mention} has been unmuted")
+    return embed
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def unmute(ctx, member: discord.Member):
-    channel = bot.get_channel(876507449362898974)
-    muterole = discord.utils.get(ctx.guild.roles, id=876508795562504252)
-    memberrole = discord.utils.get(ctx.guild.roles, id=873196004718034964)
+    channel = bot.get_channel(LOG_CHANNEL_ID)
+    muterole = discord.utils.get(ctx.guild.roles, id=MUTE_ROLE_ID)
+    memberrole = discord.utils.get(ctx.guild.roles, id=MEMBER_ROLE_ID)
 
     emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
     emb.add_field(name="✅ Unmuted", value=f"{member.mention} has been unmuted.")
@@ -136,7 +152,7 @@ async def unmute(ctx, member: discord.Member):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def kick(ctx, member: discord.Member, *, reason):
-    channel = bot.get_channel(876507449362898974)
+    channel = bot.get_channel(LOG_CHANNEL_ID)
     await member.kick(reason=reason)
     emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
     emb.add_field(name="✅ Kicked", value=f"{member.mention} has been kicked.")
@@ -145,7 +161,7 @@ async def kick(ctx, member: discord.Member, *, reason):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def ban(ctx, member: discord.Member, *, reason):
-    channel = bot.get_channel(876507449362898974)
+    channel = bot.get_channel(LOG_CHANNEL_ID)
     await member.ban(reason=reason)
     emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
     emb.add_field(name="✅ Banned", value=f"{member.mention} has been banned.")
@@ -154,7 +170,7 @@ async def ban(ctx, member: discord.Member, *, reason):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def unban(ctx, *, member):
-    channel = bot.get_channel(876507449362898974)
+    channel = bot.get_channel(LOG_CHANNEL_ID)
     banned_users = await ctx.guild.bans()
 
     for ban_entry in banned_users:
@@ -169,33 +185,34 @@ async def unban(ctx, *, member):
 @bot.command()
 async def warn(ctx, member: discord.Member, *, reason):
     guild_name = "PocoSUltojBrawlStars"
-    channel = ctx.guild.get_channel(876507449362898974)
+    channel = ctx.guild.get_channel(LOG_CHANNEL_ID)
 
-    db, cur = get_db()
-    cur.execute(f'CREATE TABLE IF NOT EXISTS {guild_name} (userid INT, count INT)')
-    db.commit()
-
-    warning = cur.execute(f'SELECT * FROM {guild_name} WHERE userid={member.id}').fetchone()
-
-    embed = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
-    embed.add_field(name="✅ Warned", value=f"{member.mention} has received a warning.", inline=False)
-    embed.add_field(name="Administrator", value=ctx.author.mention, inline=False)
-    embed.add_field(name="Reason", value=reason, inline=False)
-
-    if warning is None:
-        cur.execute(f'INSERT INTO {guild_name} VALUES ({member.id}, 1)')
+    db_path = bot.db_path
+    with sqlite3.connect(db_path) as db:
+        cur = db.cursor()
+        cur.execute(f'CREATE TABLE IF NOT EXISTS {guild_name} (userid INT, count INT)')
         db.commit()
-        await channel.send(embed=embed)
-    elif warning[1] == 1:
-        cur.execute(f'UPDATE {guild_name} SET count=2 WHERE userid={member.id}')
-        db.commit()
-        await channel.send(embed=embed)
-    elif warning[1] == 2:
-        cur.execute(f'UPDATE {guild_name} SET count=3 WHERE userid={member.id}')
-        db.commit()
-        await channel.send(embed=embed)
-        await member.ban(reason=reason)
-    db.close()
+
+        warning = cur.execute(f'SELECT * FROM {guild_name} WHERE userid={member.id}').fetchone()
+
+        embed = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
+        embed.add_field(name="✅ Warned", value=f"{member.mention} has received a warning.", inline=False)
+        embed.add_field(name="Administrator", value=ctx.author.mention, inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+
+        if warning is None:
+            cur.execute(f'INSERT INTO {guild_name} VALUES ({member.id}, 1)')
+            db.commit()
+            await channel.send(embed=embed)
+        elif warning[1] == 1:
+            cur.execute(f'UPDATE {guild_name} SET count=2 WHERE userid={member.id}')
+            db.commit()
+            await channel.send(embed=embed)
+        elif warning[1] == 2:
+            cur.execute(f'UPDATE {guild_name} SET count=3 WHERE userid={member.id}')
+            db.commit()
+            await channel.send(embed=embed)
+            await member.ban(reason=reason)
 
 @bot.command()
 @commands.has_permissions(administrator=True)

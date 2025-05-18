@@ -1,16 +1,21 @@
-from flask import Flask
+
+from flask import Flask, jsonify
 from threading import Thread
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running"
+    return jsonify({"status": "Bot is running", "code": 200})
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy", "code": 200})
 
 def run():
     app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
     server = Thread(target=run)
-    server.daemon = True  # This ensures the thread will close when the main program exits
+    server.daemon = True
     server.start()
