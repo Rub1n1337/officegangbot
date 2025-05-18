@@ -1,2 +1,2 @@
 
-TOKEN = 'your-bot-token-here'  # Replace with your actual bot token from Discord Developer Portal
+TOKEN = 'your-bot-token-here'  # Get this from Discord Developer Portal
