@@ -46,6 +46,81 @@ class BrawlStarsBot(commands.Bot):
         )
         logger.info(f'Bot logged in as {self.user}')
         print(f'Bot logged in as {self.user}')
+        
+        # Send welcome message to all guilds on startup
+        for guild in self.guilds:
+            await self.send_welcome_message(guild)
+
+    def generate_help_embed(self):
+        embed = discord.Embed(
+            title="Bot Help Guide",
+            description="Welcome! Here's a complete guide to using this bot.",
+            color=discord.Color.blue()
+        )
+
+        # Commands section
+        commands_info = {
+            "!mute @user time reason": "Mutes a user for specified time (in minutes)",
+            "!unmute @user": "Unmutes a user",
+            "!kick @user reason": "Kicks a user from the server",
+            "!ban @user reason": "Bans a user from the server",
+            "!unban username": "Unbans a user",
+            "!warn @user reason": "Warns a user (3 warnings = ban)",
+            "!clear [amount]": "Clears specified amount of messages",
+            "!info @user": "Shows user information",
+            "!setup_channels": "Creates required channels",
+        }
+
+        embed.add_field(
+            name="📋 Available Commands",
+            value="\n".join(f"`{cmd}`: {desc}" for cmd, desc in commands_info.items()),
+            inline=False
+        )
+
+        # Required channels section
+        channels_info = (
+            "**Required Channels:**\n"
+            "• `punishments`: Logs all moderation actions\n"
+            "• `bot setup`: Configuration channel (visible only to admins)\n"
+            "\n**Required Roles:**\n"
+            "• Mute role (ID: 876508795562504252)\n"
+            "• Member role (ID: 873196004718034964)"
+        )
+        embed.add_field(name="⚙️ Server Setup", value=channels_info, inline=False)
+
+        # Bot permissions section
+        permissions_info = (
+            "The bot needs these permissions:\n"
+            "• Manage Channels\n"
+            "• Manage Roles\n"
+            "• Kick Members\n"
+            "• Ban Members\n"
+            "• Send Messages\n"
+            "• Manage Messages"
+        )
+        embed.add_field(name="🔒 Required Permissions", value=permissions_info, inline=False)
+
+        return embed
+
+    async def send_welcome_message(self, guild):
+        # Try system channel first
+        target_channel = guild.system_channel
+
+        # If system channel doesn't exist or bot can't send messages there,
+        # find first available text channel
+        if not target_channel or not target_channel.permissions_for(guild.me).send_messages:
+            for channel in guild.text_channels:
+                if channel.permissions_for(guild.me).send_messages:
+                    target_channel = channel
+                    break
+
+        if target_channel:
+            try:
+                welcome_embed = self.generate_help_embed()
+                await target_channel.send("👋 **Hello! I'm your new moderation bot!**", embed=welcome_embed)
+                logger.info(f"Sent welcome message to {guild.name} in #{target_channel.name}")
+            except Exception as e:
+                logger.error(f"Failed to send welcome message in {guild.name}: {e}")
 
     async def on_guild_join(self, guild):
         try:
@@ -318,6 +393,13 @@ async def info(ctx, member: discord.Member):
 @bot.command()
 async def test(ctx):
     await ctx.send('Test command executed successfully.')
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def send_welcome(ctx):
+    """Resends the welcome message with bot information"""
+    await bot.send_welcome_message(ctx.guild)
+    await ctx.message.add_reaction('✅')
 
 # Start the webserver and run the bot
 keep_alive()
