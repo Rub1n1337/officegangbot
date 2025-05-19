@@ -28,6 +28,7 @@ class ServerSettings:
     def __init__(self, file_path='server_setups.json'):
         self.file_path = Path(file_path)
         self.settings = self._load_settings()
+        self.default_prefix = '!'
 
     def _load_settings(self):
         if self.file_path.exists():
@@ -42,8 +43,19 @@ class ServerSettings:
     def set_server_channels(self, guild_id, channels):
         guild_id = str(guild_id)
         if guild_id not in self.settings:
-            self.settings[guild_id] = {}
+            self.settings[guild_id] = {'prefix': self.default_prefix}
         self.settings[guild_id].update(channels)
+        self.save_settings()
+
+    def get_prefix(self, guild_id):
+        guild_settings = self.settings.get(str(guild_id), {})
+        return guild_settings.get('prefix', self.default_prefix)
+
+    def set_prefix(self, guild_id, prefix):
+        guild_id = str(guild_id)
+        if guild_id not in self.settings:
+            self.settings[guild_id] = {}
+        self.settings[guild_id]['prefix'] = prefix
         self.save_settings()
 
     def get_server_channels(self, guild_id):
@@ -64,9 +76,15 @@ class ServerSettings:
 class BrawlStarsBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
-        super().__init__(command_prefix='!', intents=intents)
-        self.db_path = 'Pocosultoj.db'
         self.server_settings = ServerSettings()
+        
+        async def get_prefix(bot, message):
+            if not message.guild:
+                return '!'  # DM messages use default prefix
+            return bot.server_settings.get_prefix(message.guild.id)
+            
+        super().__init__(command_prefix=get_prefix, intents=intents)
+        self.db_path = 'Pocosultoj.db'
 
     async def setup_hook(self):
         self.init_database()
@@ -549,6 +567,17 @@ async def info(ctx, member: discord.Member):
 async def set_prefix(ctx, new_prefix):
     """Change the command prefix for this server"""
     bot.command_prefix = new_prefix
+    await ctx.send(f"✅ Command prefix changed to: `{new_prefix}`")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def setprefix(ctx, new_prefix):
+    """Change the command prefix for this server"""
+    if not ctx.author.guild_permissions.administrator:
+        await ctx.send("❌ Only administrators can change the prefix!")
+        return
+        
+    bot.server_settings.set_prefix(ctx.guild.id, new_prefix)
     await ctx.send(f"✅ Command prefix changed to: `{new_prefix}`")
 
 @bot.command()
