@@ -545,6 +545,13 @@ async def info(ctx, member: discord.Member):
     await ctx.send(embed=embed)
 
 @bot.command()
+@commands.has_permissions(administrator=True)
+async def set_prefix(ctx, new_prefix):
+    """Change the command prefix for this server"""
+    bot.command_prefix = new_prefix
+    await ctx.send(f"✅ Command prefix changed to: `{new_prefix}`")
+
+@bot.command()
 async def test(ctx):
     await ctx.send('Test command executed successfully.')
 
