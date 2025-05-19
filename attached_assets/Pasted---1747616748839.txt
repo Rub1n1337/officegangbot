@@ -1,0 +1,60 @@
+Вот полностью обновлённый **англоязычный промпт**, который включает поддержку **многосерверности**, сохранение **отдельных настроек для каждого сервера**, и расширенную логику с `!setup_done`:
+
+---
+
+**Prompt (English):**
+
+Design the bot to support multiple servers (guilds), with independent configurations for each one. Here's what it should do:
+
+---
+
+### 🟩 When the bot is added to a server **or is already present**:
+
+1. Send a welcome/setup message in the system channel if it exists, or in the first available channel where the bot has permission to send messages.
+2. The message must include:
+
+   * A full list of commands with descriptions (help guide).
+   * Instructions for setting up the required channels, including:
+
+     * `punishments` — for logging punishments.
+     * `bot setup` — private channel for configuring the bot (should be visible only to admins and the **server owner**, but **only the owner** can use it to configure the bot).
+   * A clear instruction that **only the server owner** should run the command `!setup_done` once the required channels are created.
+
+---
+
+### 🟦 When the `!setup_done` command is used:
+
+1. Check if the user issuing the command is the **server owner**.
+2. Validate that the required channels (`punishments`, `bot setup`, etc.) exist. If any are missing, respond with an error message.
+3. If all required channels are found, save their **channel IDs** into a JSON file named `server_setups.json` (or a database), using the server's (guild's) ID as the key. Example structure:
+
+```json
+{
+  "123456789012345678": {
+    "punishments_channel_id": "111111111111111111",
+    "bot_setup_channel_id": "222222222222222222"
+  },
+  "987654321098765432": {
+    "punishments_channel_id": "333333333333333333",
+    "bot_setup_channel_id": "444444444444444444"
+  }
+}
+```
+
+4. After saving, send a confirmation message into the `bot setup` channel with further instructions for the server owner on how to configure the bot's settings, such as:
+
+   * Prefix change
+   * Role-based permissions
+   * Auto-punishment rules, etc.
+
+---
+
+### 🟨 On every restart or message/command execution:
+
+* The bot should load the `server_setups.json` file on startup.
+* It should use the stored channel IDs for logging and configuration actions.
+* Each server should be handled independently.
+
+---
+
+Let me know if you'd like this implemented in `discord.py`, `nextcord`, `hikari`, or another framework.
