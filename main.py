@@ -40,11 +40,26 @@ class ServerSettings:
             json.dump(self.settings, f, indent=2)
 
     def set_server_channels(self, guild_id, channels):
-        self.settings[str(guild_id)] = channels
+        guild_id = str(guild_id)
+        if guild_id not in self.settings:
+            self.settings[guild_id] = {}
+        self.settings[guild_id].update(channels)
         self.save_settings()
 
     def get_server_channels(self, guild_id):
         return self.settings.get(str(guild_id), {})
+
+    def get_punishment_channel(self, guild_id):
+        channels = self.get_server_channels(guild_id)
+        return channels.get('punishments')
+
+    def get_setup_channel(self, guild_id):
+        channels = self.get_server_channels(guild_id)
+        return channels.get('bot-setup')
+
+    def is_setup_complete(self, guild_id):
+        channels = self.get_server_channels(guild_id)
+        return all(key in channels for key in ['punishments', 'bot-setup'])
 
 class BrawlStarsBot(commands.Bot):
     def __init__(self):
@@ -308,7 +323,26 @@ async def setup_done(ctx):
 
     # Save channel IDs
     bot.server_settings.set_server_channels(ctx.guild.id, required_channels)
-    await ctx.send("✅ Setup completed successfully! Bot is now fully configured for this server.")
+    
+    # Send success message with configuration instructions
+    setup_channel = ctx.guild.get_channel(required_channels["bot-setup"])
+    if setup_channel:
+        embed = discord.Embed(
+            title="✅ Setup Complete",
+            description="The bot has been successfully configured for this server!",
+            color=discord.Color.green()
+        )
+        embed.add_field(
+            name="Next Steps",
+            value="Use these commands to customize the bot:\n"
+                  "`!set_prefix <prefix>` - Change command prefix\n"
+                  "`!set_autorole <role>` - Set role for new members\n"
+                  "`!set_punishment_rules` - Configure auto-punishment rules",
+            inline=False
+        )
+        await setup_channel.send(embed=embed)
+    
+    await ctx.send("✅ Setup completed successfully! Check the bot-setup channel for configuration instructions.")
 
 @bot.event
 async def on_raw_reaction_add(payload):
@@ -445,12 +479,15 @@ async def unban(ctx, *, member):
 
 @bot.command()
 async def warn(ctx, member: discord.Member, *, reason):
-    guild_name = "PocoSUltojBrawlStars"
-    channel = discord.utils.get(ctx.guild.channels, name='punishments')
+    # Get server-specific punishment channel
+    punishment_channel_id = bot.server_settings.get_punishment_channel(ctx.guild.id)
+    if not punishment_channel_id:
+        await ctx.send("❌ Server not properly configured. Please ask the server owner to run !setup_done")
+        return
+    
+    channel = ctx.guild.get_channel(punishment_channel_id)
     if not channel:
-        channel = ctx.guild.get_channel(LOG_CHANNEL_ID)
-    if not channel:
-        await ctx.send("Error: No logging channel found. Please set up the 'punishments' channel.")
+        await ctx.send("❌ Punishment channel not found. Please contact the server owner.")
         return
 
     db_path = bot.db_path
