@@ -89,7 +89,8 @@ class BrawlStarsBot(commands.Bot):
 
     async def setup_hook(self):
         self.init_database()
-        logger.info('Database initialized')
+        await self.add_cog(GuildSetup(self))
+        logger.info('Database initialized and cogs loaded')
 
     def init_database(self):
         with sqlite3.connect(self.db_path) as db:
@@ -314,9 +315,6 @@ class BrawlStarsBot(commands.Bot):
 
 
 bot = BrawlStarsBot()
-
-# Add the GuildSetup cog
-bot.add_cog(GuildSetup(bot))
 
 # Register setup_done command
 @bot.command()

@@ -1,101 +1,413 @@
+
 import asyncio
 import discord
 from discord.ext import commands
-from logs.logger import logger  # Убедись, что этот логгер существует
-from utils.server_settings import ServerSettings  # Убедись, что этот класс работает
+import logging
+from utils.server_settings import ServerSettings
+
+# Setup logging
+logger = logging.getLogger('BrawlStarsBot')
 
 class GuildSetup(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.server_settings = ServerSettings()
+        self.setup_sessions = {}  # Track ongoing setup sessions
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
+        """Send comprehensive welcome message when bot joins a server"""
         try:
-            if not guild.me.guild_permissions.manage_channels:
-                if guild.system_channel:
-                    await guild.system_channel.send("❌ I need 'Manage Channels' permission to create required channels!")
+            # Find the best channel to send the welcome message
+            target_channel = guild.system_channel
+            if not target_channel or not target_channel.permissions_for(guild.me).send_messages:
+                for channel in guild.text_channels:
+                    if channel.permissions_for(guild.me).send_messages:
+                        target_channel = channel
+                        break
+
+            if not target_channel:
+                logger.error(f"No accessible text channel found in {guild.name}")
                 return
 
-            punish_channel = await self.create_punishments_channel(guild)
-            setup_channel = await self.create_bot_setup_channel(guild)
+            # Create welcome embed
+            welcome_embed = discord.Embed(
+                title="🎉 Welcome to Your New Moderation Bot!",
+                description=f"Hello {guild.owner.mention if guild.owner else 'Server Owner'} and all members of **{guild.name}**!",
+                color=discord.Color.blue()
+            )
 
-            if punish_channel and setup_channel:
-                if guild.system_channel:
-                    await guild.system_channel.send(
-                        "🔧 Required channels created!\n"
-                        "Please complete setup within **30 minutes** using the `!setup_done` command in the `bot-setup` channel."
-                    )
+            welcome_embed.add_field(
+                name="🤖 What I Do",
+                value="I'm a comprehensive moderation bot designed to help manage your server efficiently and keep your community safe!",
+                inline=False
+            )
 
-                # Запускаем фоновую задачу удаления каналов, если не будет подтверждения
-                asyncio.create_task(self.auto_delete_unconfirmed_channels(guild, punish_channel, setup_channel))
+            welcome_embed.add_field(
+                name="✨ Main Features",
+                value="• **Moderation Commands**: Mute, kick, ban, warn members\n"
+                      "• **Auto-Moderation**: Automatic punishments and logging\n"
+                      "• **Server Setup**: Easy configuration system\n"
+                      "• **Warning System**: 3-strike system with auto-ban\n"
+                      "• **Message Management**: Bulk delete and content filtering\n"
+                      "• **User Information**: Detailed member profiles\n"
+                      "• **Custom Prefixes**: Personalize command prefixes",
+                inline=False
+            )
 
-            else:
-                if guild.system_channel:
-                    await guild.system_channel.send("⚠️ Failed to create required channels. Please check my permissions.")
+            # Setup instructions
+            setup_embed = discord.Embed(
+                title="🔧 Getting Started",
+                description="Let's get your server set up! Follow these simple steps:",
+                color=discord.Color.green()
+            )
+
+            setup_embed.add_field(
+                name="Step 1: Create Setup Channel",
+                value="Create a text channel named `#bot-setup` (only admins should have access)",
+                inline=False
+            )
+
+            setup_embed.add_field(
+                name="Step 2: Start Setup",
+                value="In the `#bot-setup` channel, type either:\n`!bot-setup` or `!botsetup`",
+                inline=False
+            )
+
+            setup_embed.add_field(
+                name="Step 3: Follow the Guide",
+                value="I'll guide you through each step of the configuration process!",
+                inline=False
+            )
+
+            setup_embed.set_footer(text="💡 Only server administrators can run the setup commands")
+
+            await target_channel.send(embed=welcome_embed)
+            await target_channel.send(embed=setup_embed)
+            
+            logger.info(f"Sent welcome message to {guild.name}")
+            
         except Exception as e:
-            logger.error(f"Error in on_guild_join for {guild.name}: {e}")
+            logger.error(f"Error sending welcome message to {guild.name}: {e}")
 
-    async def create_punishments_channel(self, guild):
-        existing_channel = discord.utils.get(guild.channels, name="punishments")
-        if not existing_channel:
-            try:
-                channel = await guild.create_text_channel("punishments")
-                logger.info(f"Created 'punishments' channel in {guild.name}")
-                return channel
-            except Exception as e:
-                logger.error(f"Failed to create 'punishments' channel in {guild.name}: {e}")
-        return existing_channel
-
-    async def create_bot_setup_channel(self, guild):
-        channel_name = "bot-setup"
-        existing_channel = discord.utils.get(guild.channels, name=channel_name)
-        if existing_channel:
-            return existing_channel
-
-        try:
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                guild.me: discord.PermissionOverwrite(read_messages=True),
-            }
-
-            if guild.owner:
-                overwrites[guild.owner] = discord.PermissionOverwrite(read_messages=True)
-
-            for role in guild.roles:
-                if role.permissions.administrator:
-                    overwrites[role] = discord.PermissionOverwrite(read_messages=True)
-
-            channel = await guild.create_text_channel(channel_name, overwrites=overwrites)
-            logger.info(f"Created '{channel_name}' channel in {guild.name}")
-            return channel
-        except Exception as e:
-            logger.error(f"Failed to create '{channel_name}' channel in {guild.name}: {e}")
-            return None
-
-    async def auto_delete_unconfirmed_channels(self, guild, punish_channel, setup_channel):
-        await asyncio.sleep(30 * 60)  # 30 минут
-
-        if not self.server_settings.is_setup_complete(guild.id):
-            try:
-                await punish_channel.delete(reason="Setup not completed in time")
-                await setup_channel.delete(reason="Setup not completed in time")
-                logger.info(f"Deleted setup channels in {guild.name} due to timeout")
-            except Exception as e:
-                logger.error(f"Failed to delete setup channels in {guild.name}: {e}")
-
-    @commands.command(name="setup_done")
+    @commands.command(name="bot-setup", aliases=["botsetup"])
     @commands.has_permissions(administrator=True)
-    async def setup_done(self, ctx):
-        try:
-            guild_id = ctx.guild.id
-            if self.server_settings.is_setup_complete(guild_id):
-                await ctx.send("✅ Setup was already completed!")
-                return
+    async def start_setup(self, ctx):
+        """Start the step-by-step server setup process"""
+        if ctx.channel.name != "bot-setup":
+            await ctx.send("❌ This command can only be used in the `#bot-setup` channel!")
+            return
 
-            self.server_settings.set_setup_complete(guild_id)
-            await ctx.send("🎉 Setup complete! Thank you.")
-            logger.info(f"Setup completed for {ctx.guild.name}")
+        if ctx.guild.id in self.setup_sessions:
+            await ctx.send("⚠️ A setup session is already in progress! Please complete it first.")
+            return
+
+        # Initialize setup session
+        self.setup_sessions[ctx.guild.id] = {
+            'step': 'punishments_channel',
+            'channel': ctx.channel,
+            'settings': {}
+        }
+
+        embed = discord.Embed(
+            title="🚀 Server Setup Started!",
+            description="I'll guide you through setting up your server step by step.",
+            color=discord.Color.blue()
+        )
+
+        embed.add_field(
+            name="Step 1: Punishments Channel",
+            value="Would you like to enable a punishments channel? This channel will log all moderation actions (mutes, kicks, bans, warnings).\n\n"
+                  "**Reply with:** `yes` or `no`",
+            inline=False
+        )
+
+        embed.set_footer(text="You can cancel the setup at any time by typing 'cancel'")
+        await ctx.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Handle setup process messages"""
+        if message.author.bot:
+            return
+            
+        guild_id = message.guild.id
+        if guild_id not in self.setup_sessions:
+            return
+            
+        session = self.setup_sessions[guild_id]
+        if message.channel != session['channel']:
+            return
+            
+        if not message.author.guild_permissions.administrator:
+            return
+
+        content = message.content.lower().strip()
+        
+        if content == 'cancel':
+            del self.setup_sessions[guild_id]
+            await message.channel.send("❌ Setup cancelled. You can restart it anytime with `!bot-setup`")
+            return
+
+        await self.handle_setup_step(message, session)
+
+    async def handle_setup_step(self, message, session):
+        """Handle individual setup steps"""
+        step = session['step']
+        content = message.content.lower().strip()
+        guild = message.guild
+
+        try:
+            if step == 'punishments_channel':
+                if content in ['yes', 'y']:
+                    embed = discord.Embed(
+                        title="✅ Punishments Channel - Yes",
+                        description="Great! Let's set up your punishments channel.",
+                        color=discord.Color.green()
+                    )
+                    embed.add_field(
+                        name="Instructions:",
+                        value="1. Create a text channel named `#punishments`\n"
+                              "2. Once created, type: `!set-punishment-channel #punishments`",
+                        inline=False
+                    )
+                    await message.channel.send(embed=embed)
+                    session['step'] = 'set_punishment_channel'
+                    session['settings']['wants_punishments'] = True
+                    
+                elif content in ['no', 'n']:
+                    session['settings']['wants_punishments'] = False
+                    await self.move_to_next_step(message, session, 'logging_channel')
+                else:
+                    await message.channel.send("Please reply with `yes` or `no`")
+
+            elif step == 'set_punishment_channel':
+                if content.startswith('!set-punishment-channel'):
+                    channel_mention = message.content.split()[-1]
+                    if channel_mention.startswith('<#') and channel_mention.endswith('>'):
+                        channel_id = int(channel_mention[2:-1])
+                        channel = guild.get_channel(channel_id)
+                        if channel:
+                            session['settings']['punishments_channel'] = channel_id
+                            await message.channel.send(f"✅ Punishments channel set to {channel.mention}")
+                            await self.move_to_next_step(message, session, 'logging_channel')
+                        else:
+                            await message.channel.send("❌ Channel not found. Please try again.")
+                    else:
+                        await message.channel.send("❌ Please mention the channel like this: `!set-punishment-channel #punishments`")
+                else:
+                    await message.channel.send("Please use the command: `!set-punishment-channel #punishments`")
+
+            elif step == 'logging_channel':
+                if content in ['yes', 'y']:
+                    embed = discord.Embed(
+                        title="✅ Logging Channel - Yes",
+                        description="Perfect! This will help you keep track of all bot activities.",
+                        color=discord.Color.green()
+                    )
+                    embed.add_field(
+                        name="Instructions:",
+                        value="1. Create a text channel named `#bot-logs`\n"
+                              "2. Once created, type: `!set-log-channel #bot-logs`",
+                        inline=False
+                    )
+                    await message.channel.send(embed=embed)
+                    session['step'] = 'set_log_channel'
+                    session['settings']['wants_logging'] = True
+                    
+                elif content in ['no', 'n']:
+                    session['settings']['wants_logging'] = False
+                    await self.move_to_next_step(message, session, 'auto_roles')
+                else:
+                    await message.channel.send("Please reply with `yes` or `no`")
+
+            elif step == 'set_log_channel':
+                if content.startswith('!set-log-channel'):
+                    channel_mention = message.content.split()[-1]
+                    if channel_mention.startswith('<#') and channel_mention.endswith('>'):
+                        channel_id = int(channel_mention[2:-1])
+                        channel = guild.get_channel(channel_id)
+                        if channel:
+                            session['settings']['log_channel'] = channel_id
+                            await message.channel.send(f"✅ Log channel set to {channel.mention}")
+                            await self.move_to_next_step(message, session, 'auto_roles')
+                        else:
+                            await message.channel.send("❌ Channel not found. Please try again.")
+                    else:
+                        await message.channel.send("❌ Please mention the channel like this: `!set-log-channel #bot-logs`")
+                else:
+                    await message.channel.send("Please use the command: `!set-log-channel #bot-logs`")
+
+            elif step == 'auto_roles':
+                if content in ['yes', 'y']:
+                    embed = discord.Embed(
+                        title="✅ Auto Roles - Yes",
+                        description="Great! Auto roles will be given to new members automatically.",
+                        color=discord.Color.green()
+                    )
+                    embed.add_field(
+                        name="Instructions:",
+                        value="What role should be given to new members when they join?\n"
+                              "Type: `!set-auto-role @RoleName` (mention the role)",
+                        inline=False
+                    )
+                    await message.channel.send(embed=embed)
+                    session['step'] = 'set_auto_role'
+                    session['settings']['wants_auto_roles'] = True
+                    
+                elif content in ['no', 'n']:
+                    session['settings']['wants_auto_roles'] = False
+                    await self.finalize_setup(message, session)
+                else:
+                    await message.channel.send("Please reply with `yes` or `no`")
+
+            elif step == 'set_auto_role':
+                if content.startswith('!set-auto-role'):
+                    role_mention = message.content.split(maxsplit=1)[-1]
+                    if role_mention.startswith('<@&') and role_mention.endswith('>'):
+                        role_id = int(role_mention[3:-1])
+                        role = guild.get_role(role_id)
+                        if role:
+                            session['settings']['auto_role'] = role_id
+                            await message.channel.send(f"✅ Auto role set to {role.mention}")
+                            await self.finalize_setup(message, session)
+                        else:
+                            await message.channel.send("❌ Role not found. Please try again.")
+                    else:
+                        await message.channel.send("❌ Please mention the role like this: `!set-auto-role @Member`")
+                else:
+                    await message.channel.send("Please use the command: `!set-auto-role @RoleName`")
+
         except Exception as e:
-            logger.error(f"Error in !setup_done command: {e}")
-            await ctx.send("❌ An error occurred while completing setup.")
+            logger.error(f"Error in setup step {step}: {e}")
+            await message.channel.send("❌ An error occurred. Please try again or contact support.")
+
+    async def move_to_next_step(self, message, session, next_step):
+        """Move to the next step in setup"""
+        session['step'] = next_step
+        
+        if next_step == 'logging_channel':
+            embed = discord.Embed(
+                title="Step 2: Logging Channel",
+                description="Would you like to enable a logging channel? This will log general bot activities and events.",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="Reply with:",
+                value="`yes` or `no`",
+                inline=False
+            )
+            await message.channel.send(embed=embed)
+            
+        elif next_step == 'auto_roles':
+            embed = discord.Embed(
+                title="Step 3: Auto Roles",
+                description="Would you like to enable auto roles? New members will automatically receive a specified role when they join.",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="Reply with:",
+                value="`yes` or `no`",
+                inline=False
+            )
+            await message.channel.send(embed=embed)
+
+    async def finalize_setup(self, message, session):
+        """Complete the setup process"""
+        try:
+            # Save all settings
+            settings = session['settings']
+            guild_id = message.guild.id
+            
+            # Save to server settings
+            saved_settings = {}
+            if settings.get('punishments_channel'):
+                saved_settings['punishments'] = settings['punishments_channel']
+            if settings.get('log_channel'):
+                saved_settings['bot-logs'] = settings['log_channel']
+            if settings.get('auto_role'):
+                saved_settings['auto_role'] = settings['auto_role']
+                
+            saved_settings['bot-setup'] = message.channel.id
+            
+            self.server_settings.set_server_channels(guild_id, saved_settings)
+            self.server_settings.set_setup_complete(guild_id)
+            
+            # Create final summary
+            embed = discord.Embed(
+                title="🎉 Setup Complete!",
+                description="Your server has been successfully configured!",
+                color=discord.Color.gold()
+            )
+            
+            summary = []
+            if settings.get('wants_punishments'):
+                summary.append(f"✅ Punishments channel: <#{settings['punishments_channel']}>")
+            if settings.get('wants_logging'):
+                summary.append(f"✅ Logging channel: <#{settings['log_channel']}>")
+            if settings.get('wants_auto_roles'):
+                summary.append(f"✅ Auto role: <@&{settings['auto_role']}>")
+                
+            if summary:
+                embed.add_field(
+                    name="Configured Features:",
+                    value="\n".join(summary),
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="Next Steps:",
+                value="• Try using `!help` to see all available commands\n"
+                      "• Use `!setprefix <prefix>` to change the command prefix\n"
+                      "• Test moderation commands like `!mute`, `!warn`, `!kick`\n"
+                      "• Check the documentation for advanced features",
+                inline=False
+            )
+            
+            embed.set_footer(text="Thank you for choosing our moderation bot! 🚀")
+            await message.channel.send(embed=embed)
+            
+            # Clean up session
+            del self.setup_sessions[guild_id]
+            logger.info(f"Setup completed for {message.guild.name}")
+            
+        except Exception as e:
+            logger.error(f"Error finalizing setup: {e}")
+            await message.channel.send("❌ An error occurred while saving settings. Please contact support.")
+
+    @commands.command(name="setup-status")
+    @commands.has_permissions(administrator=True)
+    async def setup_status(self, ctx):
+        """Check the current setup status"""
+        if self.server_settings.is_setup_complete(ctx.guild.id):
+            embed = discord.Embed(
+                title="✅ Setup Status",
+                description="Your server setup is complete!",
+                color=discord.Color.green()
+            )
+            
+            settings = self.server_settings.get_server_channels(ctx.guild.id)
+            if settings:
+                config_list = []
+                for key, value in settings.items():
+                    if key == 'punishments' and value:
+                        config_list.append(f"• Punishments: <#{value}>")
+                    elif key == 'bot-logs' and value:
+                        config_list.append(f"• Logging: <#{value}>")
+                    elif key == 'auto_role' and value:
+                        config_list.append(f"• Auto Role: <@&{value}>")
+                        
+                if config_list:
+                    embed.add_field(
+                        name="Current Configuration:",
+                        value="\n".join(config_list),
+                        inline=False
+                    )
+        else:
+            embed = discord.Embed(
+                title="⚠️ Setup Incomplete",
+                description="Your server setup is not complete. Use `!bot-setup` to start the configuration process.",
+                color=discord.Color.orange()
+            )
+            
+        await ctx.send(embed=embed)
