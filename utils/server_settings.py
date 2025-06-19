@@ -36,3 +36,9 @@ class ServerSettings:
         settings = self.get_settings(guild_id)
         settings['setup_complete'] = True
         self.set_settings(guild_id, settings)
+
+    def set_server_channels(self, guild_id, channels):
+        """Set multiple channel settings at once"""
+        settings = self.get_settings(guild_id)
+        settings.update(channels)
+        self.set_settings(guild_id, settings)

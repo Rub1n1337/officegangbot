@@ -312,6 +312,69 @@ class GuildSetup(commands.Cog):
             )
             await message.channel.send(embed=embed)
 
+    @commands.command(name="set-punishment-channel")
+    @commands.has_permissions(administrator=True)
+    async def set_punishment_channel(self, ctx, channel: discord.TextChannel):
+        """Set the punishment channel for this server"""
+        guild_id = ctx.guild.id
+        
+        # Check if this is being used during setup
+        if guild_id in self.setup_sessions:
+            session = self.setup_sessions[guild_id]
+            if session['step'] == 'set_punishment_channel':
+                session['settings']['punishments_channel'] = channel.id
+                await ctx.send(f"✅ Punishments channel set to {channel.mention}")
+                await self.move_to_next_step(ctx.message, session, 'logging_channel')
+                return
+        
+        # Regular usage outside of setup
+        settings = self.server_settings.get_settings(guild_id)
+        settings['punishments'] = channel.id
+        self.server_settings.set_settings(guild_id, settings)
+        await ctx.send(f"✅ Punishments channel updated to {channel.mention}")
+
+    @commands.command(name="set-log-channel")
+    @commands.has_permissions(administrator=True)
+    async def set_log_channel(self, ctx, channel: discord.TextChannel):
+        """Set the log channel for this server"""
+        guild_id = ctx.guild.id
+        
+        # Check if this is being used during setup
+        if guild_id in self.setup_sessions:
+            session = self.setup_sessions[guild_id]
+            if session['step'] == 'set_log_channel':
+                session['settings']['log_channel'] = channel.id
+                await ctx.send(f"✅ Log channel set to {channel.mention}")
+                await self.move_to_next_step(ctx.message, session, 'auto_roles')
+                return
+        
+        # Regular usage outside of setup
+        settings = self.server_settings.get_settings(guild_id)
+        settings['bot-logs'] = channel.id
+        self.server_settings.set_settings(guild_id, settings)
+        await ctx.send(f"✅ Log channel updated to {channel.mention}")
+
+    @commands.command(name="set-auto-role")
+    @commands.has_permissions(administrator=True)
+    async def set_auto_role(self, ctx, role: discord.Role):
+        """Set the auto role for new members"""
+        guild_id = ctx.guild.id
+        
+        # Check if this is being used during setup
+        if guild_id in self.setup_sessions:
+            session = self.setup_sessions[guild_id]
+            if session['step'] == 'set_auto_role':
+                session['settings']['auto_role'] = role.id
+                await ctx.send(f"✅ Auto role set to {role.mention}")
+                await self.finalize_setup(ctx.message, session)
+                return
+        
+        # Regular usage outside of setup
+        settings = self.server_settings.get_settings(guild_id)
+        settings['auto_role'] = role.id
+        self.server_settings.set_settings(guild_id, settings)
+        await ctx.send(f"✅ Auto role updated to {role.mention}")
+
     async def finalize_setup(self, message, session):
         """Complete the setup process"""
         try:
