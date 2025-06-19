@@ -498,7 +498,7 @@ async def unban(ctx, *, member):
             return
 
 @bot.command()
-async def warn(ctx, member: discord.Member, *, reason):
+async def warn(ctx, member: discord.Member, *, reason="No reason provided"):
     # Get server-specific punishment channel
     punishment_channel_id = bot.server_settings.get_punishment_channel(ctx.guild.id)
     if not punishment_channel_id:
