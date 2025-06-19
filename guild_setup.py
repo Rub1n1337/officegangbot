@@ -314,9 +314,26 @@ class GuildSetup(commands.Cog):
 
     @commands.command(name="set-punishment-channel")
     @commands.has_permissions(administrator=True)
-    async def set_punishment_channel(self, ctx, channel: discord.TextChannel):
+    async def set_punishment_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the punishment channel for this server"""
         guild_id = ctx.guild.id
+        
+        # If no channel provided, try to parse from message content
+        if channel is None:
+            # Extract channel mention from message content
+            parts = ctx.message.content.split()
+            if len(parts) >= 2:
+                channel_mention = parts[-1]
+                if channel_mention.startswith('<#') and channel_mention.endswith('>'):
+                    try:
+                        channel_id = int(channel_mention[2:-1])
+                        channel = ctx.guild.get_channel(channel_id)
+                    except ValueError:
+                        pass
+            
+            if channel is None:
+                await ctx.send("❌ Please provide a valid channel. Usage: `!set-punishment-channel #channel-name`")
+                return
         
         # Check if this is being used during setup
         if guild_id in self.setup_sessions:
@@ -335,9 +352,26 @@ class GuildSetup(commands.Cog):
 
     @commands.command(name="set-log-channel")
     @commands.has_permissions(administrator=True)
-    async def set_log_channel(self, ctx, channel: discord.TextChannel):
+    async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the log channel for this server"""
         guild_id = ctx.guild.id
+        
+        # If no channel provided, try to parse from message content
+        if channel is None:
+            # Extract channel mention from message content
+            parts = ctx.message.content.split()
+            if len(parts) >= 2:
+                channel_mention = parts[-1]
+                if channel_mention.startswith('<#') and channel_mention.endswith('>'):
+                    try:
+                        channel_id = int(channel_mention[2:-1])
+                        channel = ctx.guild.get_channel(channel_id)
+                    except ValueError:
+                        pass
+            
+            if channel is None:
+                await ctx.send("❌ Please provide a valid channel. Usage: `!set-log-channel #channel-name`")
+                return
         
         # Check if this is being used during setup
         if guild_id in self.setup_sessions:
@@ -356,9 +390,26 @@ class GuildSetup(commands.Cog):
 
     @commands.command(name="set-auto-role")
     @commands.has_permissions(administrator=True)
-    async def set_auto_role(self, ctx, role: discord.Role):
+    async def set_auto_role(self, ctx, role: discord.Role = None):
         """Set the auto role for new members"""
         guild_id = ctx.guild.id
+        
+        # If no role provided, try to parse from message content
+        if role is None:
+            # Extract role mention from message content
+            parts = ctx.message.content.split()
+            if len(parts) >= 2:
+                role_mention = parts[-1]
+                if role_mention.startswith('<@&') and role_mention.endswith('>'):
+                    try:
+                        role_id = int(role_mention[3:-1])
+                        role = ctx.guild.get_role(role_id)
+                    except ValueError:
+                        pass
+            
+            if role is None:
+                await ctx.send("❌ Please provide a valid role. Usage: `!set-auto-role @role-name`")
+                return
         
         # Check if this is being used during setup
         if guild_id in self.setup_sessions:
@@ -437,6 +488,27 @@ class GuildSetup(commands.Cog):
         except Exception as e:
             logger.error(f"Error finalizing setup: {e}")
             await message.channel.send("❌ An error occurred while saving settings. Please contact support.")
+
+    @commands.command(name="set_punishment_rules", aliases=["set-punishment-rules"])
+    @commands.has_permissions(administrator=True)
+    async def set_punishment_rules(self, ctx):
+        """Configure automatic punishment rules"""
+        embed = discord.Embed(
+            title="⚙️ Punishment Rules Configuration",
+            description="Current punishment rules are set to default:\n\n"
+                       "• **1st Warning**: Warning logged\n"
+                       "• **2nd Warning**: Warning logged\n"
+                       "• **3rd Warning**: Automatic ban\n\n"
+                       "These rules are automatically enforced when using the `!warn` command.",
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="Future Features",
+            value="Custom punishment rules will be available in a future update. "
+                  "For now, the 3-strike warning system is active.",
+            inline=False
+        )
+        await ctx.send(embed=embed)
 
     @commands.command(name="setup-status")
     @commands.has_permissions(administrator=True)
