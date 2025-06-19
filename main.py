@@ -8,6 +8,8 @@ import logging
 import json
 from datetime import datetime
 from pathlib import Path
+from guild_setup import GuildSetup
+bot.add_cog(GuildSetup(bot))
 
 # Enhanced logging configuration
 logging.basicConfig(
