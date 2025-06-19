@@ -9,7 +9,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 from guild_setup import GuildSetup
-bot.add_cog(GuildSetup(bot))
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -316,6 +315,9 @@ class BrawlStarsBot(commands.Bot):
 
 bot = BrawlStarsBot()
 
+# Add the GuildSetup cog
+bot.add_cog(GuildSetup(bot))
+
 # Register setup_done command
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -511,6 +513,7 @@ async def warn(ctx, member: discord.Member, *, reason):
         return
 
     db_path = bot.db_path
+    guild_name = f"warnings_{ctx.guild.id}"
     with sqlite3.connect(db_path) as db:
         cur = db.cursor()
         cur.execute(f'CREATE TABLE IF NOT EXISTS {guild_name} (userid INT, count INT)')

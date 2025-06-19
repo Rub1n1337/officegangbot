@@ -27,3 +27,12 @@ class ServerSettings:
         if str(guild_id) in self.data:
             del self.data[str(guild_id)]
             self.save()
+
+    def is_setup_complete(self, guild_id):
+        settings = self.get_settings(guild_id)
+        return settings.get('setup_complete', False)
+
+    def set_setup_complete(self, guild_id):
+        settings = self.get_settings(guild_id)
+        settings['setup_complete'] = True
+        self.set_settings(guild_id, settings)
