@@ -218,37 +218,73 @@ class BrawlStarsBot(commands.Bot):
 
         if target_channel:
             try:
-                setup_embed = discord.Embed(
-                    title="🔧 Server Setup Guide",
-                    description="Welcome! Please follow these setup instructions carefully.",
+                # Main welcome embed
+                welcome_embed = discord.Embed(
+                    title="🎉 Hi! Thanks for adding me!",
+                    description=f"Hello {guild.owner.mention if guild.owner else 'Server Owner'} and welcome to **{guild.name}**!\n\nI'm here to help you moderate your server effectively.",
                     color=discord.Color.blue()
                 )
 
-                required_channels = {
-                    "punishments": "Logs all moderation actions (mutes, kicks, bans, etc.)",
-                    "bot-setup": "Configuration channel for bot settings (admin-only)"
-                }
+                # Setup instructions
+                setup_embed = discord.Embed(
+                    title="🔧 Quick Setup Required",
+                    description="To get started, please follow these simple steps:",
+                    color=discord.Color.green()
+                )
 
-                channels_text = "\n".join(f"• `{name}`: {desc}" for name, desc in required_channels.items())
                 setup_embed.add_field(
-                    name="Required Channels",
-                    value=f"{channels_text}\n\n**Note:** Only server owner should perform the setup!",
+                    name="📝 Step 1: Create Setup Channel",
+                    value="Create a text channel named `#bot-setup`\n*(Only server owner/admins should have access)*",
                     inline=False
                 )
 
                 setup_embed.add_field(
-                    name="Setup Instructions",
-                    value="1. Create the required channels listed above\n"
-                          "2. Make sure bot has permissions to send messages\n"
-                          "3. Run `!setup_done` when channels are ready",
+                    name="⚙️ Step 2: Start Configuration", 
+                    value="In the `#bot-setup` channel, type:\n`!bot_setup` or `!botsetup`",
                     inline=False
                 )
 
-                help_embed = self.generate_help_embed()
+                setup_embed.add_field(
+                    name="👑 Important Note",
+                    value="**Only the server owner or administrators should run the setup!**",
+                    inline=False
+                )
 
-                await target_channel.send("👋 **Hello! I'm your new moderation bot!**")
+                # Permissions embed
+                perms_embed = discord.Embed(
+                    title="🔒 Required Permissions",
+                    description="For the bot to function properly, please ensure I have these permissions:",
+                    color=discord.Color.orange()
+                )
+
+                permissions_list = [
+                    "• **Manage Channels** - Create required channels",
+                    "• **Manage Roles** - Handle mute/member roles", 
+                    "• **Kick Members** - Moderation actions",
+                    "• **Ban Members** - Moderation actions",
+                    "• **Send Messages** - Bot communication",
+                    "• **Manage Messages** - Message moderation",
+                    "• **Read Message History** - Command processing"
+                ]
+
+                perms_embed.add_field(
+                    name="📋 Permission List",
+                    value="\n".join(permissions_list),
+                    inline=False
+                )
+
+                # Warning embed
+                warning_embed = discord.Embed(
+                    title="⚠️ Important Notice",
+                    description="**The bot will not respond to commands until the initial setup is complete!**\n\nAfter setup, all moderation commands will be available.",
+                    color=discord.Color.red()
+                )
+
+                # Send all embeds
+                await target_channel.send(embed=welcome_embed)
                 await target_channel.send(embed=setup_embed)
-                await target_channel.send("📚 **Available Commands:**", embed=help_embed)
+                await target_channel.send(embed=perms_embed)
+                await target_channel.send(embed=warning_embed)
 
                 logger.info(f"Sent welcome message to {guild.name} in #{target_channel.name}")
             except Exception as e:
