@@ -183,6 +183,8 @@ class GuildSetup(commands.Cog):
 
             elif step == 'set_punishment_channel':
                 if content.startswith('!set-punishment-channel'):
+                    # Prevent the command from being processed by the command handler as well
+                    session['processing'] = True
                     channel_mention = message.content.split()[-1]
                     if channel_mention.startswith('<#') and channel_mention.endswith('>'):
                         channel_id = int(channel_mention[2:-1])
@@ -195,6 +197,7 @@ class GuildSetup(commands.Cog):
                             await message.channel.send("❌ Channel not found. Please try again.")
                     else:
                         await message.channel.send("❌ Please mention the channel like this: `!set-punishment-channel #punishments`")
+                    session['processing'] = False
                 else:
                     await message.channel.send("Please use the command: `!set-punishment-channel #punishments`")
 
@@ -318,6 +321,12 @@ class GuildSetup(commands.Cog):
         """Set the punishment channel for this server"""
         guild_id = ctx.guild.id
         
+        # Check if this is being used during setup - if so, skip command processing
+        if guild_id in self.setup_sessions:
+            session = self.setup_sessions[guild_id]
+            if session['step'] == 'set_punishment_channel' and session.get('processing', False):
+                return  # Already being processed by message handler
+        
         # If no channel provided, try to parse from message content
         if channel is None:
             # Extract channel mention from message content
@@ -335,13 +344,11 @@ class GuildSetup(commands.Cog):
                 await ctx.send("❌ Please provide a valid channel. Usage: `!set-punishment-channel #channel-name`")
                 return
         
-        # Check if this is being used during setup
+        # Check if this is being used during setup (normal flow)
         if guild_id in self.setup_sessions:
             session = self.setup_sessions[guild_id]
             if session['step'] == 'set_punishment_channel':
-                session['settings']['punishments_channel'] = channel.id
-                await ctx.send(f"✅ Punishments channel set to {channel.mention}")
-                await self.move_to_next_step(ctx.message, session, 'logging_channel')
+                # This will be handled by the message handler, don't process here
                 return
         
         # Regular usage outside of setup
