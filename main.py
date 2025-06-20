@@ -72,7 +72,7 @@ class ServerSettings:
         channels = self.get_server_channels(guild_id)
         return channels.get('bot-setup')
 
-    defis_setup_complete(self, guild_id):
+    def is_setup_complete(self, guild_id):
         channels = self.get_server_channels(guild_id)
         return all(key in channels for key in ['punishments', 'bot-setup'])
 
