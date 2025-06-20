@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from guild_setup import GuildSetup
+from welcome_system import WelcomeSystem
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -90,6 +91,7 @@ class BrawlStarsBot(commands.Bot):
     async def setup_hook(self):
         self.init_database()
         await self.add_cog(GuildSetup(self))
+        await self.add_cog(WelcomeSystem(self))
         logger.info('Database initialized and cogs loaded')
 
     def init_database(self):
@@ -397,13 +399,7 @@ async def log_action(guild, message):
         await log_channel.send(message)
     logger.info(message)
 
-@bot.event
-async def on_member_join(member):
-    welcome_message = f'Welcome {member.mention}!'
-    await member.send('Welcome to the server!')
-
-    if welcome_channel := discord.utils.get(member.guild.channels, name=WELCOME_CHANNEL_NAME):
-        await welcome_channel.send(welcome_message)
+# Welcome messages are now handled by the WelcomeSystem cog
 
 @bot.command()
 @commands.has_permissions(administrator=True)
