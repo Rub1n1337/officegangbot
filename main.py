@@ -323,25 +323,8 @@ class BrawlStarsBot(commands.Bot):
         await ctx.send("✅ Setup completed successfully! Bot is now fully configured for this server.")
 
     async def on_guild_join(self, guild):
-        try:
-            # Check if bot has necessary permissions
-            if not guild.me.guild_permissions.manage_channels:
-                if guild.system_channel:
-                    await guild.system_channel.send("I need 'Manage Channels' permission to create required channels!")
-                return
-
-            # Create channels
-            await self.create_punishments_channel(guild)
-            await self.create_bot_setup_channel(guild)
-
-            # Notify about successful creation
-            if guild.system_channel:
-                await guild.system_channel.send("Required channels have been created!")
-
-        except Exception as e:
-            logger.error(f"Error in on_guild_join for {guild.name}: {e}")
-            if guild.system_channel:
-                await guild.system_channel.send("Failed to create required channels. Please check bot permissions.")
+        # Guild join handling is now managed by the GuildSetup cog
+        logger.info(f"Bot joined guild: {guild.name} (ID: {guild.id})")
 
     # Force create channels command
     @commands.command()
@@ -395,24 +378,11 @@ class BrawlStarsBot(commands.Bot):
         except discord.HTTPException as e:
             logger.error(f"Failed to create '{channel_name}' channel in {guild.name}: {e}")
 
-    @commands.command(aliases=['botsetup', 'bot_setup'])
+    @commands.command()
     async def help(self, ctx, command_name: str = None):
-        """Show help information or start bot setup"""
-        # If called as botsetup/bot_setup, redirect to setup
-        if ctx.invoked_with in ['botsetup', 'bot_setup']:
-            if ctx.channel.name == 'bot-setup' and ctx.author.guild_permissions.administrator:
-                # This would typically call the setup function from GuildSetup cog
-                await ctx.send("🔧 **Setup system is being prepared...** Please make sure you have the GuildSetup cog loaded for the full setup experience!")
-                return
-            elif ctx.channel.name != 'bot-setup':
-                await ctx.send("❌ Setup commands can only be used in the `#bot-setup` channel!")
-                return
-            elif not ctx.author.guild_permissions.administrator:
-                await ctx.send("❌ Only administrators can run setup commands!")
-                return
-
+        """Show help information"""
         # Check if setup is complete for regular help
-        if self._requires_setup(ctx.guild.id) and ctx.invoked_with == 'help':
+        if self._requires_setup(ctx.guild.id):
             await self._send_setup_required_message(ctx)
             return
 
