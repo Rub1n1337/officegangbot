@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from guild_setup import GuildSetup
 from welcome_system import WelcomeSystem
+from health_monitor import HealthMonitor
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -92,14 +93,28 @@ class BrawlStarsBot(commands.Bot):
         self.init_database()
         await self.add_cog(GuildSetup(self))
         await self.add_cog(WelcomeSystem(self))
-        logger.info('Database initialized and cogs loaded')
+        
+        # Start health monitoring
+        self.health_monitor = HealthMonitor(self)
+        self.health_monitor.start_monitoring()
+        
+        logger.info('Database initialized, cogs loaded, and health monitoring started')
 
     def init_database(self):
-        with sqlite3.connect(self.db_path) as db:
-            cur = db.cursor()
-            cur.execute('''CREATE TABLE IF NOT EXISTS warnings 
-                          (userid INTEGER, count INTEGER, guild_id INTEGER)''')
-            db.commit()
+        try:
+            with sqlite3.connect(self.db_path, timeout=30.0) as db:
+                db.execute('PRAGMA journal_mode=WAL')  # Better concurrency
+                db.execute('PRAGMA synchronous=NORMAL')  # Better performance
+                db.execute('PRAGMA cache_size=10000')  # Increase cache
+                db.execute('PRAGMA temp_store=memory')  # Use memory for temp
+                
+                cur = db.cursor()
+                cur.execute('''CREATE TABLE IF NOT EXISTS warnings 
+                              (userid INTEGER, count INTEGER, guild_id INTEGER)''')
+                db.commit()
+                logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Database initialization error: {e}")
 
     async def on_ready(self):
         await self.change_presence(
@@ -590,4 +605,17 @@ async def send_welcome(ctx):
 
 # Start the webserver and run the bot
 keep_alive()
-bot.run(config.TOKEN)
+
+# Enhanced bot startup with error handling
+if __name__ == "__main__":
+    try:
+        logger.info("Starting Discord bot...")
+        bot.run(config.TOKEN, log_handler=None)  # Disable discord.py's default logging
+    except discord.LoginFailure:
+        logger.error("Failed to login - Invalid token!")
+    except discord.ConnectionClosed:
+        logger.error("Connection to Discord was closed!")
+    except Exception as e:
+        logger.error(f"Unexpected error starting bot: {e}")
+        import traceback
+        logger.error(traceback.format_exc())

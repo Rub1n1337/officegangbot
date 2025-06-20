@@ -1,21 +1,49 @@
 
 from flask import Flask, jsonify
 from threading import Thread
+import logging
+import time
+
+# Suppress Flask's default logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return jsonify({"status": "Bot is running", "code": 200})
+    return jsonify({
+        "status": "Bot is running", 
+        "timestamp": time.time(),
+        "uptime": time.time() - start_time,
+        "code": 200
+    })
 
 @app.route('/health')
 def health():
-    return jsonify({"status": "healthy", "code": 200})
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": time.time(),
+        "uptime": time.time() - start_time,
+        "code": 200
+    })
+
+@app.route('/ping')
+def ping():
+    return jsonify({"status": "pong", "timestamp": time.time()})
+
+start_time = time.time()
 
 def run():
-    app.run(host='0.0.0.0', port=8080)
+    try:
+        app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"Flask server error: {e}")
 
 def keep_alive():
+    print("Starting keep-alive webserver on port 8080...")
     server = Thread(target=run)
     server.daemon = True
     server.start()
+    print("Keep-alive webserver started successfully!")
+    return server
