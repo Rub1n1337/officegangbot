@@ -183,9 +183,6 @@ class ModeratorBot(commands.Bot):
     def _init_database(self):
         """Initialize SQLite database"""
         try:
-            # Ensure database directory exists
-            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-            
             with sqlite3.connect(self.db_path, timeout=30.0) as db:
                 db.execute('PRAGMA journal_mode=WAL')
                 db.execute('PRAGMA synchronous=NORMAL')
@@ -205,22 +202,6 @@ class ModeratorBot(commands.Bot):
                 logger.info("Database initialized successfully")
         except Exception as e:
             logger.error(f"Database initialization error: {e}")
-            # Create a fallback in-memory database
-            try:
-                self.db_path = ':memory:'
-                with sqlite3.connect(self.db_path) as db:
-                    db.execute('''
-                        CREATE TABLE warnings (
-                            user_id INTEGER,
-                            guild_id INTEGER,
-                            count INTEGER,
-                            PRIMARY KEY (user_id, guild_id)
-                        )
-                    ''')
-                    db.commit()
-                logger.warning("Using in-memory database as fallback")
-            except Exception as fallback_error:
-                logger.error(f"Failed to create fallback database: {fallback_error}")
 
     async def on_ready(self):
         """Bot ready event"""
@@ -442,6 +423,9 @@ class ModeratorBot(commands.Bot):
     @commands.has_permissions(moderate_members=True)
     async def mute(self, ctx, member: discord.Member, duration: int, *, reason: str):
         """Mute a member for specified duration (in minutes)"""
+        if not self.server_settings.is_setup_complete(ctx.guild.id):
+            await ctx.send("❌ Server setup not complete. Please run `!setup` first.")
+            return
             
         try:
             # Use Discord's built-in timeout feature
@@ -738,39 +722,6 @@ class ModeratorBot(commands.Bot):
             logger.info(f"Welcome message sent for {member} in {member.guild.name}")
         except Exception as e:
             logger.error(f"Failed to send welcome message: {e}")
-
-    async def on_command_error(self, ctx, error):
-        """Handle command errors"""
-        if isinstance(error, commands.CommandNotFound):
-            return  # Ignore unknown commands
-        elif isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ You don't have permission to use this command.")
-        elif isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(f"❌ Missing required argument. Use `{ctx.prefix}help {ctx.command}` for usage.")
-        elif isinstance(error, commands.BadArgument):
-            await ctx.send(f"❌ Invalid argument. Use `{ctx.prefix}help {ctx.command}` for usage.")
-        elif isinstance(error, commands.BotMissingPermissions):
-            await ctx.send("❌ I don't have the required permissions to execute this command.")
-        else:
-            logger.error(f"Command error in {ctx.command}: {error}")
-            await ctx.send("❌ An error occurred while executing the command.")
-
-    @commands.command()
-    async def ping(self, ctx):
-        """Test if the bot is responding"""
-        await ctx.send("🏓 Pong! Bot is working!")
-
-    @commands.command()
-    async def test(self, ctx):
-        """Test command to verify bot functionality"""
-        embed = self.embed_helper.create_success_embed(
-            "✅ Bot Test",
-            "All systems operational!",
-            prefix=f"Current prefix: `{await self._get_prefix(self, ctx.message)}`",
-            permissions="Bot has basic permissions",
-            database="Database connection: ✅"
-        )
-        await ctx.send(embed=embed)
 
     @commands.command()
     async def help(self, ctx, command_name: str = None):
