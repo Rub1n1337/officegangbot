@@ -444,21 +444,22 @@ class GuildSetup(commands.Cog):
             settings = session['settings']
             guild_id = message.guild.id
             
-            # Save to server settings using the correct methods
-            saved_settings = {
-                'bot-setup': message.channel.id,
-                'setup_complete': True
-            }
+            # Get existing settings first
+            existing_settings = self.server_settings.get_settings(guild_id)
+            
+            # Update with new settings
+            existing_settings['bot-setup'] = message.channel.id
+            existing_settings['setup_complete'] = True
             
             if settings.get('punishments_channel'):
-                saved_settings['punishments'] = settings['punishments_channel']
+                existing_settings['punishments'] = settings['punishments_channel']
             if settings.get('log_channel'):
-                saved_settings['bot-logs'] = settings['log_channel']
+                existing_settings['bot-logs'] = settings['log_channel']
             if settings.get('auto_role'):
-                saved_settings['auto_role'] = settings['auto_role']
+                existing_settings['auto_role'] = settings['auto_role']
             
-            # Use the server_settings instance to save
-            self.server_settings.set_settings(guild_id, saved_settings)
+            # Save the updated settings
+            self.server_settings.set_settings(guild_id, existing_settings)
             
             # Create final summary
             embed = discord.Embed(
