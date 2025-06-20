@@ -1,3 +1,4 @@
+
 import discord
 from discord.ext import commands
 from webserver import keep_alive
@@ -6,11 +7,11 @@ import sqlite3
 import asyncio
 import logging
 import json
+import time
 from datetime import datetime
 from pathlib import Path
-from guild_setup import GuildSetup
-from welcome_system import WelcomeSystem
-from health_monitor import HealthMonitor
+import threading
+import psutil
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -20,602 +21,751 @@ logging.basicConfig(
 )
 logger = logging.getLogger('BrawlStarsBot')
 
-# Constants
-MUTE_ROLE_ID = 876508795562504252
-MEMBER_ROLE_ID = 873196004718034964
-LOG_CHANNEL_ID = 876507449362898974
-WELCOME_CHANNEL_NAME = 'велкам-👋'
-REACTION_MESSAGE_ID = 874752473405988874
-
 class ServerSettings:
-    def __init__(self, file_path='server_setups.json'):
+    """Handles all server-specific settings and configurations"""
+    
+    def __init__(self, file_path='server_settings.json'):
         self.file_path = Path(file_path)
         self.settings = self._load_settings()
         self.default_prefix = '!'
 
     def _load_settings(self):
+        """Load settings from JSON file"""
         if self.file_path.exists():
-            with open(self.file_path, 'r') as f:
-                return json.load(f)
+            try:
+                with open(self.file_path, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, FileNotFoundError):
+                logger.error("Error loading settings file, using defaults")
         return {}
 
-    def save_settings(self):
-        with open(self.file_path, 'w') as f:
-            json.dump(self.settings, f, indent=2)
+    def _save_settings(self):
+        """Save settings to JSON file"""
+        try:
+            with open(self.file_path, 'w') as f:
+                json.dump(self.settings, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving settings: {e}")
 
-    def set_server_channels(self, guild_id, channels):
+    def get_guild_settings(self, guild_id):
+        """Get all settings for a guild"""
         guild_id = str(guild_id)
         if guild_id not in self.settings:
-            self.settings[guild_id] = {'prefix': self.default_prefix}
-        self.settings[guild_id].update(channels)
-        self.save_settings()
+            self.settings[guild_id] = {
+                'prefix': self.default_prefix,
+                'setup_complete': False
+            }
+            self._save_settings()
+        return self.settings[guild_id]
+
+    def update_guild_settings(self, guild_id, **kwargs):
+        """Update guild settings"""
+        guild_id = str(guild_id)
+        settings = self.get_guild_settings(guild_id)
+        settings.update(kwargs)
+        self._save_settings()
 
     def get_prefix(self, guild_id):
-        guild_settings = self.settings.get(str(guild_id), {})
-        return guild_settings.get('prefix', self.default_prefix)
+        """Get command prefix for guild"""
+        return self.get_guild_settings(guild_id).get('prefix', self.default_prefix)
 
-    def set_prefix(self, guild_id, prefix):
-        guild_id = str(guild_id)
-        if guild_id not in self.settings:
-            self.settings[guild_id] = {}
-        self.settings[guild_id]['prefix'] = prefix
-        self.save_settings()
-
-    def get_server_channels(self, guild_id):
-        return self.settings.get(str(guild_id), {})
-
-    def get_punishment_channel(self, guild_id):
-        channels = self.get_server_channels(guild_id)
-        return channels.get('punishments')
-
-    def get_setup_channel(self, guild_id):
-        channels = self.get_server_channels(guild_id)
-        return channels.get('bot-setup')
+    def get_channel(self, guild_id, channel_type):
+        """Get specific channel ID for guild"""
+        return self.get_guild_settings(guild_id).get(f'{channel_type}_channel')
 
     def is_setup_complete(self, guild_id):
-        channels = self.get_server_channels(guild_id)
-        return all(key in channels for key in ['punishments', 'bot-setup'])
+        """Check if guild setup is complete"""
+        return self.get_guild_settings(guild_id).get('setup_complete', False)
 
-class BrawlStarsBot(commands.Bot):
+class HealthMonitor:
+    """Monitors bot health and performance"""
+    
+    def __init__(self, bot, check_interval=300):
+        self.bot = bot
+        self.check_interval = check_interval
+        self.last_heartbeat = time.time()
+        self.is_running = True
+        
+    def start_monitoring(self):
+        """Start health monitoring in background thread"""
+        monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        monitor_thread.start()
+        logger.info("Health monitoring started")
+        
+    def _monitor_loop(self):
+        """Main monitoring loop"""
+        while self.is_running:
+            try:
+                self.last_heartbeat = time.time()
+                
+                if self.bot.is_ready():
+                    logger.info(f"Bot health check: OK - {len(self.bot.guilds)} guilds")
+                else:
+                    logger.warning("Bot health check: Bot not ready")
+                    
+                # Check memory usage
+                memory_percent = psutil.virtual_memory().percent
+                if memory_percent > 80:
+                    logger.warning(f"High memory usage: {memory_percent}%")
+                    
+                time.sleep(self.check_interval)
+                
+            except Exception as e:
+                logger.error(f"Health monitor error: {e}")
+                time.sleep(60)
+
+class EmbedHelper:
+    """Helper class for creating consistent embeds"""
+    
+    @staticmethod
+    def create_success_embed(title, description, **fields):
+        """Create a success embed"""
+        embed = discord.Embed(title=title, description=description, color=discord.Color.green())
+        for name, value in fields.items():
+            embed.add_field(name=name.replace('_', ' ').title(), value=value, inline=False)
+        return embed
+    
+    @staticmethod
+    def create_error_embed(title, description):
+        """Create an error embed"""
+        return discord.Embed(title=title, description=description, color=discord.Color.red())
+    
+    @staticmethod
+    def create_info_embed(title, description, **fields):
+        """Create an info embed"""
+        embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
+        for name, value in fields.items():
+            embed.add_field(name=name.replace('_', ' ').title(), value=value, inline=False)
+        return embed
+
+    @staticmethod
+    def create_punishment_embed(action, member, moderator, reason, duration=None):
+        """Create a punishment logging embed"""
+        embed = discord.Embed(color=discord.Color.orange())
+        embed.add_field(name=f"✅ {action.title()}", value=f"{member.mention} has been {action.lower()}", inline=False)
+        embed.add_field(name="Moderator", value=moderator.mention, inline=True)
+        embed.add_field(name="Reason", value=reason, inline=True)
+        if duration:
+            embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
+        embed.timestamp = datetime.utcnow()
+        return embed
+
+class ModeratorBot(commands.Bot):
+    """Main bot class with enhanced functionality"""
+    
     def __init__(self):
         intents = discord.Intents.all()
         self.server_settings = ServerSettings()
         
-        async def get_prefix(bot, message):
-            if not message.guild:
-                return '!'  # DM messages use default prefix
-            return bot.server_settings.get_prefix(message.guild.id)
-            
-        super().__init__(command_prefix=get_prefix, intents=intents)
-        self.db_path = 'Pocosultoj.db'
+        super().__init__(
+            command_prefix=self._get_prefix,
+            intents=intents,
+            help_command=None  # We'll create a custom help command
+        )
+        
+        self.db_path = 'bot_database.db'
+        self.embed_helper = EmbedHelper()
+        self.setup_sessions = {}  # Track ongoing setup sessions
+
+    async def _get_prefix(self, bot, message):
+        """Dynamic prefix getter"""
+        if not message.guild:
+            return self.server_settings.default_prefix
+        return self.server_settings.get_prefix(message.guild.id)
 
     async def setup_hook(self):
-        self.init_database()
-        await self.add_cog(GuildSetup(self))
-        await self.add_cog(WelcomeSystem(self))
-        
-        # Start health monitoring
+        """Initialize bot components"""
+        self._init_database()
         self.health_monitor = HealthMonitor(self)
         self.health_monitor.start_monitoring()
-        
-        logger.info('Database initialized, cogs loaded, and health monitoring started')
+        logger.info('Bot setup completed')
 
-    def init_database(self):
+    def _init_database(self):
+        """Initialize SQLite database"""
         try:
             with sqlite3.connect(self.db_path, timeout=30.0) as db:
-                db.execute('PRAGMA journal_mode=WAL')  # Better concurrency
-                db.execute('PRAGMA synchronous=NORMAL')  # Better performance
-                db.execute('PRAGMA cache_size=10000')  # Increase cache
-                db.execute('PRAGMA temp_store=memory')  # Use memory for temp
+                db.execute('PRAGMA journal_mode=WAL')
+                db.execute('PRAGMA synchronous=NORMAL')
+                db.execute('PRAGMA cache_size=10000')
+                db.execute('PRAGMA temp_store=memory')
                 
-                cur = db.cursor()
-                cur.execute('''CREATE TABLE IF NOT EXISTS warnings 
-                              (userid INTEGER, count INTEGER, guild_id INTEGER)''')
+                # Create warnings table with guild_id
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS warnings (
+                        user_id INTEGER,
+                        guild_id INTEGER,
+                        count INTEGER,
+                        PRIMARY KEY (user_id, guild_id)
+                    )
+                ''')
                 db.commit()
                 logger.info("Database initialized successfully")
         except Exception as e:
             logger.error(f"Database initialization error: {e}")
 
     async def on_ready(self):
+        """Bot ready event"""
         await self.change_presence(
             status=discord.Status.online,
-            activity=discord.Game('Brawl Stars')
+            activity=discord.Game('Moderating servers')
         )
-        logger.info(f'Bot logged in as {self.user}')
-        print(f'Bot logged in as {self.user}')
-        
-        # Send welcome message to all guilds on startup
-        for guild in self.guilds:
-            await self.send_welcome_message(guild)
-
-    def generate_help_embed(self):
-        embed = discord.Embed(
-            title="Bot Help Guide",
-            description="Welcome! Here's a complete guide to using this bot.",
-            color=discord.Color.blue()
-        )
-
-        # Commands section
-        commands_info = {
-            "!mute @user time reason": "Mutes a user for specified time (in minutes)",
-            "!unmute @user": "Unmutes a user",
-            "!kick @user reason": "Kicks a user from the server",
-            "!ban @user reason": "Bans a user from the server",
-            "!unban username": "Unbans a user",
-            "!warn @user reason": "Warns a user (3 warnings = ban)",
-            "!clear [amount]": "Clears specified amount of messages",
-            "!info @user": "Shows user information",
-            "!setup_channels": "Creates required channels",
-        }
-
-        embed.add_field(
-            name="📋 Available Commands",
-            value="\n".join(f"`{cmd}`: {desc}" for cmd, desc in commands_info.items()),
-            inline=False
-        )
-
-        # Required channels section
-        channels_info = (
-            "**Required Channels:**\n"
-            "• `punishments`: Logs all moderation actions\n"
-            "• `bot setup`: Configuration channel (visible only to admins)\n"
-            "\n**Required Roles:**\n"
-            "• Mute role (ID: 876508795562504252)\n"
-            "• Member role (ID: 873196004718034964)"
-        )
-        embed.add_field(name="⚙️ Server Setup", value=channels_info, inline=False)
-
-        # Bot permissions section
-        permissions_info = (
-            "The bot needs these permissions:\n"
-            "• Manage Channels\n"
-            "• Manage Roles\n"
-            "• Kick Members\n"
-            "• Ban Members\n"
-            "• Send Messages\n"
-            "• Manage Messages"
-        )
-        embed.add_field(name="🔒 Required Permissions", value=permissions_info, inline=False)
-
-        return embed
-
-    async def send_welcome_message(self, guild):
-        target_channel = guild.system_channel
-        if not target_channel or not target_channel.permissions_for(guild.me).send_messages:
-            for channel in guild.text_channels:
-                if channel.permissions_for(guild.me).send_messages:
-                    target_channel = channel
-                    break
-
-        if target_channel:
-            try:
-                setup_embed = discord.Embed(
-                    title="🔧 Server Setup Guide",
-                    description="Welcome! Please follow these setup instructions carefully.",
-                    color=discord.Color.blue()
-                )
-                
-                required_channels = {
-                    "punishments": "Logs all moderation actions (mutes, kicks, bans, etc.)",
-                    "bot-setup": "Configuration channel for bot settings (admin-only)"
-                }
-                
-                channels_text = "\n".join(f"• `{name}`: {desc}" for name, desc in required_channels.items())
-                setup_embed.add_field(
-                    name="Required Channels",
-                    value=f"{channels_text}\n\n**Note:** Only server owner should perform the setup!",
-                    inline=False
-                )
-                
-                setup_embed.add_field(
-                    name="Setup Instructions",
-                    value="1. Create the required channels listed above\n"
-                          "2. Make sure bot has permissions to send messages\n"
-                          "3. Run `!setup_done` when channels are ready",
-                    inline=False
-                )
-
-                help_embed = self.generate_help_embed()
-                
-                await target_channel.send("👋 **Hello! I'm your new moderation bot!**")
-                await target_channel.send(embed=setup_embed)
-                await target_channel.send("📚 **Available Commands:**", embed=help_embed)
-                
-                logger.info(f"Sent welcome message to {guild.name} in #{target_channel.name}")
-            except Exception as e:
-                logger.error(f"Failed to send welcome message in {guild.name}: {e}")
-
-    def get_channel_id(self, guild_id, channel_name):
-        channels = self.server_settings.get_server_channels(guild_id)
-        return channels.get(channel_name)
-
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def setup_done(self, ctx):
-        """Verify and save channel setup"""
-        if ctx.author != ctx.guild.owner:
-            await ctx.send("❌ Only the server owner can complete the setup!")
-            return
-
-        required_channels = {
-            "punishments": None,
-            "bot-setup": None
-        }
-
-        # Verify channels exist
-        for channel in ctx.guild.channels:
-            if channel.name in required_channels:
-                required_channels[channel.name] = channel.id
-
-        # Check if any channels are missing
-        missing = [name for name, id in required_channels.items() if id is None]
-        if missing:
-            await ctx.send(f"❌ Missing required channels: {', '.join(missing)}\nPlease create them and try again.")
-            return
-
-        # Save channel IDs
-        self.server_settings.set_server_channels(ctx.guild.id, required_channels)
-        await ctx.send("✅ Setup completed successfully! Bot is now fully configured for this server.")
+        logger.info(f'Bot ready as {self.user} in {len(self.guilds)} guilds')
+        print(f'Bot ready as {self.user}')
 
     async def on_guild_join(self, guild):
-        try:
-            # Check if bot has necessary permissions
-            if not guild.me.guild_permissions.manage_channels:
-                if guild.system_channel:
-                    await guild.system_channel.send("I need 'Manage Channels' permission to create required channels!")
-                return
+        """Handle joining a new guild"""
+        await self._send_welcome_message(guild)
 
-            # Create channels
-            await self.create_punishments_channel(guild)
-            await self.create_bot_setup_channel(guild)
-            
-            # Notify about successful creation
-            if guild.system_channel:
-                await guild.system_channel.send("Required channels have been created!")
-                
-        except Exception as e:
-            logger.error(f"Error in on_guild_join for {guild.name}: {e}")
-            if guild.system_channel:
-                await guild.system_channel.send("Failed to create required channels. Please check bot permissions.")
-
-    # Force create channels command
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def setup_channels(self, ctx):
-        """Force create/check required channels"""
-        await self.create_punishments_channel(ctx.guild)
-        await self.create_bot_setup_channel(ctx.guild)
-        await ctx.send("Channels setup completed!")
-
-    async def create_punishments_channel(self, guild):
-        existing_channel = discord.utils.get(guild.channels, name="punishments")
-        if not existing_channel:
-            try:
-                await guild.create_text_channel("punishments")
-                logger.info(f"Created 'punishments' channel in {guild.name}")
-            except discord.Forbidden:
-                logger.error(f"Missing permissions to create 'punishments' channel in {guild.name}")
-            except discord.HTTPException as e:
-                logger.error(f"Failed to create 'punishments' channel in {guild.name}: {e}")
-        else:
-            logger.info(f"'punishments' channel already exists in {guild.name}")
-
-    async def create_bot_setup_channel(self, guild):
-        channel_name = "bot setup"
-        existing_channel = discord.utils.get(guild.channels, name=channel_name)
-        channel_number = 1
-
-        while existing_channel:
-            channel_name = f"bot setup {channel_number}"
-            existing_channel = discord.utils.get(guild.channels, name=channel_name)
-            channel_number += 1
-
-        try:
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                guild.owner: discord.PermissionOverwrite(read_messages=True),
-                guild.me: discord.PermissionOverwrite(read_messages=True)
-            }
-
-            # Give administrator role permissions
-            for role in guild.roles:
-                if role.permissions.administrator:
-                     overwrites[role] = discord.PermissionOverwrite(read_messages=True)
-
-            channel = await guild.create_text_channel(channel_name, overwrites=overwrites)
-            logger.info(f"Created '{channel_name}' channel in {guild.name}")
-
-        except discord.Forbidden:
-            logger.error(f"Missing permissions to create '{channel_name}' channel in {guild.name}")
-        except discord.HTTPException as e:
-            logger.error(f"Failed to create '{channel_name}' channel in {guild.name}: {e}")
-
-
-bot = BrawlStarsBot()
-
-# Register setup_done command
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def setup_done(ctx):
-    """Verify and save channel setup"""
-    if ctx.author != ctx.guild.owner:
-        await ctx.send("❌ Only the server owner can complete the setup!")
-        return
-
-    required_channels = {
-        "punishments": None,
-        "bot-setup": None
-    }
-
-    # Verify channels exist
-    for channel in ctx.guild.channels:
-        if channel.name in required_channels:
-            required_channels[channel.name] = channel.id
-
-    # Check if any channels are missing
-    missing = [name for name, id in required_channels.items() if id is None]
-    if missing:
-        await ctx.send(f"❌ Missing required channels: {', '.join(missing)}\nPlease create them and try again.")
-        return
-
-    # Save channel IDs
-    bot.server_settings.set_server_channels(ctx.guild.id, required_channels)
-    
-    # Send success message with configuration instructions
-    setup_channel = ctx.guild.get_channel(required_channels["bot-setup"])
-    if setup_channel:
-        embed = discord.Embed(
-            title="✅ Setup Complete",
-            description="The bot has been successfully configured for this server!",
-            color=discord.Color.green()
-        )
-        embed.add_field(
-            name="Next Steps",
-            value="Use these commands to customize the bot:\n"
-                  "`!set_prefix <prefix>` - Change command prefix\n"
-                  "`!set_autorole <role>` - Set role for new members\n"
-                  "`!set_punishment_rules` - Configure auto-punishment rules",
-            inline=False
-        )
-        await setup_channel.send(embed=embed)
-    
-    await ctx.send("✅ Setup completed successfully! Check the bot-setup channel for configuration instructions.")
-
-@bot.event
-async def on_raw_reaction_add(payload):
-    if payload.message_id != REACTION_MESSAGE_ID:
-        return
-
-    guild = bot.get_guild(payload.guild_id)
-    if not guild:
-        return
-
-    role_name = 'Member' if payload.emoji.name == '✅' else payload.emoji.name
-    if role := discord.utils.get(guild.roles, name=role_name):
-        await payload.member.add_roles(role)
-        await log_action(guild, f"Role '{role.name}' added to {payload.member}")
-
-@bot.event
-async def on_raw_reaction_remove(payload):
-    if payload.message_id != REACTION_MESSAGE_ID:
-        return
-
-    guild = bot.get_guild(payload.guild_id)
-    if not guild or not (member := await guild.fetch_member(payload.user_id)):
-        return
-
-    role_name = 'Member' if payload.emoji.name == '✅' else payload.emoji.name
-    if role := discord.utils.get(guild.roles, name=role_name):
-        await member.remove_roles(role)
-        await log_action(guild, f"Role '{role.name}' removed from {member}")
-
-async def log_action(guild, message):
-    if log_channel := bot.get_channel(LOG_CHANNEL_ID):
-        await log_channel.send(message)
-    logger.info(message)
-
-# Welcome messages are now handled by the WelcomeSystem cog
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def mute(ctx, member: discord.Member, time: int, reason: str):
-    mute_role = discord.utils.get(ctx.guild.roles, id=MUTE_ROLE_ID)
-    member_role = discord.utils.get(ctx.guild.roles, id=MEMBER_ROLE_ID)
-    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
-
-    if not all([mute_role, member_role, channel]):
-        await ctx.send("Configuration error: Missing roles or channels")
-        return
-
-    embed = create_embed(
-        "✅ Muted",
-        member.mention,
-        ctx.author.mention,
-        reason,
-        time
-    )
-
-    await member.remove_roles(member_role)
-    await member.add_roles(mute_role)
-    await channel.send(embed=embed)
-
-    await asyncio.sleep(time * 60)
-
-    if mute_role in member.roles:
-        await member.remove_roles(mute_role)
-        await member.add_roles(member_role)
-        await channel.send(embed=create_unmute_embed(member))
-
-def create_embed(title, member_mention, admin_mention, reason, duration=None):
-    embed = discord.Embed(color=discord.Color.yellow())
-    embed.add_field(name=title, value=f"{member_mention} has been {title.lower()}")
-    embed.add_field(name="Administrator", value=admin_mention, inline=False)
-    embed.add_field(name="Reason", value=reason, inline=False)
-    if duration:
-        embed.add_field(name="Duration", value=f"{duration} minutes", inline=False)
-    return embed
-
-def create_unmute_embed(member):
-    embed = discord.Embed(color=discord.Color.green())
-    embed.add_field(name="✅ Unmuted", value=f"{member.mention} has been unmuted")
-    return embed
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def unmute(ctx, member: discord.Member):
-    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
-    muterole = discord.utils.get(ctx.guild.roles, id=MUTE_ROLE_ID)
-    memberrole = discord.utils.get(ctx.guild.roles, id=MEMBER_ROLE_ID)
-
-    emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
-    emb.add_field(name="✅ Unmuted", value=f"{member.mention} has been unmuted.")
-    emb.add_field(name="Administrator", value=ctx.author.mention, inline=False)
-
-    await member.remove_roles(muterole)
-    await member.add_roles(memberrole)
-    await channel.send(embed=emb)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def kick(ctx, member: discord.Member, *, reason):
-    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
-    await member.kick(reason=reason)
-    emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
-    emb.add_field(name="✅ Kicked", value=f"{member.mention} has been kicked.")
-    await channel.send(embed=emb)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def ban(ctx, member: discord.Member, *, reason):
-    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
-    await member.ban(reason=reason)
-    emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
-    emb.add_field(name="✅ Banned", value=f"{member.mention} has been banned.")
-    await channel.send(embed=emb)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def unban(ctx, *, member):
-    channel = discord.utils.get(ctx.guild.channels, name='punishments') or bot.get_channel(LOG_CHANNEL_ID)
-    banned_users = await ctx.guild.bans()
-
-    for ban_entry in banned_users:
-        user = ban_entry.user
-        if str(user) == member:
-            await ctx.guild.unban(user)
-            emb = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
-            emb.add_field(name="✅ Unbanned", value=f"{member} has been unbanned.")
-            await channel.send(embed=emb)
+    async def _send_welcome_message(self, guild):
+        """Send comprehensive welcome message"""
+        # Find appropriate channel
+        channel = guild.system_channel
+        if not channel or not channel.permissions_for(guild.me).send_messages:
+            for ch in guild.text_channels:
+                if ch.permissions_for(guild.me).send_messages:
+                    channel = ch
+                    break
+        
+        if not channel:
+            logger.error(f"No accessible channel in {guild.name}")
             return
 
-@bot.command()
-async def warn(ctx, member: discord.Member, *, reason=None):
-    # Check if reason is provided
-    if reason is None:
-        await ctx.send("❌ Please provide a reason for the warning.\n**Usage:** `!warn @user <reason>`\n**Example:** `!warn @user spamming in chat`")
-        return
+        try:
+            # Welcome embed
+            welcome_embed = self.embed_helper.create_info_embed(
+                "🎉 Welcome to Your New Moderation Bot!",
+                f"Hello {guild.owner.mention if guild.owner else 'Server Owner'} and welcome to **{guild.name}**!",
+                features="• **Moderation Commands**: Mute, kick, ban, warn members\n"
+                        "• **Auto-Moderation**: 3-strike warning system\n"
+                        "• **Welcome System**: Customizable welcome messages\n"
+                        "• **Server Setup**: Easy configuration system\n"
+                        "• **Message Management**: Bulk delete capabilities",
+                setup_instructions="1. Use `!setup` to configure the bot\n"
+                                  "2. Follow the interactive setup process\n"
+                                  "3. Customize settings as needed"
+            )
+            
+            await channel.send(embed=welcome_embed)
+            logger.info(f"Welcome message sent to {guild.name}")
+            
+        except Exception as e:
+            logger.error(f"Error sending welcome message to {guild.name}: {e}")
+
+    async def _log_to_channel(self, guild, embed, channel_type='punishment'):
+        """Log action to appropriate channel"""
+        channel_id = self.server_settings.get_channel(guild.id, channel_type)
+        if channel_id:
+            channel = guild.get_channel(channel_id)
+            if channel:
+                try:
+                    await channel.send(embed=embed)
+                except Exception as e:
+                    logger.error(f"Failed to log to {channel_type} channel: {e}")
+
+    # === SETUP COMMANDS ===
     
-    # Get server-specific punishment channel
-    punishment_channel_id = bot.server_settings.get_punishment_channel(ctx.guild.id)
-    if not punishment_channel_id:
-        await ctx.send("❌ Server not properly configured. Please ask the server owner to run !setup_done")
-        return
-    
-    channel = ctx.guild.get_channel(punishment_channel_id)
-    if not channel:
-        await ctx.send("❌ Punishment channel not found. Please contact the server owner.")
-        return
+    @commands.command(name='setup')
+    @commands.has_permissions(administrator=True)
+    async def start_setup(self, ctx):
+        """Start interactive server setup"""
+        if ctx.guild.id in self.setup_sessions:
+            await ctx.send("⚠️ Setup already in progress!")
+            return
 
-    db_path = bot.db_path
-    guild_name = f"warnings_{ctx.guild.id}"
-    with sqlite3.connect(db_path) as db:
-        cur = db.cursor()
-        cur.execute(f'CREATE TABLE IF NOT EXISTS {guild_name} (userid INT, count INT)')
-        db.commit()
+        self.setup_sessions[ctx.guild.id] = {
+            'step': 'punishment_channel',
+            'settings': {}
+        }
 
-        warning = cur.execute(f'SELECT * FROM {guild_name} WHERE userid={member.id}').fetchone()
+        embed = self.embed_helper.create_info_embed(
+            "🚀 Server Setup",
+            "Let's configure your server step by step!",
+            step_1="**Punishment Channel Setup**\nWould you like a channel for logging moderation actions?\nReply with `yes` or `no`"
+        )
+        embed.set_footer(text="Type 'cancel' to stop setup")
+        await ctx.send(embed=embed)
 
-        embed = discord.Embed(color=discord.Colour.from_rgb(225, 225, 0))
-        embed.add_field(name="✅ Warned", value=f"{member.mention} has received a warning.", inline=False)
-        embed.add_field(name="Administrator", value=ctx.author.mention, inline=False)
-        embed.add_field(name="Reason", value=reason, inline=False)
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Handle setup process messages"""
+        if message.author.bot or not message.guild:
+            return
+            
+        guild_id = message.guild.id
+        if guild_id not in self.setup_sessions:
+            return
+            
+        if not message.author.guild_permissions.administrator:
+            return
 
-        if warning is None:
-            cur.execute(f'INSERT INTO {guild_name} VALUES ({member.id}, 1)')
-            db.commit()
-            await channel.send(embed=embed)
-        elif warning[1] == 1:
-            cur.execute(f'UPDATE {guild_name} SET count=2 WHERE userid={member.id}')
-            db.commit()
-            await channel.send(embed=embed)
-        elif warning[1] == 2:
-            cur.execute(f'UPDATE {guild_name} SET count=3 WHERE userid={member.id}')
-            db.commit()
-            await channel.send(embed=embed)
-            await member.ban(reason=reason)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def clear(ctx, amount=100):
-    await ctx.channel.purge(limit=amount)
-
-@bot.command()
-async def info(ctx, member: discord.Member):
-    embed = discord.Embed(
-        title="User Information",
-        color=discord.Color.blue(),
-        timestamp=datetime.utcnow()
-    )
-
-    fields = {
-        "Display Name": member.display_name,
-        "ID": member.id,
-        "Joined Server": member.joined_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "Account Created": member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "Roles": ", ".join(role.name for role in member.roles[1:])
-    }
-
-    for name, value in fields.items():
-        embed.add_field(name=name, value=value, inline=False)
-
-    embed.set_thumbnail(url=member.display_avatar.url)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def setprefix(ctx, new_prefix):
-    """Change the command prefix for this server"""
-    if not ctx.author.guild_permissions.administrator:
-        await ctx.send("❌ Only administrators can change the prefix!")
-        return
+        content = message.content.lower().strip()
         
-    bot.server_settings.set_prefix(ctx.guild.id, new_prefix)
-    await ctx.send(f"✅ Command prefix changed to: `{new_prefix}`")
+        if content == 'cancel':
+            del self.setup_sessions[guild_id]
+            await message.channel.send("❌ Setup cancelled.")
+            return
 
-@bot.command()
-async def test(ctx):
-    await ctx.send('Test command executed successfully.')
+        await self._handle_setup_step(message)
 
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def send_welcome(ctx):
-    """Resends the welcome message with bot information"""
-    await bot.send_welcome_message(ctx.guild)
-    await ctx.message.add_reaction('✅')
+    async def _handle_setup_step(self, message):
+        """Handle individual setup steps"""
+        session = self.setup_sessions[message.guild.id]
+        content = message.content.lower().strip()
+        
+        try:
+            if session['step'] == 'punishment_channel':
+                if content in ['yes', 'y']:
+                    embed = self.embed_helper.create_info_embed(
+                        "Create Punishment Channel",
+                        "Please create a channel named `#punishments` then type: `done`"
+                    )
+                    await message.channel.send(embed=embed)
+                    session['step'] = 'confirm_punishment_channel'
+                    session['settings']['wants_punishment'] = True
+                elif content in ['no', 'n']:
+                    session['settings']['wants_punishment'] = False
+                    await self._move_to_welcome_setup(message, session)
+                else:
+                    await message.channel.send("Please reply with `yes` or `no`")
+                    
+            elif session['step'] == 'confirm_punishment_channel':
+                if content == 'done':
+                    channel = discord.utils.get(message.guild.channels, name='punishments')
+                    if channel:
+                        session['settings']['punishment_channel'] = channel.id
+                        await message.channel.send("✅ Punishment channel configured!")
+                        await self._move_to_welcome_setup(message, session)
+                    else:
+                        await message.channel.send("❌ Channel `#punishments` not found. Please create it first.")
+                        
+            elif session['step'] == 'welcome_channel':
+                if content in ['yes', 'y']:
+                    embed = self.embed_helper.create_info_embed(
+                        "Welcome Channel Setup",
+                        "Please mention the channel for welcome messages.\nExample: `#general`"
+                    )
+                    await message.channel.send(embed=embed)
+                    session['step'] = 'set_welcome_channel'
+                    session['settings']['wants_welcome'] = True
+                elif content in ['no', 'n']:
+                    session['settings']['wants_welcome'] = False
+                    await self._finalize_setup(message, session)
+                else:
+                    await message.channel.send("Please reply with `yes` or `no`")
+                    
+            elif session['step'] == 'set_welcome_channel':
+                # Extract channel mention
+                if message.channel_mentions:
+                    channel = message.channel_mentions[0]
+                    session['settings']['welcome_channel'] = channel.id
+                    await message.channel.send(f"✅ Welcome channel set to {channel.mention}")
+                    await self._finalize_setup(message, session)
+                else:
+                    await message.channel.send("Please mention a channel (e.g., #general)")
+                    
+        except Exception as e:
+            logger.error(f"Setup error: {e}")
+            await message.channel.send("❌ An error occurred. Please try again.")
 
-# Start the webserver and run the bot
-keep_alive()
+    async def _move_to_welcome_setup(self, message, session):
+        """Move to welcome message setup"""
+        session['step'] = 'welcome_channel'
+        embed = self.embed_helper.create_info_embed(
+            "Welcome Messages",
+            "Would you like to enable welcome messages for new members?\nReply with `yes` or `no`"
+        )
+        await message.channel.send(embed=embed)
 
-# Enhanced bot startup with error handling
+    async def _finalize_setup(self, message, session):
+        """Complete setup process"""
+        try:
+            settings = session['settings']
+            guild_id = message.guild.id
+            
+            # Update server settings
+            updates = {'setup_complete': True}
+            if settings.get('punishment_channel'):
+                updates['punishment_channel'] = settings['punishment_channel']
+            if settings.get('welcome_channel'):
+                updates['welcome_channel'] = settings['welcome_channel']
+                updates['welcome_enabled'] = True
+                updates['welcome_message'] = '{user} Welcome to {server}! Please read the rules.'
+            
+            self.server_settings.update_guild_settings(guild_id, **updates)
+            
+            # Create summary
+            summary_parts = []
+            if settings.get('wants_punishment'):
+                summary_parts.append(f"✅ Punishment logging: <#{settings['punishment_channel']}>")
+            if settings.get('wants_welcome'):
+                summary_parts.append(f"✅ Welcome messages: <#{settings['welcome_channel']}>")
+            
+            embed = self.embed_helper.create_success_embed(
+                "🎉 Setup Complete!",
+                "Your server has been successfully configured!",
+                configured_features="\n".join(summary_parts) if summary_parts else "Basic setup completed",
+                next_steps="• Use `!help` to see all commands\n"
+                          "• Use `!prefix <new_prefix>` to change command prefix\n"
+                          "• Use `!welcome` commands to customize welcome messages"
+            )
+            
+            await message.channel.send(embed=embed)
+            del self.setup_sessions[guild_id]
+            logger.info(f"Setup completed for {message.guild.name}")
+            
+        except Exception as e:
+            logger.error(f"Error finalizing setup: {e}")
+            await message.channel.send("❌ Error saving settings. Please contact support.")
+
+    # === MODERATION COMMANDS ===
+    
+    @commands.command()
+    @commands.has_permissions(moderate_members=True)
+    async def mute(self, ctx, member: discord.Member, duration: int, *, reason: str):
+        """Mute a member for specified duration (in minutes)"""
+        if not self.server_settings.is_setup_complete(ctx.guild.id):
+            await ctx.send("❌ Server setup not complete. Please run `!setup` first.")
+            return
+            
+        try:
+            # Use Discord's built-in timeout feature
+            timeout_duration = duration * 60  # Convert to seconds
+            await member.timeout(discord.utils.utcnow() + discord.timedelta(seconds=timeout_duration), reason=reason)
+            
+            embed = self.embed_helper.create_punishment_embed(
+                "Muted", member, ctx.author, reason, duration
+            )
+            
+            await self._log_to_channel(ctx.guild, embed)
+            await ctx.send(f"✅ {member.mention} has been muted for {duration} minutes.")
+            
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to mute this member.")
+        except Exception as e:
+            logger.error(f"Mute error: {e}")
+            await ctx.send("❌ Failed to mute member.")
+
+    @commands.command()
+    @commands.has_permissions(moderate_members=True)
+    async def unmute(self, ctx, member: discord.Member):
+        """Remove timeout from a member"""
+        try:
+            await member.timeout(None)
+            
+            embed = self.embed_helper.create_punishment_embed(
+                "Unmuted", member, ctx.author, "Manual unmute"
+            )
+            
+            await self._log_to_channel(ctx.guild, embed)
+            await ctx.send(f"✅ {member.mention} has been unmuted.")
+            
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to unmute this member.")
+        except Exception as e:
+            logger.error(f"Unmute error: {e}")
+            await ctx.send("❌ Failed to unmute member.")
+
+    @commands.command()
+    @commands.has_permissions(kick_members=True)
+    async def kick(self, ctx, member: discord.Member, *, reason: str):
+        """Kick a member from the server"""
+        try:
+            await member.kick(reason=reason)
+            
+            embed = self.embed_helper.create_punishment_embed(
+                "Kicked", member, ctx.author, reason
+            )
+            
+            await self._log_to_channel(ctx.guild, embed)
+            await ctx.send(f"✅ {member.mention} has been kicked.")
+            
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to kick this member.")
+        except Exception as e:
+            logger.error(f"Kick error: {e}")
+            await ctx.send("❌ Failed to kick member.")
+
+    @commands.command()
+    @commands.has_permissions(ban_members=True)
+    async def ban(self, ctx, member: discord.Member, *, reason: str):
+        """Ban a member from the server"""
+        try:
+            await member.ban(reason=reason)
+            
+            embed = self.embed_helper.create_punishment_embed(
+                "Banned", member, ctx.author, reason
+            )
+            
+            await self._log_to_channel(ctx.guild, embed)
+            await ctx.send(f"✅ {member.mention} has been banned.")
+            
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to ban this member.")
+        except Exception as e:
+            logger.error(f"Ban error: {e}")
+            await ctx.send("❌ Failed to ban member.")
+
+    @commands.command()
+    @commands.has_permissions(ban_members=True)
+    async def unban(self, ctx, *, member_name: str):
+        """Unban a member by username"""
+        try:
+            banned_users = [entry async for entry in ctx.guild.bans()]
+            
+            for ban_entry in banned_users:
+                user = ban_entry.user
+                if str(user).lower() == member_name.lower():
+                    await ctx.guild.unban(user)
+                    
+                    embed = self.embed_helper.create_punishment_embed(
+                        "Unbanned", user, ctx.author, "Manual unban"
+                    )
+                    
+                    await self._log_to_channel(ctx.guild, embed)
+                    await ctx.send(f"✅ {user} has been unbanned.")
+                    return
+                    
+            await ctx.send("❌ User not found in ban list.")
+            
+        except Exception as e:
+            logger.error(f"Unban error: {e}")
+            await ctx.send("❌ Failed to unban user.")
+
+    @commands.command()
+    @commands.has_permissions(moderate_members=True)
+    async def warn(self, ctx, member: discord.Member, *, reason: str):
+        """Warn a member (3 warnings = automatic ban)"""
+        try:
+            with sqlite3.connect(self.db_path) as db:
+                # Get current warning count
+                cur = db.execute(
+                    'SELECT count FROM warnings WHERE user_id = ? AND guild_id = ?',
+                    (member.id, ctx.guild.id)
+                )
+                result = cur.fetchone()
+                
+                if result:
+                    new_count = result[0] + 1
+                    db.execute(
+                        'UPDATE warnings SET count = ? WHERE user_id = ? AND guild_id = ?',
+                        (new_count, member.id, ctx.guild.id)
+                    )
+                else:
+                    new_count = 1
+                    db.execute(
+                        'INSERT INTO warnings (user_id, guild_id, count) VALUES (?, ?, ?)',
+                        (member.id, ctx.guild.id, new_count)
+                    )
+                
+                db.commit()
+                
+                embed = self.embed_helper.create_punishment_embed(
+                    f"Warning #{new_count}", member, ctx.author, reason
+                )
+                
+                await self._log_to_channel(ctx.guild, embed)
+                
+                if new_count >= 3:
+                    # Auto-ban on 3rd warning
+                    await member.ban(reason=f"Auto-ban: 3 warnings reached. Last reason: {reason}")
+                    await ctx.send(f"⚠️ {member.mention} has been **banned** for receiving 3 warnings!")
+                else:
+                    await ctx.send(f"⚠️ {member.mention} has been warned! ({new_count}/3 warnings)")
+                
+        except Exception as e:
+            logger.error(f"Warn error: {e}")
+            await ctx.send("❌ Failed to warn member.")
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def clear(self, ctx, amount: int = 10):
+        """Clear specified number of messages"""
+        if amount > 100:
+            await ctx.send("❌ Cannot clear more than 100 messages at once.")
+            return
+            
+        try:
+            deleted = await ctx.channel.purge(limit=amount + 1)  # +1 to include the command message
+            await ctx.send(f"✅ Cleared {len(deleted) - 1} messages.", delete_after=3)
+            
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to delete messages.")
+        except Exception as e:
+            logger.error(f"Clear error: {e}")
+            await ctx.send("❌ Failed to clear messages.")
+
+    # === UTILITY COMMANDS ===
+    
+    @commands.command()
+    async def info(self, ctx, member: discord.Member = None):
+        """Show information about a member"""
+        member = member or ctx.author
+        
+        embed = discord.Embed(
+            title=f"User Information - {member.display_name}",
+            color=discord.Color.blue(),
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="Username", value=str(member), inline=True)
+        embed.add_field(name="ID", value=member.id, inline=True)
+        embed.add_field(name="Joined Server", 
+                       value=member.joined_at.strftime("%Y-%m-%d %H:%M:%S") if member.joined_at else "Unknown", 
+                       inline=True)
+        embed.add_field(name="Account Created", 
+                       value=member.created_at.strftime("%Y-%m-%d %H:%M:%S"), 
+                       inline=True)
+        
+        roles = [role.name for role in member.roles[1:]]  # Skip @everyone
+        embed.add_field(name="Roles", value=", ".join(roles) if roles else "None", inline=False)
+        
+        await ctx.send(embed=embed)
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def prefix(self, ctx, new_prefix: str = None):
+        """View or change the command prefix"""
+        if not new_prefix:
+            current_prefix = self.server_settings.get_prefix(ctx.guild.id)
+            await ctx.send(f"Current prefix: `{current_prefix}`")
+            return
+            
+        self.server_settings.update_guild_settings(ctx.guild.id, prefix=new_prefix)
+        await ctx.send(f"✅ Prefix changed to: `{new_prefix}`")
+
+    # === WELCOME SYSTEM ===
+    
+    @commands.group(name='welcome', invoke_without_command=True)
+    @commands.has_permissions(administrator=True)
+    async def welcome(self, ctx):
+        """Welcome message management"""
+        settings = self.server_settings.get_guild_settings(ctx.guild.id)
+        
+        embed = self.embed_helper.create_info_embed(
+            "🎉 Welcome System",
+            "Current welcome message configuration:",
+            status="✅ Enabled" if settings.get('welcome_enabled') else "❌ Disabled",
+            channel=f"<#{settings.get('welcome_channel')}>" if settings.get('welcome_channel') else "Not set",
+            message=settings.get('welcome_message', 'Default message'),
+            commands="`!welcome enable/disable` - Toggle welcome messages\n"
+                    "`!welcome channel #channel` - Set welcome channel\n"
+                    "`!welcome message <text>` - Set welcome message\n"
+                    "`!welcome test` - Test welcome message"
+        )
+        
+        await ctx.send(embed=embed)
+
+    @welcome.command()
+    @commands.has_permissions(administrator=True)
+    async def enable(self, ctx):
+        """Enable welcome messages"""
+        self.server_settings.update_guild_settings(ctx.guild.id, welcome_enabled=True)
+        await ctx.send("✅ Welcome messages enabled!")
+
+    @welcome.command()
+    @commands.has_permissions(administrator=True)
+    async def disable(self, ctx):
+        """Disable welcome messages"""
+        self.server_settings.update_guild_settings(ctx.guild.id, welcome_enabled=False)
+        await ctx.send("❌ Welcome messages disabled!")
+
+    @welcome.command()
+    @commands.has_permissions(administrator=True)
+    async def channel(self, ctx, channel: discord.TextChannel):
+        """Set welcome channel"""
+        self.server_settings.update_guild_settings(ctx.guild.id, welcome_channel=channel.id)
+        await ctx.send(f"✅ Welcome channel set to {channel.mention}")
+
+    @welcome.command()
+    @commands.has_permissions(administrator=True)
+    async def message(self, ctx, *, message: str):
+        """Set welcome message (use {user} for mention, {server} for server name)"""
+        self.server_settings.update_guild_settings(ctx.guild.id, welcome_message=message)
+        await ctx.send("✅ Welcome message updated!")
+
+    @welcome.command()
+    @commands.has_permissions(administrator=True)
+    async def test(self, ctx):
+        """Test the welcome message"""
+        settings = self.server_settings.get_guild_settings(ctx.guild.id)
+        
+        if not settings.get('welcome_enabled'):
+            await ctx.send("❌ Welcome messages are disabled.")
+            return
+            
+        message = settings.get('welcome_message', '{user} Welcome to {server}!')
+        formatted_message = message.replace('{user}', ctx.author.mention).replace('{server}', ctx.guild.name)
+        
+        await ctx.send(f"**[TEST]** {formatted_message}")
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        """Send welcome message to new members"""
+        settings = self.server_settings.get_guild_settings(member.guild.id)
+        
+        if not settings.get('welcome_enabled'):
+            return
+            
+        channel_id = settings.get('welcome_channel')
+        if not channel_id:
+            return
+            
+        channel = member.guild.get_channel(channel_id)
+        if not channel:
+            return
+            
+        try:
+            message = settings.get('welcome_message', '{user} Welcome to {server}!')
+            formatted_message = message.replace('{user}', member.mention).replace('{server}', member.guild.name)
+            await channel.send(formatted_message)
+            logger.info(f"Welcome message sent for {member} in {member.guild.name}")
+        except Exception as e:
+            logger.error(f"Failed to send welcome message: {e}")
+
+    @commands.command()
+    async def help(self, ctx, command_name: str = None):
+        """Show help information"""
+        if command_name:
+            # Show help for specific command
+            command = self.get_command(command_name)
+            if command:
+                embed = self.embed_helper.create_info_embed(
+                    f"Help: {command.name}",
+                    command.help or "No description available",
+                    usage=f"`{ctx.prefix}{command.name} {command.signature}`"
+                )
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send("❌ Command not found.")
+            return
+        
+        # Show general help
+        embed = self.embed_helper.create_info_embed(
+            "🤖 Bot Help",
+            "Here are all available commands:",
+            moderation_commands="`mute` `unmute` `kick` `ban` `unban` `warn` `clear`",
+            utility_commands="`info` `prefix` `help`",
+            setup_commands="`setup`",
+            welcome_commands="`welcome` (with subcommands)",
+            usage_tip=f"Use `{ctx.prefix}help <command>` for detailed help on a specific command"
+        )
+        
+        await ctx.send(embed=embed)
+
+# Create and run bot
+bot = ModeratorBot()
+
+# Start webserver and bot
 if __name__ == "__main__":
+    keep_alive()
+    
     try:
         logger.info("Starting Discord bot...")
-        bot.run(config.TOKEN, log_handler=None)  # Disable discord.py's default logging
+        bot.run(config.TOKEN, log_handler=None)
     except discord.LoginFailure:
         logger.error("Failed to login - Invalid token!")
-    except discord.ConnectionClosed:
-        logger.error("Connection to Discord was closed!")
     except Exception as e:
-        logger.error(f"Unexpected error starting bot: {e}")
+        logger.error(f"Bot startup error: {e}")
         import traceback
         logger.error(traceback.format_exc())

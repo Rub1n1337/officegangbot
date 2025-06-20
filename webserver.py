@@ -9,6 +9,7 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
+start_time = time.time()
 
 @app.route('/')
 def home():
@@ -32,18 +33,17 @@ def health():
 def ping():
     return jsonify({"status": "pong", "timestamp": time.time()})
 
-start_time = time.time()
-
 def run():
+    """Run Flask server"""
     try:
         app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
     except Exception as e:
         print(f"Flask server error: {e}")
 
 def keep_alive():
+    """Start the keep-alive webserver"""
     print("Starting keep-alive webserver on port 8080...")
-    server = Thread(target=run)
-    server.daemon = True
+    server = Thread(target=run, daemon=True)
     server.start()
     print("Keep-alive webserver started successfully!")
     return server
