@@ -157,6 +157,11 @@ class GuildSetup(commands.Cog):
         content = message.content.lower().strip()
         guild = message.guild
 
+        # Prevent duplicate processing
+        if session.get('processing_message', False):
+            return
+        session['processing_message'] = True
+
         try:
             if step == 'punishments_channel':
                 if content in ['yes', 'y']:
@@ -183,8 +188,6 @@ class GuildSetup(commands.Cog):
 
             elif step == 'set_punishment_channel':
                 if content.startswith('!set-punishment-channel'):
-                    # Prevent the command from being processed by the command handler as well
-                    session['processing'] = True
                     channel_mention = message.content.split()[-1]
                     if channel_mention.startswith('<#') and channel_mention.endswith('>'):
                         channel_id = int(channel_mention[2:-1])
@@ -197,7 +200,6 @@ class GuildSetup(commands.Cog):
                             await message.channel.send("❌ Channel not found. Please try again.")
                     else:
                         await message.channel.send("❌ Please mention the channel like this: `!set-punishment-channel #punishments`")
-                    session['processing'] = False
                 else:
                     await message.channel.send("Please use the command: `!set-punishment-channel #punishments`")
 
@@ -284,6 +286,8 @@ class GuildSetup(commands.Cog):
         except Exception as e:
             logger.error(f"Error in setup step {step}: {e}")
             await message.channel.send("❌ An error occurred. Please try again or contact support.")
+        finally:
+            session['processing_message'] = False
 
     async def move_to_next_step(self, message, session, next_step):
         """Move to the next step in setup"""
@@ -440,19 +444,21 @@ class GuildSetup(commands.Cog):
             settings = session['settings']
             guild_id = message.guild.id
             
-            # Save to server settings
-            saved_settings = {}
+            # Save to server settings using the correct methods
+            saved_settings = {
+                'bot-setup': message.channel.id,
+                'setup_complete': True
+            }
+            
             if settings.get('punishments_channel'):
                 saved_settings['punishments'] = settings['punishments_channel']
             if settings.get('log_channel'):
                 saved_settings['bot-logs'] = settings['log_channel']
             if settings.get('auto_role'):
                 saved_settings['auto_role'] = settings['auto_role']
-                
-            saved_settings['bot-setup'] = message.channel.id
             
+            # Use the server_settings instance to save
             self.server_settings.set_server_channels(guild_id, saved_settings)
-            self.server_settings.set_setup_complete(guild_id)
             
             # Create final summary
             embed = discord.Embed(
@@ -462,11 +468,11 @@ class GuildSetup(commands.Cog):
             )
             
             summary = []
-            if settings.get('wants_punishments'):
+            if settings.get('wants_punishments') and settings.get('punishments_channel'):
                 summary.append(f"✅ Punishments channel: <#{settings['punishments_channel']}>")
-            if settings.get('wants_logging'):
+            if settings.get('wants_logging') and settings.get('log_channel'):
                 summary.append(f"✅ Logging channel: <#{settings['log_channel']}>")
-            if settings.get('wants_auto_roles'):
+            if settings.get('wants_auto_roles') and settings.get('auto_role'):
                 summary.append(f"✅ Auto role: <@&{settings['auto_role']}>")
                 
             if summary:
