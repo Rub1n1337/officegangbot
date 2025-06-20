@@ -458,7 +458,7 @@ class GuildSetup(commands.Cog):
                 saved_settings['auto_role'] = settings['auto_role']
             
             # Use the server_settings instance to save
-            self.server_settings.set_server_channels(guild_id, saved_settings)
+            self.server_settings.set_settings(guild_id, saved_settings)
             
             # Create final summary
             embed = discord.Embed(
