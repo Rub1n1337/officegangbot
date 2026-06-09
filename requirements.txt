@@ -1,5 +1,7 @@
-discord.py
-flask
-asyncio
-psutil
-requests
+discord.py>=2.3.0
+python-dotenv        # For loading secret keys from a .env file
+Flask                # For the keep-alive web server
+psutil               # For monitoring system resources like memory usage
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
