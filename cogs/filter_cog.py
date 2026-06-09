@@ -24,7 +24,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = getattr(bot, 'settings_manager', None) or SettingsManager()
+        self.settings_manager = bot.settings_manager
         self.pattern_cache = {}
 
     def _get_pattern(self, guild_id: int):

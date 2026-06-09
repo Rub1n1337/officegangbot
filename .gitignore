@@ -43,3 +43,6 @@ Thumbs.db
 # Bot data
 data/
 *.lock
+data/guild_settings.json 
+officegangbot.zip 
+dashboard-tmp/ 

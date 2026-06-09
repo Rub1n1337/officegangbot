@@ -168,6 +168,8 @@ async def main():
     settings_manager = SettingsManager()
     bot = MyBot(settings_manager=settings_manager)
     health_monitor = HealthMonitor(bot)
+    bot.health_monitor = health_monitor
+    health_monitor.start()
 
     try:
         # Create the lock file
@@ -190,8 +192,6 @@ async def main():
         if hasattr(bot, 'health_monitor'):
             if health_monitor.running:
                 health_monitor.stop()
-        if hasattr(bot, 'webserver_thread'):
-            shutdown_webserver(bot.webserver_thread)
         # Clean up bot and other components
         if 'bot' in locals() and bot and not bot.is_closed():
             await bot.close()

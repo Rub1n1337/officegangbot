@@ -20,7 +20,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = getattr(bot, 'settings_manager', None) or SettingsManager()
+        self.settings_manager = bot.settings_manager
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         """Handles errors for all commands in this cog."""

@@ -1,7 +1,7 @@
 # api_server.py
 # REST API for OfficeGangBot dashboard integration (FastAPI, best practices)
 
-from fastapi import FastAPI, HTTPException, Path, Request
+from fastapi import FastAPI, HTTPException, Path, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -27,6 +27,11 @@ class RulesFeatureModel(BaseModel):
     channel: Optional[str] = None
     message: str
 
+# --- API Authentication ---
+async def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != os.getenv("API_SECRET_KEY"):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
 # --- Utility functions ---
 def load_guild_settings():
     with _settings_lock:
@@ -43,7 +48,7 @@ def save_guild_settings(settings):
         os.replace(tmp_path, DATA_PATH)
 
 # --- API Endpoints ---
-@app.get("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel)
+@app.get("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
 def get_rules_feature(guild_id: str):
     settings = load_guild_settings()
     guild = settings.get(guild_id)
@@ -54,7 +59,7 @@ def get_rules_feature(guild_id: str):
         "message": guild.get("rules_message", "")
     }
 
-@app.patch("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel)
+@app.patch("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
 def update_rules_feature(guild_id: str, body: RulesFeatureModel):
     settings = load_guild_settings()
     guild = settings.setdefault(guild_id, {})
@@ -68,7 +73,7 @@ def update_rules_feature(guild_id: str, body: RulesFeatureModel):
         "message": body.message
     }
 
-@app.get("/guilds/{guild_id}")
+@app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
 async def get_guild_info(guild_id: str):
     settings = load_guild_settings()
     guild_data = settings.get(guild_id, {})
