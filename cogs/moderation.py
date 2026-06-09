@@ -10,6 +10,49 @@ from core.permissions import has_permission
 from core.settings_manager import SettingsManager
 from typing import Optional, Literal
 from .utils import reply
+from discord.ui import View, Button
+
+class BanConfirmView(discord.ui.View):
+    """Confirmation view for the /ban command."""
+
+    def __init__(self, moderator: discord.Member, target: discord.Member, reason: str):
+        super().__init__(timeout=30)
+        self.moderator = moderator
+        self.target = target
+        self.reason = reason
+        self.confirmed = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only the moderator who called the command can press the buttons."""
+        if interaction.user.id != self.moderator.id:
+            await interaction.response.send_message(
+                "❌ Only the moderator who issued this command can confirm the action.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="✅ Confirm Ban", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.confirmed = True
+        self.stop()
+        await interaction.response.edit_message(
+            content=f"⏳ Banning `{self.target}`...",
+            view=None
+        )
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.confirmed = False
+        self.stop()
+        await interaction.response.edit_message(
+            content=f"🚫 Ban of `{self.target}` has been cancelled.",
+            view=None
+        )
+
+    async def on_timeout(self):
+        self.confirmed = False
+        self.stop()
 
 class HierarchyError(commands.CheckFailure):
     """Custom exception for hierarchy check failures."""
@@ -89,6 +132,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.hybrid_command(name="clear", description="Delete a specified number of messages.")
     @app_commands.describe(amount="Number of messages to delete (1-100).")
     @commands.bot_has_permissions(manage_messages=True)
+    @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("clear")
     async def clear(self, ctx: commands.Context, amount: commands.Range[int, 1, 100]):
         deleted = await ctx.channel.purge(limit=amount)
@@ -97,6 +141,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.hybrid_command(name="kick", description="Kick a member from the server.")
     @app_commands.describe(member="The member to kick.", reason="The reason for the kick.")
     @commands.bot_has_permissions(kick_members=True)
+    @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("kick")
     async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
         self._check_hierarchy(ctx, member)
@@ -106,21 +151,44 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         await reply(ctx, f"✅ **{member}** has been kicked.", ephemeral=True)
 
     @commands.hybrid_command(name="ban", description="Ban a member from the server.")
-    @app_commands.describe(member="The member to ban.", delete_messages="Delete user's message history.", reason="The reason for the ban.")
+    @app_commands.describe(member="Member to ban.", reason="Reason for the ban.")
     @commands.bot_has_permissions(ban_members=True)
+    @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("ban")
-    async def ban(self, ctx: commands.Context, member: discord.Member, delete_messages: Optional[Literal["Don't Delete", "1 Hour", "6 Hours", "12 Hours", "1 Day", "3 Days", "7 Days"]] = "Don't Delete", *, reason: str = "No reason provided"):
+    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
         self._check_hierarchy(ctx, member)
-        delete_seconds_map = {
-            "1 Hour": 3600, "6 Hours": 21600, "12 Hours": 43200,
-            "1 Day": 86400, "3 Days": 259200, "7 Days": 604800
-        }
-        delete_seconds = delete_seconds_map.get(delete_messages, 0)
 
-        await self._notify_user(member, ctx.guild.name, "banned", reason)
-        await member.ban(reason=f"{reason} (Moderator: {ctx.author.id})", delete_message_seconds=delete_seconds)
-        await self._log_action(ctx, "Member Banned", member, reason, delete_history=delete_messages)
-        await reply(ctx, f"✅ **{member}** has been banned.", ephemeral=True)
+        view = BanConfirmView(moderator=ctx.author, target=member, reason=reason)
+
+        confirm_content = (
+            f"⚠️ **Ban Confirmation**\n"
+            f"Are you sure you want to ban {member.mention}?\n"
+            f"**Reason:** `{reason}`"
+        )
+
+        if ctx.interaction:
+            await ctx.interaction.response.send_message(
+                content=confirm_content,
+                view=view,
+                ephemeral=True
+            )
+        else:
+            await ctx.send(content=confirm_content, view=view)
+
+        await view.wait()
+
+        if not view.confirmed:
+            return
+
+        dm_sent = await self._notify_user(member, ctx.guild.name, "banned", reason)
+        await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
+        await self._log_action(ctx, "🔨 Ban", member, reason, dm_notified="✅" if dm_sent else "❌")
+
+        result_content = f"✅ {member.mention} has been banned. Reason: `{reason}`"
+        if ctx.interaction:
+            await ctx.interaction.followup.send(content=result_content, ephemeral=True)
+        else:
+            await ctx.send(content=result_content)
 
     @commands.hybrid_command(name="unban", description="Unban a user from the server.")
     @app_commands.describe(user_id="The ID of the user to unban.", reason="The reason for the unban.")
@@ -142,6 +210,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.hybrid_command(name="mute", description="Mute a member for a specified duration.")
     @app_commands.describe(member="The member to mute.", duration="Duration (e.g., 10m, 1h, 1d). Max: 28d.", reason="The reason for the mute.")
     @commands.bot_has_permissions(moderate_members=True)
+    @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("mute")
     async def mute(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
         self._check_hierarchy(ctx, member)
@@ -174,70 +243,6 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         await member.timeout(None, reason=f"{reason} (Moderator: {ctx.author.id})")
         await self._log_action(ctx, "Member Unmuted", member, reason)
         await reply(ctx, f"✅ **{member}** has been unmuted.", ephemeral=True)
-
-    @commands.hybrid_group(name="warn", description="Manage warnings for a member.")
-    @has_permission("warn")
-    async def warn(self, ctx: commands.Context):
-        if ctx.invoked_subcommand is None:
-            help_cog = self.bot.get_cog("❓ Help")
-            if help_cog:
-                await help_cog.send_command_help(ctx, ctx.command)
-            else:
-                await reply(ctx, "The help command is currently unavailable.", ephemeral=True)
-
-    @warn.command(name="add", description="Warns a member and logs it.")
-    @app_commands.describe(member="The member to warn.", reason="The reason for the warning.")
-    @has_permission("warn")
-    async def warn_add(self, ctx: commands.Context, member: discord.Member, *, reason: str):
-        self._check_hierarchy(ctx, member)
-        warnings = self.settings_manager.get_setting(ctx.guild.id, 'warnings', {})
-        user_warnings = warnings.get(str(member.id), [])
-        warn_id = str(uuid.uuid4()).split('-')[0]
-        
-        user_warnings.append({
-            "id": warn_id, "moderator_id": ctx.author.id,
-            "reason": reason, "timestamp": int(time.time())
-        })
-        warnings[str(member.id)] = user_warnings
-
-        await self.settings_manager.update_setting(ctx.guild.id, 'warnings', warnings)
-        await self._log_action(ctx, "Member Warned", member, reason, warning_id=warn_id, total_warnings=len(user_warnings))
-        await reply(ctx, f"✅ **{member}** has been warned. (Warning ID: `{warn_id}`)", ephemeral=True)
-
-    @warn.command(name="list", description="View warnings for a member.")
-    @has_permission("warn")
-    async def warn_list(self, ctx: commands.Context, member: discord.Member):
-        all_warnings = self.settings_manager.get_setting(ctx.guild.id, 'warnings', {})
-        user_warnings = all_warnings.get(str(member.id), [])
-
-        if not user_warnings:
-            return await reply(ctx, f"✅ **{member}** has no warnings.", ephemeral=True)
-
-        embed = discord.Embed(title=f"Warnings for {member}", color=discord.Color.blue())
-        embed.set_thumbnail(url=member.display_avatar.url)
-        
-        description = []
-        for w in user_warnings:
-            mod_mention = f"<@{w['moderator_id']}>" or f"ID: {w['moderator_id']}"
-            description.append(f"**ID:** `{w['id']}` | **Mod:** {mod_mention} (<t:{w['timestamp']}:R>)\n**Reason:** {w['reason']}")
-        
-        embed.description = "\n\n".join(description)
-        await reply(ctx, embed=embed, ephemeral=True)
-
-    @warn.command(name="remove", description="Remove a warning from a member by ID.")
-    @app_commands.describe(member="The member to unwarn.", warn_id="The ID of the warning to remove.")
-    @has_permission("warn")
-    async def warn_remove(self, ctx: commands.Context, member: discord.Member, warn_id: str):
-        all_warnings = self.settings_manager.get_setting(ctx.guild.id, 'warnings', {})
-        user_warnings = all_warnings.get(str(member.id), [])
-
-        if not any(w.get('id') == warn_id for w in user_warnings):
-            return await reply(ctx, f"❌ Warning ID `{warn_id}` not found for {member}.", ephemeral=True)
-
-        all_warnings[str(member.id)] = [w for w in user_warnings if w.get('id') != warn_id]
-        await self.settings_manager.update_setting(ctx.guild.id, 'warnings', all_warnings)
-        await self._log_action(ctx, "Warning Removed", member, f"Removed warning `{warn_id}`.")
-        await reply(ctx, f"✅ Warning `{warn_id}` removed from **{member}**.", ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
