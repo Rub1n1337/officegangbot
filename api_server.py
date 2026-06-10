@@ -8,9 +8,21 @@ from typing import Optional
 import json
 import os
 import threading
+import time
+import psutil
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'guild_settings.json')
 _settings_lock = threading.Lock()
+
+# Store bot start time globally
+BOT_START_TIME = time.time()
+
+# Store bot instance globally
+bot_instance = None
+
+def set_bot_instance(bot):
+    global bot_instance
+    bot_instance = bot
 
 app = FastAPI(title="OfficeGangBot API", version="1.0.0")
 
@@ -116,6 +128,55 @@ async def get_guild_info(guild_id: str):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/stats", dependencies=[Depends(verify_api_key)])
+async def get_bot_stats():
+    """
+    Returns general bot statistics:
+    uptime, CPU/RAM usage, total guilds and users.
+    """
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot is not connected")
+
+    uptime_seconds = int(time.time() - BOT_START_TIME)
+    uptime_str = f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m {uptime_seconds % 60}s"
+
+    total_users = sum(g.member_count for g in bot_instance.guilds)
+
+    return {
+        "status": "online",
+        "uptime": uptime_str,
+        "uptime_seconds": uptime_seconds,
+        "guilds": len(bot_instance.guilds),
+        "total_users": total_users,
+        "latency_ms": round(bot_instance.latency * 1000, 2),
+        "cpu_percent": psutil.cpu_percent(interval=0.1),
+        "ram_percent": psutil.virtual_memory().percent,
+        "ram_used_mb": round(psutil.virtual_memory().used / 1024 / 1024, 2),
+    }
+
+
+@app.get("/api/guild/{guild_id}", dependencies=[Depends(verify_api_key)])
+async def get_guild_settings(guild_id: int):
+    """
+    Returns the full settings for a specific guild from SettingsManager.
+    """
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot is not connected")
+
+    guild = bot_instance.get_guild(guild_id)
+    if not guild:
+        raise HTTPException(status_code=404, detail="Guild not found or bot is not a member")
+
+    settings = bot_instance.settings_manager.get_all_settings(guild_id)
+
+    return {
+        "guild_id": guild_id,
+        "guild_name": guild.name,
+        "member_count": guild.member_count,
+        "settings": settings
+    }
 
 if __name__ == "__main__":
     import uvicorn

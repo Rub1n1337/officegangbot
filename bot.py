@@ -171,6 +171,10 @@ async def main():
     bot.health_monitor = health_monitor
     health_monitor.start()
 
+    # Set bot instance for API server
+    from api_server import set_bot_instance
+    set_bot_instance(bot)
+
     try:
         # Create the lock file
         with open(LOCK_FILE_PATH, 'w') as f:

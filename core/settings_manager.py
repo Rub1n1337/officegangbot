@@ -92,3 +92,7 @@ class SettingsManager:
             del self.data[guild_id_str]
             await self._save()
             logger.info(f"Removed all settings for guild {guild_id}.")
+
+    def get_all_settings(self, guild_id: int) -> dict:
+        """Returns all settings for a guild."""
+        return self.data.get(str(guild_id), {})
