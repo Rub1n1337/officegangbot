@@ -1,6 +1,6 @@
 # cogs/automod.py
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from core.logger import logger
 import datetime
 import asyncio
@@ -18,28 +18,40 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         self.settings_manager = bot.settings_manager
         # Message tracking: {guild_id: {user_id: [timestamps]}}
         self._message_log: dict = {}
+        self.cleanup_message_log.start()
 
     async def _apply_mute(self, member: discord.Member, guild: discord.Guild, reason: str):
-        """Applies a 10-minute mute to a member."""
+        """Applies mute and saves to timed_punishments for auto-expiry via TimedEventsCog."""
         mute_role = discord.utils.get(guild.roles, name="Muted")
         if not mute_role:
             try:
                 mute_role = await guild.create_role(name="Muted", reason="AutoMod mute role")
                 for channel in guild.channels:
-                    await channel.set_permissions(mute_role, send_messages=False, speak=False)
+                    try:
+                        await channel.set_permissions(mute_role, send_messages=False, speak=False)
+                    except discord.Forbidden:
+                        pass
             except discord.Forbidden:
-                logger.warning(f"Cannot create Muted role in {guild.name}")
+                logger.warning(f"AutoMod: Cannot create Muted role in {guild.name}")
                 return
 
         try:
             await member.add_roles(mute_role, reason=reason)
             logger.info(f"AutoMod: Muted {member} in {guild.name} for 10 minutes. Reason: {reason}")
 
-            # Auto-unmute after 10 minutes
-            await asyncio.sleep(600)
-            if mute_role in member.roles:
-                await member.remove_roles(mute_role, reason="AutoMod: mute expired")
-                logger.info(f"AutoMod: Auto-unmuted {member} in {guild.name}")
+            # Save to timed_punishments so TimedEventsCog auto-unmutes after 10 minutes
+            expires_at = (
+                datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+            ).timestamp()
+            timed = self.bot.settings_manager.get_setting(guild.id, 'timed_punishments', {})
+            timed[str(member.id)] = {
+                'type': 'mute',
+                'expires_at': expires_at,
+                'reason': reason,
+                'moderator_id': self.bot.user.id
+            }
+            await self.bot.settings_manager.update_setting(guild.id, 'timed_punishments', timed)
+
         except discord.Forbidden:
             logger.warning(f"AutoMod: Cannot mute {member} in {guild.name} — missing permissions")
 
@@ -117,11 +129,33 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
                 f"Sent 5+ messages in 3 seconds. Auto-muted for **10 minutes**."
             )
-            asyncio.create_task(self._apply_mute(
+            await self._apply_mute(
                 message.author,
                 message.guild,
                 "AutoMod: spam detection"
-            ))
+            )
+
+
+    @tasks.loop(minutes=5)
+    async def cleanup_message_log(self):
+        """Cleans up stale message log entries older than 10 seconds."""
+        try:
+            now = datetime.datetime.utcnow().timestamp()
+            for guild_id in list(self._message_log.keys()):
+                for user_id in list(self._message_log[guild_id].keys()):
+                    self._message_log[guild_id][user_id] = [
+                        t for t in self._message_log[guild_id][user_id]
+                        if now - t < 10
+                    ]
+        except Exception as e:
+            logger.error(f"cleanup_message_log crashed: {e}", exc_info=True)
+
+    @cleanup_message_log.before_loop
+    async def before_cleanup(self):
+        await self.bot.wait_until_ready()
+
+    def cog_unload(self):
+        self.cleanup_message_log.cancel()
 
 
 async def setup(bot: commands.Bot):

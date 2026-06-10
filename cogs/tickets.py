@@ -7,6 +7,7 @@ from core.permissions import has_permission
 from .utils import reply
 from typing import Optional
 import asyncio
+import re
 
 
 class CloseTicketView(discord.ui.View):
@@ -14,6 +15,37 @@ class CloseTicketView(discord.ui.View):
 
     def __init__(self):
         super().__init__(timeout=None)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only ticket owner, support role, or admins can close the ticket."""
+        bot = interaction.client
+        guild = interaction.guild
+
+        # Check admin permission
+        if interaction.user.guild_permissions.manage_channels:
+            return True
+
+        # Check support role
+        support_role_id = bot.settings_manager.get_setting(guild.id, 'ticket_support_role_id')
+        if support_role_id:
+            support_role = guild.get_role(int(support_role_id))
+            if support_role and support_role in interaction.user.roles:
+                return True
+
+        # Check if ticket owner (channel name ends with their sanitized name or id)
+        clean_name = re.sub(r'[^a-z0-9-]', '', interaction.user.name.lower())
+        is_owner = (
+            interaction.channel.name == f"ticket-{clean_name}-{interaction.user.id}" or
+            interaction.channel.name == f"ticket-{clean_name}"
+        )
+        if is_owner:
+            return True
+
+        await interaction.response.send_message(
+            "❌ You don't have permission to close this ticket.",
+            ephemeral=True
+        )
+        return False
 
     @discord.ui.button(
         label="🔒 Close Ticket",
@@ -50,11 +82,12 @@ class OpenTicketView(discord.ui.View):
         guild = interaction.guild
         member = interaction.user
 
+        # Sanitize channel name for Unicode safety
+        clean_name = re.sub(r'[^a-z0-9-]', '', member.name.lower()) or str(member.id)
+        channel_name = f"ticket-{clean_name}-{member.id}"
+
         # Check if ticket already exists
-        existing = discord.utils.get(
-            guild.text_channels,
-            name=f"ticket-{member.name.lower().replace(' ', '-')}"
-        )
+        existing = discord.utils.get(guild.text_channels, name=channel_name)
         if existing:
             await interaction.response.send_message(
                 f"❌ You already have an open ticket: {existing.mention}",
@@ -84,7 +117,7 @@ class OpenTicketView(discord.ui.View):
 
         try:
             channel = await guild.create_text_channel(
-                name=f"ticket-{member.name.lower().replace(' ', '-')}",
+                name=channel_name,
                 overwrites=overwrites,
                 category=category,
                 reason=f"Ticket opened by {member}"

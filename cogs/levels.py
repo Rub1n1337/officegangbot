@@ -1,12 +1,13 @@
 # cogs/levels.py
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
 from .utils import reply
 from typing import Optional
 import random
 import datetime
+import asyncio
 
 
 def get_xp_for_level(level: int) -> int:
@@ -38,6 +39,8 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         self.settings_manager = bot.settings_manager
         # Cooldown tracking: {guild_id: {user_id: last_xp_timestamp}}
         self._xp_cooldowns: dict = {}
+        self._xp_lock = asyncio.Lock()
+        self.cleanup_xp_cooldowns.start()
 
     def _get_user_data(self, guild_id: int, user_id: int) -> dict:
         """Returns XP data for a user."""
@@ -91,16 +94,17 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             return
         guild_cooldowns[user_id] = now
 
-        # Award XP
+        # Award XP with lock to prevent race conditions
         xp_gain = random.randint(15, 25)
-        user_data = self._get_user_data(guild_id, user_id)
-        old_level = user_data['level']
-        user_data['xp'] += xp_gain
-
-        # Calculate new level
-        new_level = get_level_from_xp(user_data['xp'])
-        user_data['level'] = new_level
-        await self._save_user_data(guild_id, user_id, user_data)
+        async with self._xp_lock:
+            user_data = self._get_user_data(guild_id, user_id)
+            old_level = user_data['level']
+            user_data['xp'] += xp_gain
+            new_level = get_level_from_xp(user_data['xp'])
+            user_data['level'] = new_level
+            # Save username for leaderboard display even after user leaves
+            user_data['display_name'] = message.author.display_name
+            await self._save_user_data(guild_id, user_id, user_data)
 
         # Level up notification
         if new_level > old_level:
@@ -193,7 +197,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         description = ""
         for i, (user_id, data) in enumerate(sorted_users):
             member = ctx.guild.get_member(int(user_id))
-            name = member.display_name if member else f"User {user_id}"
+            name = member.display_name if member else data.get('display_name', f'User {user_id}')
             medal = medals[i] if i < 3 else f"`#{i+1}`"
             description += f"{medal} **{name}** — Level {data.get('level', 0)} | {data.get('xp', 0)} XP\n"
 
@@ -203,6 +207,27 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             icon_url=ctx.author.display_avatar.url
         )
         await reply(ctx, embed=embed)
+
+
+    @tasks.loop(minutes=10)
+    async def cleanup_xp_cooldowns(self):
+        """Removes stale XP cooldown entries older than 120 seconds."""
+        try:
+            now = datetime.datetime.utcnow().timestamp()
+            for guild_id in list(self._xp_cooldowns.keys()):
+                self._xp_cooldowns[guild_id] = {
+                    uid: ts for uid, ts in self._xp_cooldowns[guild_id].items()
+                    if now - ts < 120
+                }
+        except Exception as e:
+            logger.error(f"cleanup_xp_cooldowns crashed: {e}", exc_info=True)
+
+    @cleanup_xp_cooldowns.before_loop
+    async def before_cleanup_xp(self):
+        await self.bot.wait_until_ready()
+
+    def cog_unload(self):
+        self.cleanup_xp_cooldowns.cancel()
 
 
 async def setup(bot: commands.Bot):

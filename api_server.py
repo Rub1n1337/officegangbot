@@ -140,9 +140,15 @@ async def get_bot_stats():
         raise HTTPException(status_code=503, detail="Bot is not connected")
 
     uptime_seconds = int(time.time() - BOT_START_TIME)
-    uptime_str = f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m {uptime_seconds % 60}s"
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    uptime_str = f"{hours}h {minutes}m {seconds}s"
 
     total_users = sum(g.member_count for g in bot_instance.guilds)
+
+    # Use interval=None to avoid blocking the event loop
+    cpu = psutil.cpu_percent(interval=None)
+    ram = psutil.virtual_memory()
 
     return {
         "status": "online",
@@ -151,9 +157,9 @@ async def get_bot_stats():
         "guilds": len(bot_instance.guilds),
         "total_users": total_users,
         "latency_ms": round(bot_instance.latency * 1000, 2),
-        "cpu_percent": psutil.cpu_percent(interval=0.1),
-        "ram_percent": psutil.virtual_memory().percent,
-        "ram_used_mb": round(psutil.virtual_memory().used / 1024 / 1024, 2),
+        "cpu_percent": cpu,
+        "ram_percent": ram.percent,
+        "ram_used_mb": round(ram.used / 1024 / 1024, 2),
     }
 
 
