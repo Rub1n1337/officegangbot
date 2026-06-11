@@ -23,6 +23,7 @@ from config import load_config
 from core.settings_manager import SettingsManager
 from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
+from core.redis_manager import RedisManager
 from cogs.utils import reply
 
 # --- Bot Initialization ---
@@ -57,6 +58,7 @@ class MyBot(commands.Bot):
 
         self.settings_manager = settings_manager
         self.db = None
+        self.redis = None
 
         # Set up the global error handler for slash commands
         self.tree.on_error = self.on_app_command_error
@@ -64,6 +66,8 @@ class MyBot(commands.Bot):
     async def close(self):
         if hasattr(self, 'db') and self.db:
             await self.db.close()
+        if hasattr(self, 'redis') and self.redis:
+            await self.redis.close()
         await super().close()
 
     async def setup_hook(self):
@@ -76,6 +80,17 @@ class MyBot(commands.Bot):
             logger.critical(f"Failed to initialize database: {e}")
             # Bot continues with JSON fallback if DB is unavailable
             self.db = None
+
+        # Initialize Redis
+        self.redis = RedisManager()
+        try:
+            await self.redis.connect()
+            # Start RPC listener for API server requests
+            await self.redis.start_rpc_listener("bot:rpc", self._handle_rpc_request)
+            logger.info("Redis RPC listener started.")
+        except Exception as e:
+            logger.warning(f"Redis unavailable, continuing without it: {e}")
+            self.redis = None
 
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
@@ -104,6 +119,52 @@ class MyBot(commands.Bot):
 
         logger.info('Bot is ready and listening for commands.')
         logger.warning("Manual command syncing via /sync is now the primary method.")
+
+    async def _handle_rpc_request(self, payload: dict) -> dict:
+        """Handles RPC requests from the API server via Redis Pub/Sub."""
+        action = payload.get("action")
+
+        if action == "get_guild_info":
+            guild_id = payload.get("guild_id")
+            guild = self.get_guild(int(guild_id)) if guild_id else None
+            if not guild:
+                return {"error": "Guild not found"}
+            settings = self.settings_manager.get_all_settings(int(guild_id))
+            return {
+                "id": str(guild.id),
+                "name": guild.name,
+                "icon": str(guild.icon) if guild.icon else None,
+                "member_count": guild.member_count,
+                "owner_id": str(guild.owner_id),
+                "settings": settings
+            }
+
+        if action == "get_stats":
+            import psutil
+            return {
+                "status": "online",
+                "guilds": len(self.guilds),
+                "total_users": sum(g.member_count for g in self.guilds),
+                "latency_ms": round(self.latency * 1000, 2),
+                "cpu_percent": psutil.cpu_percent(interval=None),
+                "ram_percent": psutil.virtual_memory().percent,
+                "ram_used_mb": round(psutil.virtual_memory().used / 1024 / 1024, 2),
+            }
+
+        if action == "get_guilds":
+            return {
+                "guilds": [
+                    {
+                        "id": str(g.id),
+                        "name": g.name,
+                        "icon": str(g.icon) if g.icon else None,
+                        "member_count": g.member_count
+                    }
+                    for g in self.guilds
+                ]
+            }
+
+        return {"error": f"Unknown action: {action}"}
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         """Global error handler for all slash commands."""
@@ -187,9 +248,7 @@ async def main():
     bot.health_monitor = health_monitor
     health_monitor.start()
 
-    # Set bot instance for API server
-    from api_server import set_bot_instance
-    set_bot_instance(bot)
+    # API server now uses Redis RPC - no need to set bot_instance
 
     try:
         # Create the lock file

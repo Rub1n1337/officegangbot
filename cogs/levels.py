@@ -37,32 +37,39 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.settings_manager = bot.settings_manager
-        # Cooldown tracking: {guild_id: {user_id: last_xp_timestamp}}
-        self._xp_cooldowns: dict = {}
         self._xp_lock = asyncio.Lock()
-        # In-memory XP cache: {guild_id: {user_id: data_dict}}
-        self._xp_cache: dict = {}
-        self._dirty_guilds: set = set()  # Guilds with unsaved XP changes
-        self.cleanup_xp_cooldowns.start()
+        # Redis handles caching — keep local dict only as write buffer
+        self._write_buffer: dict = {}  # {guild_id: {user_id: data}}
+        self._dirty_guilds: set = set()
+        # Fallback cooldown tracking if Redis unavailable
+        self._xp_cooldowns: dict = {}
         self.flush_xp_cache.start()
 
-    async def _get_user_data_db(self, guild_id: int, user_id: int) -> dict:
-        """Returns XP data from cache or PostgreSQL."""
-        if guild_id not in self._xp_cache:
-            self._xp_cache[guild_id] = {}
+    async def _get_user_data(self, guild_id: int, user_id: int) -> dict:
+        """Returns XP data from Redis cache, falling back to PostgreSQL."""
+        # Try Redis first
+        if self.bot.redis:
+            cached = await self.bot.redis.get_xp_data(guild_id, user_id)
+            if cached is not None:
+                return cached
 
-        user_id_str = str(user_id)
-        if user_id_str not in self._xp_cache[guild_id]:
-            db_data = await self.bot.db.get_user_xp(guild_id, user_id)
-            self._xp_cache[guild_id][user_id_str] = db_data
+        # Fallback to PostgreSQL
+        if self.bot.db:
+            data = await self.bot.db.get_user_xp(guild_id, user_id)
+        else:
+            data = {'xp': 0, 'level': 0, 'display_name': None}
 
-        return dict(self._xp_cache[guild_id].get(user_id_str, {'xp': 0, 'level': 0}))
+        # Populate Redis cache
+        if self.bot.redis and data:
+            await self.bot.redis.set_xp_data(guild_id, user_id, data)
 
-    def _save_user_data(self, guild_id: int, user_id: int, data: dict):
-        """Saves XP data to in-memory cache only. Disk flush happens every 2 minutes."""
-        if guild_id not in self._xp_cache:
-            self._xp_cache[guild_id] = {}
-        self._xp_cache[guild_id][str(user_id)] = data
+        return data
+
+    def _save_user_data(self, guild_id: int, user_id: int, data: dict) -> None:
+        """Saves XP to write buffer and marks dirty for DB flush."""
+        if guild_id not in self._write_buffer:
+            self._write_buffer[guild_id] = {}
+        self._write_buffer[guild_id][str(user_id)] = data
         self._dirty_guilds.add(guild_id)
 
     async def _check_role_rewards(self, member: discord.Member, level: int):
@@ -99,17 +106,23 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         user_id = message.author.id
         now = datetime.datetime.utcnow().timestamp()
 
-        # Cooldown check (60 seconds)
-        guild_cooldowns = self._xp_cooldowns.setdefault(guild_id, {})
-        last_xp = guild_cooldowns.get(user_id, 0)
-        if now - last_xp < 60:
-            return
-        guild_cooldowns[user_id] = now
+        # Cooldown check via Redis (atomic, cross-process safe)
+        if self.bot.redis:
+            on_cooldown = await self.bot.redis.check_xp_cooldown(guild_id, user_id)
+            if on_cooldown:
+                return
+        else:
+            # Fallback to in-memory cooldown
+            guild_cooldowns = self._xp_cooldowns.setdefault(guild_id, {})
+            last_xp = guild_cooldowns.get(user_id, 0)
+            if now - last_xp < 60:
+                return
+            guild_cooldowns[user_id] = now
 
         # Award XP with lock to prevent race conditions
         xp_gain = random.randint(15, 25)
         async with self._xp_lock:
-            user_data = await self._get_user_data_db(guild_id, user_id)
+            user_data = await self._get_user_data(guild_id, user_id)
             old_level = user_data['level']
             user_data['xp'] += xp_gain
             new_level = get_level_from_xp(user_data['xp'])
@@ -117,6 +130,9 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             # Save username for leaderboard display even after user leaves
             user_data['display_name'] = message.author.display_name
             self._save_user_data(guild_id, user_id, user_data)
+            # Update Redis cache immediately
+            if self.bot.redis:
+                await self.bot.redis.set_xp_data(guild_id, user_id, user_data)
 
         # Level up notification
         if new_level > old_level:
@@ -147,7 +163,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     @app_commands.describe(member="Member to check. Defaults to yourself.")
     async def rank(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         member = member or ctx.author
-        user_data = await self._get_user_data_db(ctx.guild.id, member.id)
+        user_data = await self._get_user_data(ctx.guild.id, member.id)
 
         total_xp = user_data['xp']
         level = user_data['level']
@@ -216,28 +232,12 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         await reply(ctx, embed=embed)
 
 
-    @tasks.loop(minutes=10)
-    async def cleanup_xp_cooldowns(self):
-        """Removes stale XP cooldown entries older than 120 seconds."""
-        try:
-            now = datetime.datetime.utcnow().timestamp()
-            for guild_id in list(self._xp_cooldowns.keys()):
-                self._xp_cooldowns[guild_id] = {
-                    uid: ts for uid, ts in self._xp_cooldowns[guild_id].items()
-                    if now - ts < 120
-                }
-        except Exception as e:
-            logger.error(f"cleanup_xp_cooldowns crashed: {e}", exc_info=True)
-
-    @cleanup_xp_cooldowns.before_loop
-    async def before_cleanup_xp(self):
-        await self.bot.wait_until_ready()
 
     @tasks.loop(minutes=2)
     async def flush_xp_cache(self):
-        """Flushes in-memory XP cache to PostgreSQL every 2 minutes via bulk upsert."""
+        """Flushes XP write buffer to PostgreSQL every 2 minutes."""
         try:
-            if not self._dirty_guilds:
+            if not self._dirty_guilds or not self.bot.db:
                 return
 
             dirty = set(self._dirty_guilds)
@@ -245,9 +245,9 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
             records = []
             for guild_id in dirty:
-                if guild_id not in self._xp_cache:
+                if guild_id not in self._write_buffer:
                     continue
-                for user_id_str, data in self._xp_cache[guild_id].items():
+                for user_id_str, data in self._write_buffer[guild_id].items():
                     records.append({
                         'guild_id': guild_id,
                         'user_id': int(user_id_str),
@@ -255,10 +255,11 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                         'level': data.get('level', 0),
                         'display_name': data.get('display_name', '')
                     })
+                del self._write_buffer[guild_id]
 
             if records:
                 await self.bot.db.bulk_upsert_xp(records)
-                logger.info(f"XP cache flushed: {len(records)} records to PostgreSQL")
+                logger.info(f"XP flush: {len(records)} records to PostgreSQL")
 
         except Exception as e:
             logger.error(f"flush_xp_cache crashed: {e}", exc_info=True)
@@ -268,11 +269,10 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         await self.bot.wait_until_ready()
 
     def cog_unload(self):
-        self.cleanup_xp_cooldowns.cancel()
         self.flush_xp_cache.cancel()
         # Don't attempt DB write on unload - pool may already be closed
         self._dirty_guilds.clear()
-        self._xp_cache.clear()
+        self._write_buffer.clear()
 
 
 async def setup(bot: commands.Bot):

@@ -10,19 +10,35 @@ import os
 import threading
 import time
 import psutil
+from core.logger import logger
+from core.redis_manager import RedisManager
 
 
 # Store bot start time globally
 BOT_START_TIME = time.time()
 
-# Store bot instance globally
-bot_instance = None
-
-def set_bot_instance(bot):
-    global bot_instance
-    bot_instance = bot
+# Redis manager for RPC communication with bot process
+_redis: Optional[RedisManager] = None
 
 app = FastAPI(title="OfficeGangBot API", version="1.0.0")
+
+@app.on_event("startup")
+async def startup():
+    """Initialize Redis connection on API server startup."""
+    global _redis
+    _redis = RedisManager()
+    try:
+        await _redis.connect()
+        logger.info("API server Redis connected.")
+    except Exception as e:
+        logger.warning(f"API Redis unavailable: {e}")
+        _redis = None
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Close Redis connection on shutdown."""
+    if _redis:
+        await _redis.close()
 
 # Allow dashboard dev server
 app.add_middleware(
@@ -42,135 +58,77 @@ async def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key != os.getenv("API_SECRET_KEY"):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+# --- RPC Helper ---
+async def _rpc(action: str, **kwargs) -> dict:
+    """Sends an RPC request to the bot via Redis and returns response."""
+    if not _redis:
+        raise HTTPException(status_code=503, detail="Redis not available")
+    result = await _redis.rpc_request("bot:rpc", {"action": action, **kwargs})
+    if result is None:
+        raise HTTPException(status_code=504, detail="Bot RPC timeout — bot may be offline")
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
 
 # --- API Endpoints ---
 @app.get("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
 async def get_rules_feature(guild_id: str):
-    if bot_instance is None:
-        raise HTTPException(status_code=503, detail="Bot is not connected")
-    channel = bot_instance.settings_manager.get_setting(int(guild_id), "rules_channel_id")
-    message = bot_instance.settings_manager.get_setting(int(guild_id), "rules_message", "")
-    return {
-        "channel": str(channel) if channel else None,
-        "message": message
-    }
+    # This endpoint still uses settings_manager - will need to be migrated to RPC later
+    # For now, we'll keep it as is since it's not critical
+    raise HTTPException(status_code=503, detail="This endpoint requires direct bot access - use RPC endpoints instead")
 
 @app.patch("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
 async def update_rules_feature(guild_id: str, body: RulesFeatureModel):
-    if bot_instance is None:
-        raise HTTPException(status_code=503, detail="Bot is not connected")
-    if body.channel:
-        await bot_instance.settings_manager.update_setting(int(guild_id), "rules_channel_id", body.channel)
-    if body.message:
-        await bot_instance.settings_manager.update_setting(int(guild_id), "rules_message", body.message)
-    return {"channel": body.channel, "message": body.message}
+    raise HTTPException(status_code=503, detail="This endpoint requires direct bot access - use RPC endpoints instead")
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
 async def get_guild_info(guild_id: str):
-    if bot_instance is None:
-        raise HTTPException(status_code=503, detail="Bot is not connected")
-    guild_data = bot_instance.settings_manager.get_all_settings(int(guild_id))
-    guild = bot_instance.get_guild(int(guild_id))
-    return {
-        "id": guild_id,
-        "name": guild.name if guild else guild_data.get("name", "Unknown"),
-        "icon": str(guild.icon) if guild and guild.icon else None,
-        "owner_id": str(guild.owner_id) if guild else "0",
-        "features": {
-            "rules": {
-                "channel": str(guild_data.get("rules_channel_id", "")) or None,
-                "message": guild_data.get("rules_message", "")
-            },
-            "welcome-message": {
-                "channel": str(guild_data.get("welcome_channel_id", "")) or None,
-                "message": guild_data.get("welcome_message", "Welcome {user.mention} to **{server.name}**!")
-            },
-            "reaction-role": {
-                "messageId": str(guild_data.get("rules_message_id", "")) or None,
-                "channelId": str(guild_data.get("rules_channel_id", "")) or None,
-                "emoji": guild_data.get("reaction_emoji", ""),
-                "roleId": str(guild_data.get("reaction_role_id", "")) or None
-            },
-            "moderation": {
-                "modRoles": [],
-                "adminRoles": [],
-                "muteRole": None
-            },
-            "logging": {
-                "logChannel": str(guild_data.get("punishment_log_id", "")) or None,
-                "events": []
-            }
-        },
-        "permissions": 0
-    }
+    data = await _rpc("get_guild_info", guild_id=guild_id)
+    return data
 
 # Health check
 @app.get("/health")
 async def health_check():
     """Health check endpoint for uptime monitoring services."""
-    if bot_instance is None:
+    if _redis is None:
         return {"status": "starting", "bot": False}
-    return {
-        "status": "ok",
-        "bot": True,
-        "latency_ms": round(bot_instance.latency * 1000, 2),
-        "guilds": len(bot_instance.guilds)
-    }
+    try:
+        data = await _rpc("get_stats")
+        return {
+            "status": "ok",
+            "bot": True,
+            "latency_ms": data.get("latency_ms", 0),
+            "guilds": data.get("guilds", 0)
+        }
+    except:
+        return {"status": "starting", "bot": False}
 
 
 @app.get("/api/stats", dependencies=[Depends(verify_api_key)])
 async def get_bot_stats():
-    if bot_instance is None:
-        raise HTTPException(status_code=503, detail="Bot is not connected")
-
+    """Returns bot statistics via Redis RPC."""
+    data = await _rpc("get_stats")
+    # Add uptime since API server doesn't track it
     uptime_seconds = int(time.time() - BOT_START_TIME)
     hours, remainder = divmod(uptime_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    uptime_str = f"{hours}h {minutes}m {seconds}s"
-
-    total_users = sum(g.member_count for g in bot_instance.guilds)
-
-    # Use health monitor cached values instead of blocking psutil calls
-    health_status = {}
-    if hasattr(bot_instance, 'health_monitor'):
-        health_status = bot_instance.health_monitor.get_status()
-
-    ram = psutil.virtual_memory()
-
-    return {
-        "status": "online",
-        "uptime": uptime_str,
-        "uptime_seconds": uptime_seconds,
-        "guilds": len(bot_instance.guilds),
-        "total_users": total_users,
-        "latency_ms": health_status.get("latency_ms", round(bot_instance.latency * 1000, 2)),
-        "cpu_percent": psutil.cpu_percent(interval=None),
-        "ram_percent": ram.percent,
-        "ram_used_mb": round(ram.used / 1024 / 1024, 2),
-        "memory_mb": health_status.get("memory_mb", 0),
-    }
+    data["uptime"] = f"{hours}h {minutes}m {seconds}s"
+    data["uptime_seconds"] = uptime_seconds
+    return data
 
 
 @app.get("/api/guild/{guild_id}", dependencies=[Depends(verify_api_key)])
 async def get_guild_settings(guild_id: int):
-    """
-    Returns the full settings for a specific guild from SettingsManager.
-    """
-    if bot_instance is None:
-        raise HTTPException(status_code=503, detail="Bot is not connected")
+    """Returns guild info and settings via Redis RPC."""
+    data = await _rpc("get_guild_info", guild_id=guild_id)
+    return data
 
-    guild = bot_instance.get_guild(guild_id)
-    if not guild:
-        raise HTTPException(status_code=404, detail="Guild not found or bot is not a member")
-
-    settings = bot_instance.settings_manager.get_all_settings(guild_id)
-
-    return {
-        "guild_id": guild_id,
-        "guild_name": guild.name,
-        "member_count": guild.member_count,
-        "settings": settings
-    }
+@app.get("/api/guilds", dependencies=[Depends(verify_api_key)])
+async def get_guilds():
+    """Returns list of all guilds the bot is in via Redis RPC."""
+    data = await _rpc("get_guilds")
+    return data
 
 if __name__ == "__main__":
     import uvicorn

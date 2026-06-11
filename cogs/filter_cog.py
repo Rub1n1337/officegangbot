@@ -25,25 +25,37 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.settings_manager = bot.settings_manager
-        self.pattern_cache = {}
+        self._pattern_cache: dict = {}  # Local fallback if Redis unavailable
 
-    def _get_pattern(self, guild_id: int):
-        if guild_id in self.pattern_cache:
-            return self.pattern_cache[guild_id]
+    async def _get_pattern(self, guild_id: int):
+        """Returns compiled regex pattern from Redis cache or builds it."""
+        # Try Redis first
+        if self.bot.redis:
+            cached = await self.bot.redis.get_filter_pattern(guild_id)
+            if cached:
+                return re.compile(cached, re.IGNORECASE)
 
-        settings = self.settings_manager.get_setting(guild_id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        banned_words = settings.get('filter_words', [])
-        if not banned_words:
+        # Build pattern from settings
+        words = self.settings_manager.get_setting(guild_id, 'filter_words', [])
+        if not words:
             return None
 
-        pattern = r'\b(' + '|'.join(re.escape(word) for word in banned_words) + r')\b'
-        compiled_pattern = re.compile(pattern, re.IGNORECASE)
-        self.pattern_cache[guild_id] = compiled_pattern
-        return compiled_pattern
+        pattern_str = r'\b(' + '|'.join(re.escape(w) for w in words) + r')\b'
 
-    def _invalidate_pattern_cache(self, guild_id: int):
-        if guild_id in self.pattern_cache:
-            del self.pattern_cache[guild_id]
+        # Cache in Redis
+        if self.bot.redis:
+            await self.bot.redis.set_filter_pattern(guild_id, pattern_str)
+        else:
+            self._pattern_cache[guild_id] = re.compile(pattern_str, re.IGNORECASE)
+
+        return re.compile(pattern_str, re.IGNORECASE)
+
+    async def _invalidate_pattern(self, guild_id: int):
+        """Invalidates pattern cache when word list changes."""
+        if self.bot.redis:
+            await self.bot.redis.invalidate_filter_pattern(guild_id)
+        if guild_id in self._pattern_cache:
+            del self._pattern_cache[guild_id]
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -54,7 +66,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         if not settings.get('filter_enabled'):
             return
 
-        pattern = self._get_pattern(message.guild.id)
+        pattern = await self._get_pattern(message.guild.id)
         if pattern and pattern.search(message.content):
             try:
                 await message.delete()
@@ -112,7 +124,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
             return
         banned_words.append(word)
         await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
-        self._invalidate_pattern_cache(ctx.guild.id)
+        await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ The word `{word}` has been added to the filter.")
 
     @filter.command(name="add_defaults", description="Adds the default list of profanities to the filter.")
@@ -131,7 +143,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         
         banned_words.extend(new_words)
         await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
-        self._invalidate_pattern_cache(ctx.guild.id)
+        await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ Added **{added_count}** new words from the default profanity list to your filter.")
 
     @filter.command(name="remove", description="Removes a word from the filter.")
@@ -146,7 +158,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
             return
         banned_words.remove(word)
         await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
-        self._invalidate_pattern_cache(ctx.guild.id)
+        await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ The word `{word}` has been removed from the filter.")
 
     @filter.command(name="list", description="Lists all words in the filter.")

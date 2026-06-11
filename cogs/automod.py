@@ -16,9 +16,9 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.settings_manager = bot.settings_manager
-        # Message tracking: {guild_id: {user_id: [timestamps]}}
+        # Message log now handled by Redis (no in-memory dict needed)
+        # Fallback if Redis unavailable
         self._message_log: dict = {}
-        self.cleanup_message_log.start()
 
     async def _apply_mute(self, member: discord.Member, guild: discord.Guild, reason: str):
         """Applies mute and saves to timed_punishments for auto-expiry via TimedEventsCog."""
@@ -116,56 +116,52 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             return
 
         # --- Anti-spam (5 messages in 3 seconds) ---
-        guild_log = self._message_log.setdefault(guild_id, {})
-        user_log = guild_log.setdefault(user_id, [])
-
-        # Keep only messages from the last 3 seconds
-        user_log[:] = [t for t in user_log if now - t < 3]
-        user_log.append(now)
-
-        if len(user_log) >= 5:
-            user_log.clear()
-            try:
-                await message.channel.send(
-                    f"⚠️ {message.author.mention} You are sending messages too fast. "
-                    f"You have been muted for **10 minutes**.",
-                    delete_after=10
+        if self.bot.redis:
+            msg_count = await self.bot.redis.log_message(guild_id, user_id)
+            if msg_count >= 5:
+                await self.bot.redis.clear_message_log(guild_id, user_id)
+                try:
+                    await message.channel.send(
+                        f"⚠️ {message.author.mention} You are sending messages too fast. "
+                        f"You have been muted for **10 minutes**.",
+                        delete_after=10
+                    )
+                except discord.Forbidden:
+                    pass
+                await self._log_automod(
+                    message.guild,
+                    f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
+                    f"Sent 5+ messages in 3 seconds. Auto-muted for **10 minutes**."
                 )
-            except discord.Forbidden:
-                pass
+                await self._apply_mute(message.author, message.guild, "AutoMod: spam detection")
+        else:
+            # Fallback to in-memory if Redis unavailable
+            guild_log = self._message_log.setdefault(guild_id, {})
+            user_log = guild_log.setdefault(user_id, [])
 
-            await self._log_automod(
-                message.guild,
-                f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                f"Sent 5+ messages in 3 seconds. Auto-muted for **10 minutes**."
-            )
-            await self._apply_mute(
-                message.author,
-                message.guild,
-                "AutoMod: spam detection"
-            )
+            # Keep only messages from the last 3 seconds
+            user_log[:] = [t for t in user_log if now - t < 3]
+            user_log.append(now)
+
+            if len(user_log) >= 5:
+                user_log.clear()
+                try:
+                    await message.channel.send(
+                        f"⚠️ {message.author.mention} You are sending messages too fast. "
+                        f"You have been muted for **10 minutes**.",
+                        delete_after=10
+                    )
+                except discord.Forbidden:
+                    pass
+
+                await self._log_automod(
+                    message.guild,
+                    f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
+                    f"Sent 5+ messages in 3 seconds. Auto-muted for **10 minutes**."
+                )
+                await self._apply_mute(message.author, message.guild, "AutoMod: spam detection")
 
 
-    @tasks.loop(minutes=5)
-    async def cleanup_message_log(self):
-        """Cleans up stale message log entries older than 10 seconds."""
-        try:
-            now = datetime.datetime.utcnow().timestamp()
-            for guild_id in list(self._message_log.keys()):
-                for user_id in list(self._message_log[guild_id].keys()):
-                    self._message_log[guild_id][user_id] = [
-                        t for t in self._message_log[guild_id][user_id]
-                        if now - t < 10
-                    ]
-        except Exception as e:
-            logger.error(f"cleanup_message_log crashed: {e}", exc_info=True)
-
-    @cleanup_message_log.before_loop
-    async def before_cleanup(self):
-        await self.bot.wait_until_ready()
-
-    def cog_unload(self):
-        self.cleanup_message_log.cancel()
 
 
 async def setup(bot: commands.Bot):
