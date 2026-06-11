@@ -39,18 +39,28 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             await member.add_roles(mute_role, reason=reason)
             logger.info(f"AutoMod: Muted {member} in {guild.name} for 10 minutes. Reason: {reason}")
 
-            # Save to timed_punishments so TimedEventsCog auto-unmutes after 10 minutes
-            expires_at = (
-                datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
-            ).timestamp()
-            timed = self.bot.settings_manager.get_setting(guild.id, 'timed_punishments', {})
-            timed[str(member.id)] = {
-                'type': 'mute',
-                'expires_at': expires_at,
-                'reason': reason,
-                'moderator_id': self.bot.user.id
-            }
-            await self.bot.settings_manager.update_setting(guild.id, 'timed_punishments', timed)
+            # Save to PostgreSQL for auto-expiry via TimedEventsCog
+            expires_at_dt = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+
+            if self.bot.db:
+                await self.bot.db.add_timed_punishment(
+                    guild_id=guild.id,
+                    user_id=member.id,
+                    punishment_type='mute',
+                    expires_at=expires_at_dt.replace(tzinfo=datetime.timezone.utc),
+                    reason=reason,
+                    moderator_id=self.bot.user.id
+                )
+            else:
+                # Fallback to JSON if DB unavailable
+                timed = self.bot.settings_manager.get_setting(guild.id, 'timed_punishments', {})
+                timed[str(member.id)] = {
+                    'type': 'mute',
+                    'expires_at': expires_at_dt.timestamp(),
+                    'reason': reason,
+                    'moderator_id': self.bot.user.id
+                }
+                await self.bot.settings_manager.update_setting(guild.id, 'timed_punishments', timed)
 
         except discord.Forbidden:
             logger.warning(f"AutoMod: Cannot mute {member} in {guild.name} — missing permissions")

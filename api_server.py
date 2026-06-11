@@ -106,8 +106,16 @@ async def get_guild_info(guild_id: str):
 
 # Health check
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+async def health_check():
+    """Health check endpoint for uptime monitoring services."""
+    if bot_instance is None:
+        return {"status": "starting", "bot": False}
+    return {
+        "status": "ok",
+        "bot": True,
+        "latency_ms": round(bot_instance.latency * 1000, 2),
+        "guilds": len(bot_instance.guilds)
+    }
 
 
 @app.get("/api/stats", dependencies=[Depends(verify_api_key)])

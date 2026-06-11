@@ -207,30 +207,6 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         except discord.NotFound:
             await reply(ctx, f"❌ **{user}** is not banned from this server.", ephemeral=True)
 
-    @commands.hybrid_command(name="mute", description="Mute a member for a specified duration.")
-    @app_commands.describe(member="The member to mute.", duration="Duration (e.g., 10m, 1h, 1d). Max: 28d.", reason="The reason for the mute.")
-    @commands.bot_has_permissions(moderate_members=True)
-    @commands.cooldown(3, 10, commands.BucketType.user)
-    @has_permission("mute")
-    async def mute(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
-        self._check_hierarchy(ctx, member)
-        try:
-            units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
-            amount = int(duration[:-1])
-            unit = duration[-1].lower()
-            if unit not in units:
-                raise ValueError()
-            delta = timedelta(seconds=amount * units[unit])
-            if delta > timedelta(days=28):
-                return await reply(ctx, "❌ Mute duration cannot exceed 28 days.", ephemeral=True)
-        except (ValueError, KeyError):
-            return await reply(ctx, "❌ Invalid duration format. Use a number followed by `s`, `m`, `h`, or `d`.", ephemeral=True)
-
-        await self._notify_user(member, ctx.guild.name, "muted", reason, duration=duration)
-        await member.timeout(delta, reason=f"{reason} (Moderator: {ctx.author.id})")
-        await self._log_action(ctx, "Member Muted", member, reason, duration=duration)
-        await reply(ctx, f"✅ **{member}** has been muted for {duration}.", ephemeral=True)
-
     @commands.hybrid_command(name="unmute", description="Unmute a member.")
     @app_commands.describe(member="The member to unmute.", reason="The reason for unmuting.")
     @commands.bot_has_permissions(moderate_members=True)

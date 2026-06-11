@@ -48,6 +48,19 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
     def cog_unload(self):
         self.check_expired_punishments.cancel()
 
+    def _check_hierarchy(self, ctx: commands.Context, target: discord.Member):
+        """Checks if the author can perform an action on the target."""
+        if target.id == ctx.author.id:
+            raise commands.CheckFailure("You cannot moderate yourself.")
+        if target.id == self.bot.user.id:
+            raise commands.CheckFailure("I cannot moderate myself.")
+        if target.id == ctx.guild.owner_id:
+            raise commands.CheckFailure("You cannot moderate the server owner.")
+        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role <= target.top_role:
+            raise commands.CheckFailure("You cannot moderate a member with an equal or higher role.")
+        if ctx.guild.me.top_role <= target.top_role:
+            raise commands.CheckFailure("I cannot moderate a member with an equal or higher role than me.")
+
     @tasks.loop(seconds=60)
     async def check_expired_punishments(self):
         """Checks PostgreSQL for expired punishments and lifts them."""
@@ -117,58 +130,33 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
     async def before_check(self):
         await self.bot.wait_until_ready()
 
-    @commands.hybrid_command(name="tempmute", description="Temporarily mute a member.")
+    @commands.hybrid_command(name="mute", description="Temporarily mute a member using Discord timeout.")
     @app_commands.describe(
         member="Member to mute.",
-        duration="Duration (e.g. 30m, 2h, 1d).",
+        duration="Duration (e.g. 30m, 2h, 1d). Max: 28d.",
         reason="Reason for the mute."
     )
+    @commands.bot_has_permissions(moderate_members=True)
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("mute")
-    async def tempmute(self, ctx: commands.Context, member: discord.Member,
+    async def mute(self, ctx: commands.Context, member: discord.Member,
                        duration: str, *, reason: str = "No reason provided"):
+        self._check_hierarchy(ctx, member)
         seconds = parse_duration(duration)
         if not seconds:
             return await reply(ctx,
                 "❌ Invalid duration format. Use: `30s`, `10m`, `2h`, `1d`",
                 ephemeral=True
             )
+        if seconds > 60 * 60 * 24 * 28:
+            return await reply(ctx,
+                "❌ Discord timeout cannot exceed 28 days.",
+                ephemeral=True
+            )
 
-        mute_role = discord.utils.get(ctx.guild.roles, name="Muted")
-        if not mute_role:
-            # Create mute role if it doesn't exist
-            try:
-                mute_role = await ctx.guild.create_role(name="Muted", reason="Created for mute system")
-                for channel in ctx.guild.channels:
-                    await channel.set_permissions(mute_role, send_messages=False, speak=False)
-            except discord.Forbidden:
-                return await reply(ctx,
-                    "❌ I don't have permission to create roles.",
-                    ephemeral=True
-                )
+        delta = datetime.timedelta(seconds=seconds)
 
-        await member.add_roles(mute_role, reason=f"{reason} | Moderator: {ctx.author}")
-
-        expires_at = (datetime.datetime.utcnow() +
-                      datetime.timedelta(seconds=seconds)).timestamp()
-        timed = self.settings_manager.get_setting(ctx.guild.id, 'timed_punishments', {})
-        timed[str(member.id)] = {
-            'type': 'mute',
-            'expires_at': expires_at,
-            'reason': reason,
-            'moderator_id': ctx.author.id
-        }
-        await self.settings_manager.update_setting(ctx.guild.id, 'timed_punishments', timed)
-
-        embed = discord.Embed(title="🔇 Temporary Mute", color=discord.Color.orange())
-        embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
-        embed.add_field(name="Duration", value=format_duration(seconds), inline=True)
-        embed.add_field(name="Expires", value=f"<t:{int(expires_at)}:R>", inline=True)
-        embed.add_field(name="Reason", value=reason, inline=False)
-        embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
-        await reply(ctx, embed=embed)
-
-        # DM user
+        # DM user before timeout
         try:
             dm_embed = discord.Embed(
                 title=f"🔇 You have been temporarily muted in {ctx.guild.name}",
@@ -180,6 +168,16 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         except discord.Forbidden:
             pass
 
+        await member.timeout(delta, reason=f"{reason} | Moderator: {ctx.author}")
+
+        expires_at = discord.utils.utcnow() + delta
+        embed = discord.Embed(title="🔇 Temporary Mute", color=discord.Color.orange())
+        embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
+        embed.add_field(name="Duration", value=format_duration(seconds), inline=True)
+        embed.add_field(name="Expires", value=f"<t:{int(expires_at.timestamp())}:R>", inline=True)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
+        await reply(ctx, embed=embed)
         logger.info(f"Temp-muted {member} in {ctx.guild.name} for {format_duration(seconds)} by {ctx.author}")
 
     @commands.hybrid_command(name="tempban", description="Temporarily ban a member.")
@@ -216,14 +214,22 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
 
         await member.ban(reason=f"{reason} | Moderator: {ctx.author} | Duration: {format_duration(seconds)}")
 
-        timed = self.settings_manager.get_setting(ctx.guild.id, 'timed_punishments', {})
-        timed[str(member.id)] = {
-            'type': 'ban',
-            'expires_at': expires_at,
-            'reason': reason,
-            'moderator_id': ctx.author.id
-        }
-        await self.settings_manager.update_setting(ctx.guild.id, 'timed_punishments', timed)
+        expires_at_dt = datetime.datetime.utcnow() + datetime.timedelta(seconds=seconds)
+        expires_at = expires_at_dt.timestamp()
+
+        if self.bot.db:
+            await self.bot.db.add_timed_punishment(
+                guild_id=ctx.guild.id,
+                user_id=member.id,
+                punishment_type='ban',
+                expires_at=expires_at_dt.replace(tzinfo=datetime.timezone.utc),
+                reason=reason,
+                moderator_id=ctx.author.id
+            )
+        else:
+            timed = self.settings_manager.get_setting(ctx.guild.id, 'timed_punishments', {})
+            timed[str(member.id)] = {'type': 'ban', 'expires_at': expires_at, 'reason': reason, 'moderator_id': ctx.author.id}
+            await self.settings_manager.update_setting(ctx.guild.id, 'timed_punishments', timed)
 
         embed = discord.Embed(title="🔨 Temporary Ban", color=discord.Color.red())
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
