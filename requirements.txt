@@ -5,3 +5,4 @@ psutil               # For monitoring system resources like memory usage
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.0.0
+asyncpg>=0.29.0

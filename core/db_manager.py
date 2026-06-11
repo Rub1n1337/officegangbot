@@ -1,0 +1,303 @@
+# core/db_manager.py
+"""
+Async PostgreSQL database manager using asyncpg connection pool.
+Replaces the JSON-based SettingsManager for all persistent storage.
+"""
+
+import asyncpg
+import os
+import datetime
+from typing import Optional, List, Dict, Any
+from core.logger import logger
+
+
+class DatabaseManager:
+    """
+    Async PostgreSQL manager with connection pooling via asyncpg.
+    Initialize once at bot startup via connect(), close pool via close().
+    """
+
+    def __init__(self):
+        self._pool: Optional[asyncpg.Pool] = None
+
+    async def connect(self) -> None:
+        """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            raise ValueError("DATABASE_URL environment variable is not set.")
+        try:
+            self._pool = await asyncpg.create_pool(
+                dsn=dsn,
+                min_size=2,
+                max_size=10,
+                command_timeout=30,
+            )
+            logger.info("PostgreSQL connection pool created successfully.")
+            await self._init_schema()
+        except Exception as e:
+            logger.critical(f"Failed to connect to PostgreSQL: {e}", exc_info=True)
+            raise
+
+    async def close(self) -> None:
+        """Closes the connection pool. Call this in bot.close()."""
+        if self._pool:
+            await self._pool.close()
+            logger.info("PostgreSQL connection pool closed.")
+
+    async def _init_schema(self) -> None:
+        """Runs the SQL schema initialization script."""
+        schema_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'init_db.sql')
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            schema_sql = f.read()
+        async with self._pool.acquire() as conn:
+            await conn.execute(schema_sql)
+        logger.info("Database schema initialized.")
+
+    @property
+    def pool(self) -> asyncpg.Pool:
+        if not self._pool:
+            raise RuntimeError("DatabaseManager is not connected. Call connect() first.")
+        return self._pool
+
+    # -------------------------
+    # Guild settings
+    # -------------------------
+
+    async def ensure_guild(self, guild_id: int) -> None:
+        """Inserts guild row if it doesn't exist (upsert)."""
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO guilds (guild_id) VALUES ($1)
+                ON CONFLICT (guild_id) DO NOTHING
+                """,
+                guild_id
+            )
+
+    async def get_guild_setting(self, guild_id: int, key: str, default: Any = None) -> Any:
+        """Returns a single guild setting by column name."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"SELECT {key} FROM guilds WHERE guild_id = $1",
+                guild_id
+            )
+            if row is None:
+                return default
+            value = row[key]
+            return value if value is not None else default
+
+    async def set_guild_setting(self, guild_id: int, key: str, value: Any) -> None:
+        """Updates a single guild setting by column name."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                f"UPDATE guilds SET {key} = $1, updated_at = NOW() WHERE guild_id = $2",
+                value, guild_id
+            )
+
+    async def get_all_guild_settings(self, guild_id: int) -> Dict[str, Any]:
+        """Returns all settings for a guild as a dict."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM guilds WHERE guild_id = $1",
+                guild_id
+            )
+            return dict(row) if row else {}
+
+    # -------------------------
+    # XP / Levels
+    # -------------------------
+
+    async def get_user_xp(self, guild_id: int, user_id: int) -> Dict[str, Any]:
+        """Returns XP data for a user."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT xp, level, display_name FROM users_xp WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id
+            )
+            if row:
+                return dict(row)
+            return {'xp': 0, 'level': 0, 'display_name': None}
+
+    async def upsert_user_xp(self, guild_id: int, user_id: int, xp: int, level: int, display_name: str) -> None:
+        """Inserts or updates XP data for a user."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO users_xp (guild_id, user_id, xp, level, display_name, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                ON CONFLICT (guild_id, user_id) DO UPDATE
+                SET xp = EXCLUDED.xp,
+                    level = EXCLUDED.level,
+                    display_name = EXCLUDED.display_name,
+                    updated_at = NOW()
+                """,
+                guild_id, user_id, xp, level, display_name
+            )
+
+    async def bulk_upsert_xp(self, records: List[Dict[str, Any]]) -> None:
+        """
+        Bulk upsert XP records for multiple users at once.
+        records: list of dicts with keys: guild_id, user_id, xp, level, display_name
+        """
+        if not records:
+            return
+        async with self.pool.acquire() as conn:
+            await conn.executemany(
+                """
+                INSERT INTO users_xp (guild_id, user_id, xp, level, display_name, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                ON CONFLICT (guild_id, user_id) DO UPDATE
+                SET xp = EXCLUDED.xp,
+                    level = EXCLUDED.level,
+                    display_name = EXCLUDED.display_name,
+                    updated_at = NOW()
+                """,
+                [(r['guild_id'], r['user_id'], r['xp'], r['level'], r['display_name']) for r in records]
+            )
+        logger.info(f"Bulk XP upsert: {len(records)} records.")
+
+    async def get_leaderboard(self, guild_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """Returns top N users by XP for a guild."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT user_id, xp, level, display_name
+                FROM users_xp
+                WHERE guild_id = $1
+                ORDER BY xp DESC
+                LIMIT $2
+                """,
+                guild_id, limit
+            )
+            return [dict(r) for r in rows]
+
+    # -------------------------
+    # Warnings
+    # -------------------------
+
+    async def add_warning(self, guild_id: int, user_id: int, reason: str,
+                          moderator_id: int, moderator_name: str) -> int:
+        """Adds a warning and returns its ID."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO warnings (guild_id, user_id, reason, moderator_id, moderator_name)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id
+                """,
+                guild_id, user_id, reason, moderator_id, moderator_name
+            )
+            return row['id']
+
+    async def get_warnings(self, guild_id: int, user_id: int) -> List[Dict[str, Any]]:
+        """Returns all warnings for a user."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, reason, moderator_id, moderator_name, created_at
+                FROM warnings
+                WHERE guild_id = $1 AND user_id = $2
+                ORDER BY created_at ASC
+                """,
+                guild_id, user_id
+            )
+            return [dict(r) for r in rows]
+
+    async def clear_warnings(self, guild_id: int, user_id: int) -> int:
+        """Clears all warnings for a user. Returns count deleted."""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM warnings WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id
+            )
+            return int(result.split()[-1])
+
+    # -------------------------
+    # Timed Punishments
+    # -------------------------
+
+    async def add_timed_punishment(self, guild_id: int, user_id: int,
+                                    punishment_type: str, expires_at: datetime.datetime,
+                                    reason: str = None, moderator_id: int = None) -> None:
+        """Adds or replaces a timed punishment."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO timed_punishments (guild_id, user_id, punishment_type, expires_at, reason, moderator_id)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (guild_id, user_id) DO UPDATE
+                SET punishment_type = EXCLUDED.punishment_type,
+                    expires_at = EXCLUDED.expires_at,
+                    reason = EXCLUDED.reason,
+                    moderator_id = EXCLUDED.moderator_id,
+                    created_at = NOW()
+                """,
+                guild_id, user_id, punishment_type, expires_at, reason, moderator_id
+            )
+
+    async def get_expired_punishments(self) -> List[Dict[str, Any]]:
+        """Returns all punishments that have expired."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT guild_id, user_id, punishment_type
+                FROM timed_punishments
+                WHERE expires_at <= NOW()
+                """
+            )
+            return [dict(r) for r in rows]
+
+    async def remove_timed_punishment(self, guild_id: int, user_id: int) -> None:
+        """Removes a timed punishment after it has been lifted."""
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM timed_punishments WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id
+            )
+
+    async def get_timed_punishments(self, guild_id: int) -> List[Dict[str, Any]]:
+        """Returns all active timed punishments for a guild."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT user_id, punishment_type, expires_at, reason
+                FROM timed_punishments
+                WHERE guild_id = $1
+                ORDER BY expires_at ASC
+                """,
+                guild_id
+            )
+            return [dict(r) for r in rows]
+
+    # -------------------------
+    # Level Roles
+    # -------------------------
+
+    async def set_level_role(self, guild_id: int, level: int, role_id: int) -> None:
+        """Sets a role reward for a specific level."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO level_roles (guild_id, level, role_id)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (guild_id, level) DO UPDATE SET role_id = EXCLUDED.role_id
+                """,
+                guild_id, level, role_id
+            )
+
+    async def get_level_roles(self, guild_id: int) -> Dict[int, int]:
+        """Returns {level: role_id} mapping for a guild."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT level, role_id FROM level_roles WHERE guild_id = $1",
+                guild_id
+            )
+            return {r['level']: r['role_id'] for r in rows}

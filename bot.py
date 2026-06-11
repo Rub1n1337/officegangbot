@@ -22,6 +22,7 @@ from config import load_config
 # from core.webserver import keep_alive
 from core.settings_manager import SettingsManager
 from core.health_monitor import HealthMonitor
+from core.db_manager import DatabaseManager
 from cogs.utils import reply
 
 # --- Bot Initialization ---
@@ -55,12 +56,27 @@ class MyBot(commands.Bot):
         )
 
         self.settings_manager = settings_manager
+        self.db = None
 
         # Set up the global error handler for slash commands
         self.tree.on_error = self.on_app_command_error
 
+    async def close(self):
+        if hasattr(self, 'db') and self.db:
+            await self.db.close()
+        await super().close()
+
     async def setup_hook(self):
         """This is called once when the bot logs in, to load cogs."""
+        # Initialize database
+        self.db = DatabaseManager()
+        try:
+            await self.db.connect()
+        except Exception as e:
+            logger.critical(f"Failed to initialize database: {e}")
+            # Bot continues with JSON fallback if DB is unavailable
+            self.db = None
+
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
         for filename in os.listdir(cogs_dir):

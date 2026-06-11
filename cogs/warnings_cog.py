@@ -15,16 +15,6 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         self.bot = bot
         self.settings_manager = bot.settings_manager
 
-    def _get_warnings(self, guild_id: int, user_id: int) -> list:
-        """Returns the list of warnings for a user."""
-        warnings_data = self.settings_manager.get_setting(guild_id, 'warnings', {})
-        return warnings_data.get(str(user_id), [])
-
-    async def _save_warnings(self, guild_id: int, user_id: int, warnings: list):
-        """Saves the list of warnings for a user."""
-        warnings_data = self.settings_manager.get_setting(guild_id, 'warnings', {})
-        warnings_data[str(user_id)] = warnings
-        await self.settings_manager.update_setting(guild_id, 'warnings', warnings_data)
 
     @commands.hybrid_command(name="warn", description="Issue a warning to a server member.")
     @app_commands.describe(member="Member to warn.", reason="Reason for the warning.")
@@ -36,15 +26,10 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         if member.bot:
             return await reply(ctx, "❌ You cannot warn bots.", ephemeral=True)
 
-        warnings = self._get_warnings(ctx.guild.id, member.id)
-        warning_entry = {
-            "reason": reason,
-            "moderator_id": ctx.author.id,
-            "moderator_name": str(ctx.author),
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }
-        warnings.append(warning_entry)
-        await self._save_warnings(ctx.guild.id, member.id, warnings)
+        warning_id = await self.bot.db.add_warning(
+            ctx.guild.id, member.id, reason, ctx.author.id, str(ctx.author)
+        )
+        warnings = await self.bot.db.get_warnings(ctx.guild.id, member.id)
 
         # Attempt to DM the user
         try:
@@ -72,7 +57,7 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
     @app_commands.describe(member="Member whose warnings to view.")
     @has_permission("warn")
     async def warnings(self, ctx: commands.Context, member: discord.Member):
-        warnings = self._get_warnings(ctx.guild.id, member.id)
+        warnings = await self.bot.db.get_warnings(ctx.guild.id, member.id)
 
         embed = discord.Embed(
             title=f"⚠️ Warnings: {member.display_name}",
@@ -85,9 +70,13 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         else:
             embed.description = f"Total warnings: **{len(warnings)}**"
             for i, w in enumerate(warnings, 1):
-                timestamp = datetime.datetime.fromisoformat(w['timestamp'])
+                timestamp = w['created_at']
+                if isinstance(timestamp, datetime.datetime):
+                    timestamp_str = timestamp.strftime('%d.%m.%Y %H:%M')
+                else:
+                    timestamp_str = str(timestamp)
                 embed.add_field(
-                    name=f"#{i} — {timestamp.strftime('%d.%m.%Y %H:%M')} UTC",
+                    name=f"#{i} — {timestamp_str} UTC",
                     value=f"**Reason:** {w['reason']}\n**Moderator:** {w['moderator_name']}",
                     inline=False
                 )
@@ -98,12 +87,7 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
     @app_commands.describe(member="Member whose warnings to clear.")
     @has_permission("warn")
     async def clearwarnings(self, ctx: commands.Context, member: discord.Member):
-        warnings = self._get_warnings(ctx.guild.id, member.id)
-        if not warnings:
-            return await reply(ctx, f"✅ {member.mention} has no warnings to clear.", ephemeral=True)
-
-        count = len(warnings)
-        await self._save_warnings(ctx.guild.id, member.id, [])
+        count = await self.bot.db.clear_warnings(ctx.guild.id, member.id)
         await reply(ctx, f"✅ Cleared **{count}** warning(s) for {member.mention}.", ephemeral=True)
         logger.info(f"Cleared {count} warnings for {member} in {ctx.guild.name} by {ctx.author}.")
 

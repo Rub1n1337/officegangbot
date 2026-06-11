@@ -50,64 +50,68 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
 
     @tasks.loop(seconds=60)
     async def check_expired_punishments(self):
-        """Background task: checks and lifts expired timed punishments every 60 seconds."""
+        """Checks PostgreSQL for expired punishments and lifts them."""
         try:
-            now = datetime.datetime.utcnow().timestamp()
-            for guild in self.bot.guilds:
-                timed = self.settings_manager.get_setting(guild.id, 'timed_punishments', {})
-                if not timed:
+            if not self.bot.db:
+                return
+
+            expired = await self.bot.db.get_expired_punishments()
+
+            for record in expired:
+                guild_id = record['guild_id']
+                user_id = record['user_id']
+                punishment_type = record['punishment_type']
+                guild = self.bot.get_guild(guild_id)
+
+                if not guild:
+                    await self.bot.db.remove_timed_punishment(guild_id, user_id)
                     continue
-                expired = [
-                    (uid, data) for uid, data in timed.items()
-                    if data.get('expires_at', 0) <= now
-                ]
-                for user_id, data in expired:
-                    try:
-                        punishment_type = data.get('type')
-                        if punishment_type == 'mute':
-                            member = guild.get_member(int(user_id))
-                            if member:
-                                mute_role = discord.utils.get(guild.roles, name="Muted")
-                                if mute_role and mute_role in member.roles:
-                                    await member.remove_roles(mute_role, reason="Timed mute expired")
-                                    logger.info(f"Auto-unmuted {member} in {guild.name}")
-                        elif punishment_type == 'ban':
-                            try:
-                                await guild.unban(
-                                    discord.Object(id=int(user_id)),
-                                    reason="Timed ban expired"
-                                )
-                                logger.info(f"Auto-unbanned user {user_id} in {guild.name}")
-                            except discord.NotFound:
-                                pass
-                        del timed[user_id]
-                        await self.settings_manager.update_setting(
-                            guild.id, 'timed_punishments', timed
-                        )
-                        log_channel_id = self.settings_manager.get_setting(
-                            guild.id, 'punishment_log_id'
-                        )
-                        if log_channel_id:
-                            channel = guild.get_channel(int(log_channel_id))
-                            if channel:
-                                embed = discord.Embed(
-                                    title=f"⏰ Timed {punishment_type.title()} Expired",
-                                    color=discord.Color.green(),
-                                    timestamp=datetime.datetime.utcnow()
-                                )
-                                embed.add_field(name="User ID", value=f"`{user_id}`", inline=True)
-                                embed.add_field(
-                                    name="Action",
-                                    value=f"Auto-{'unmuted' if punishment_type == 'mute' else 'unbanned'}",
-                                    inline=True
-                                )
-                                await channel.send(embed=embed)
-                    except discord.Forbidden as e:
-                        logger.warning(f"Missing permissions for punishment on {user_id} in {guild.name}: {e}")
-                    except Exception as e:
-                        logger.error(f"Error lifting punishment for {user_id} in {guild.name}: {e}", exc_info=True)
+
+                try:
+                    if punishment_type == 'mute':
+                        member = guild.get_member(user_id)
+                        if member:
+                            mute_role = discord.utils.get(guild.roles, name="Muted")
+                            if mute_role and mute_role in member.roles:
+                                await member.remove_roles(mute_role, reason="Timed mute expired")
+                                logger.info(f"Auto-unmuted {member} in {guild.name}")
+                    elif punishment_type == 'ban':
+                        try:
+                            await guild.unban(
+                                discord.Object(id=user_id),
+                                reason="Timed ban expired"
+                            )
+                            logger.info(f"Auto-unbanned {user_id} in {guild.name}")
+                        except discord.NotFound:
+                            pass
+
+                    await self.bot.db.remove_timed_punishment(guild_id, user_id)
+
+                    # Log to punishment channel
+                    log_channel_id = await self.bot.db.get_guild_setting(guild_id, 'punishment_log_id')
+                    if log_channel_id:
+                        channel = guild.get_channel(log_channel_id)
+                        if channel:
+                            embed = discord.Embed(
+                                title=f"⏰ Timed {punishment_type.title()} Expired",
+                                color=discord.Color.green(),
+                                timestamp=datetime.datetime.utcnow()
+                            )
+                            embed.add_field(name="User ID", value=f"`{user_id}`", inline=True)
+                            embed.add_field(
+                                name="Action",
+                                value=f"Auto-{'unmuted' if punishment_type == 'mute' else 'unbanned'}",
+                                inline=True
+                            )
+                            await channel.send(embed=embed)
+
+                except discord.Forbidden as e:
+                    logger.warning(f"Missing permissions for {punishment_type} on {user_id} in {guild.name}: {e}")
+                except Exception as e:
+                    logger.error(f"Error lifting {punishment_type} for {user_id}: {e}", exc_info=True)
+
         except Exception as e:
-            logger.error(f"check_expired_punishments task crashed: {e}", exc_info=True)
+            logger.error(f"check_expired_punishments crashed: {e}", exc_info=True)
 
     @check_expired_punishments.before_loop
     async def before_check(self):

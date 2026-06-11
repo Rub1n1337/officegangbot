@@ -46,11 +46,17 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         self.cleanup_xp_cooldowns.start()
         self.flush_xp_cache.start()
 
-    def _get_user_data(self, guild_id: int, user_id: int) -> dict:
-        """Returns XP data from in-memory cache, loading from storage if needed."""
+    async def _get_user_data_db(self, guild_id: int, user_id: int) -> dict:
+        """Returns XP data from cache or PostgreSQL."""
         if guild_id not in self._xp_cache:
-            self._xp_cache[guild_id] = self.settings_manager.get_setting(guild_id, 'levels', {})
-        return dict(self._xp_cache[guild_id].get(str(user_id), {'xp': 0, 'level': 0}))
+            self._xp_cache[guild_id] = {}
+
+        user_id_str = str(user_id)
+        if user_id_str not in self._xp_cache[guild_id]:
+            db_data = await self.bot.db.get_user_xp(guild_id, user_id)
+            self._xp_cache[guild_id][user_id_str] = db_data
+
+        return dict(self._xp_cache[guild_id].get(user_id_str, {'xp': 0, 'level': 0}))
 
     def _save_user_data(self, guild_id: int, user_id: int, data: dict):
         """Saves XP data to in-memory cache only. Disk flush happens every 2 minutes."""
@@ -103,7 +109,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         # Award XP with lock to prevent race conditions
         xp_gain = random.randint(15, 25)
         async with self._xp_lock:
-            user_data = self._get_user_data(guild_id, user_id)
+            user_data = await self._get_user_data_db(guild_id, user_id)
             old_level = user_data['level']
             user_data['xp'] += xp_gain
             new_level = get_level_from_xp(user_data['xp'])
@@ -141,7 +147,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     @app_commands.describe(member="Member to check. Defaults to yourself.")
     async def rank(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         member = member or ctx.author
-        user_data = self._get_user_data(ctx.guild.id, member.id)
+        user_data = await self._get_user_data_db(ctx.guild.id, member.id)
 
         total_xp = user_data['xp']
         level = user_data['level']
@@ -191,27 +197,22 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
     @commands.hybrid_command(name="leaderboard", description="Shows the top 10 members by XP.")
     async def leaderboard(self, ctx: commands.Context):
-        levels_data = self.settings_manager.get_setting(ctx.guild.id, 'levels', {})
-        if not levels_data:
+        rows = await self.bot.db.get_leaderboard(ctx.guild.id, limit=10)
+        if not rows:
             return await reply(ctx, "❌ No XP data found for this server.", ephemeral=True)
-
-        sorted_users = sorted(levels_data.items(), key=lambda x: x[1].get('xp', 0), reverse=True)[:10]
 
         embed = discord.Embed(title="🏆 XP Leaderboard", color=discord.Color.gold())
         medals = ["🥇", "🥈", "🥉"]
-
         description = ""
-        for i, (user_id, data) in enumerate(sorted_users):
-            member = ctx.guild.get_member(int(user_id))
-            name = member.display_name if member else data.get('display_name', f'User {user_id}')
+
+        for i, row in enumerate(rows):
+            member = ctx.guild.get_member(row['user_id'])
+            name = member.display_name if member else (row.get('display_name') or f"User {row['user_id']}")
             medal = medals[i] if i < 3 else f"`#{i+1}`"
-            description += f"{medal} **{name}** — Level {data.get('level', 0)} | {data.get('xp', 0)} XP\n"
+            description += f"{medal} **{name}** — Level {row['level']} | {row['xp']} XP\n"
 
         embed.description = description
-        embed.set_footer(
-            text=f"Requested by {ctx.author}",
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
         await reply(ctx, embed=embed)
 
 
@@ -234,18 +235,31 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
     @tasks.loop(minutes=2)
     async def flush_xp_cache(self):
-        """Flushes in-memory XP cache to disk every 2 minutes."""
+        """Flushes in-memory XP cache to PostgreSQL every 2 minutes via bulk upsert."""
         try:
             if not self._dirty_guilds:
                 return
+
             dirty = set(self._dirty_guilds)
             self._dirty_guilds.clear()
+
+            records = []
             for guild_id in dirty:
-                if guild_id in self._xp_cache:
-                    await self.settings_manager.update_setting(
-                        guild_id, 'levels', self._xp_cache[guild_id]
-                    )
-            logger.info(f"XP cache flushed for {len(dirty)} guild(s)")
+                if guild_id not in self._xp_cache:
+                    continue
+                for user_id_str, data in self._xp_cache[guild_id].items():
+                    records.append({
+                        'guild_id': guild_id,
+                        'user_id': int(user_id_str),
+                        'xp': data.get('xp', 0),
+                        'level': data.get('level', 0),
+                        'display_name': data.get('display_name', '')
+                    })
+
+            if records:
+                await self.bot.db.bulk_upsert_xp(records)
+                logger.info(f"XP cache flushed: {len(records)} records to PostgreSQL")
+
         except Exception as e:
             logger.error(f"flush_xp_cache crashed: {e}", exc_info=True)
 
@@ -263,9 +277,17 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                 try:
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
-                        loop.create_task(
-                            self.settings_manager.update_setting(guild_id, 'levels', self._xp_cache[guild_id])
-                        )
+                        records = []
+                        for user_id_str, data in self._xp_cache[guild_id].items():
+                            records.append({
+                                'guild_id': guild_id,
+                                'user_id': int(user_id_str),
+                                'xp': data.get('xp', 0),
+                                'level': data.get('level', 0),
+                                'display_name': data.get('display_name', '')
+                            })
+                        if records:
+                            loop.create_task(self.bot.db.bulk_upsert_xp(records))
                 except Exception as e:
                     logger.error(f"Error flushing XP cache on unload: {e}")
 
