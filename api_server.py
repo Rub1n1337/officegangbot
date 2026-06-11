@@ -11,8 +11,6 @@ import threading
 import time
 import psutil
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'guild_settings.json')
-_settings_lock = threading.Lock()
 
 # Store bot start time globally
 BOT_START_TIME = time.time()
@@ -44,65 +42,47 @@ async def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key != os.getenv("API_SECRET_KEY"):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-# --- Utility functions ---
-def load_guild_settings():
-    with _settings_lock:
-        if not os.path.exists(DATA_PATH):
-            return {}
-        with open(DATA_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-
-def save_guild_settings(settings):
-    with _settings_lock:
-        tmp_path = DATA_PATH + '.tmp'
-        with open(tmp_path, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
-        os.replace(tmp_path, DATA_PATH)
 
 # --- API Endpoints ---
 @app.get("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
-def get_rules_feature(guild_id: str):
-    settings = load_guild_settings()
-    guild = settings.get(guild_id)
-    if not guild:
-        raise HTTPException(status_code=404, detail="Guild not found")
+async def get_rules_feature(guild_id: str):
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot is not connected")
+    channel = bot_instance.settings_manager.get_setting(int(guild_id), "rules_channel_id")
+    message = bot_instance.settings_manager.get_setting(int(guild_id), "rules_message", "")
     return {
-        "channel": str(guild.get("rules_channel_id")) if guild.get("rules_channel_id") else None,
-        "message": guild.get("rules_message", "")
+        "channel": str(channel) if channel else None,
+        "message": message
     }
 
 @app.patch("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
-def update_rules_feature(guild_id: str, body: RulesFeatureModel):
-    settings = load_guild_settings()
-    guild = settings.setdefault(guild_id, {})
+async def update_rules_feature(guild_id: str, body: RulesFeatureModel):
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot is not connected")
     if body.channel:
-        guild["rules_channel_id"] = body.channel
+        await bot_instance.settings_manager.update_setting(int(guild_id), "rules_channel_id", body.channel)
     if body.message:
-        guild["rules_message"] = body.message
-    save_guild_settings(settings)
-    return {
-        "channel": body.channel,
-        "message": body.message
-    }
+        await bot_instance.settings_manager.update_setting(int(guild_id), "rules_message", body.message)
+    return {"channel": body.channel, "message": body.message}
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
 async def get_guild_info(guild_id: str):
-    settings = load_guild_settings()
-    guild_data = settings.get(guild_id, {})
-
-    # Transform to match CustomGuildInfo type
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot is not connected")
+    guild_data = bot_instance.settings_manager.get_all_settings(int(guild_id))
+    guild = bot_instance.get_guild(int(guild_id))
     return {
         "id": guild_id,
-        "name": guild_data.get("name", "OfficeGang Server"),
-        "icon": guild_data.get("icon"),
-        "owner_id": guild_data.get("owner_id", "0"),
+        "name": guild.name if guild else guild_data.get("name", "Unknown"),
+        "icon": str(guild.icon) if guild and guild.icon else None,
+        "owner_id": str(guild.owner_id) if guild else "0",
         "features": {
             "rules": {
                 "channel": str(guild_data.get("rules_channel_id", "")) or None,
-                "message": ""  # Rules message is not stored in the current format
+                "message": guild_data.get("rules_message", "")
             },
             "welcome-message": {
-                "channel": None,  # Not in current settings
+                "channel": str(guild_data.get("welcome_channel_id", "")) or None,
                 "message": guild_data.get("welcome_message", "Welcome {user.mention} to **{server.name}**!")
             },
             "reaction-role": {
@@ -132,10 +112,6 @@ def health():
 
 @app.get("/api/stats", dependencies=[Depends(verify_api_key)])
 async def get_bot_stats():
-    """
-    Returns general bot statistics:
-    uptime, CPU/RAM usage, total guilds and users.
-    """
     if bot_instance is None:
         raise HTTPException(status_code=503, detail="Bot is not connected")
 
@@ -146,8 +122,11 @@ async def get_bot_stats():
 
     total_users = sum(g.member_count for g in bot_instance.guilds)
 
-    # Use interval=None to avoid blocking the event loop
-    cpu = psutil.cpu_percent(interval=None)
+    # Use health monitor cached values instead of blocking psutil calls
+    health_status = {}
+    if hasattr(bot_instance, 'health_monitor'):
+        health_status = bot_instance.health_monitor.get_status()
+
     ram = psutil.virtual_memory()
 
     return {
@@ -156,10 +135,11 @@ async def get_bot_stats():
         "uptime_seconds": uptime_seconds,
         "guilds": len(bot_instance.guilds),
         "total_users": total_users,
-        "latency_ms": round(bot_instance.latency * 1000, 2),
-        "cpu_percent": cpu,
+        "latency_ms": health_status.get("latency_ms", round(bot_instance.latency * 1000, 2)),
+        "cpu_percent": psutil.cpu_percent(interval=None),
         "ram_percent": ram.percent,
         "ram_used_mb": round(ram.used / 1024 / 1024, 2),
+        "memory_mb": health_status.get("memory_mb", 0),
     }
 
 

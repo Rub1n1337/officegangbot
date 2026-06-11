@@ -28,7 +28,21 @@ class UsageLogCog(commands.Cog):
         # Truncate fields for Discord embed limits
         command_name = f"`{ctx.command.qualified_name}`"[:256]
         channel_mention = ctx.channel.mention[:256]
-        full_command = f"```\n{ctx.message.content[:900] if ctx.message.content else ''}\n```"
+
+        # Build full command string for both prefix and slash commands
+        if ctx.interaction:
+            # Slash command: reconstruct from interaction data
+            args_parts = []
+            if ctx.args:
+                args_parts.extend([str(a) for a in ctx.args[2:] if a is not None])  # skip self and ctx
+            if ctx.kwargs:
+                args_parts.extend([f"{k}: {v}" for k, v in ctx.kwargs.items() if v is not None])
+            full_command_text = f"/{ctx.command.qualified_name} {' '.join(args_parts)}".strip()
+        else:
+            # Prefix command: use message content directly
+            full_command_text = ctx.message.content or f"!{ctx.command.qualified_name}"
+
+        full_command = f"```\n{full_command_text[:900]}\n```"
 
         embed = discord.Embed(
             title="Command Used",
@@ -38,6 +52,7 @@ class UsageLogCog(commands.Cog):
         embed.set_author(name=f"{ctx.author.name} ({ctx.author.id})", icon_url=ctx.author.display_avatar.url)
         embed.add_field(name="Command", value=command_name)
         embed.add_field(name="Channel", value=channel_mention)
+        embed.add_field(name="Type", value="Slash `/`" if ctx.interaction else "Prefix `!`", inline=True)
         embed.add_field(name="Full Command", value=full_command, inline=False)
 
         try:

@@ -40,18 +40,24 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         # Cooldown tracking: {guild_id: {user_id: last_xp_timestamp}}
         self._xp_cooldowns: dict = {}
         self._xp_lock = asyncio.Lock()
+        # In-memory XP cache: {guild_id: {user_id: data_dict}}
+        self._xp_cache: dict = {}
+        self._dirty_guilds: set = set()  # Guilds with unsaved XP changes
         self.cleanup_xp_cooldowns.start()
+        self.flush_xp_cache.start()
 
     def _get_user_data(self, guild_id: int, user_id: int) -> dict:
-        """Returns XP data for a user."""
-        levels_data = self.settings_manager.get_setting(guild_id, 'levels', {})
-        return levels_data.get(str(user_id), {'xp': 0, 'level': 0})
+        """Returns XP data from in-memory cache, loading from storage if needed."""
+        if guild_id not in self._xp_cache:
+            self._xp_cache[guild_id] = self.settings_manager.get_setting(guild_id, 'levels', {})
+        return dict(self._xp_cache[guild_id].get(str(user_id), {'xp': 0, 'level': 0}))
 
-    async def _save_user_data(self, guild_id: int, user_id: int, data: dict):
-        """Saves XP data for a user."""
-        levels_data = self.settings_manager.get_setting(guild_id, 'levels', {})
-        levels_data[str(user_id)] = data
-        await self.settings_manager.update_setting(guild_id, 'levels', levels_data)
+    def _save_user_data(self, guild_id: int, user_id: int, data: dict):
+        """Saves XP data to in-memory cache only. Disk flush happens every 2 minutes."""
+        if guild_id not in self._xp_cache:
+            self._xp_cache[guild_id] = {}
+        self._xp_cache[guild_id][str(user_id)] = data
+        self._dirty_guilds.add(guild_id)
 
     async def _check_role_rewards(self, member: discord.Member, level: int):
         """Assigns role rewards for reaching a level."""
@@ -104,7 +110,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             user_data['level'] = new_level
             # Save username for leaderboard display even after user leaves
             user_data['display_name'] = message.author.display_name
-            await self._save_user_data(guild_id, user_id, user_data)
+            self._save_user_data(guild_id, user_id, user_data)
 
         # Level up notification
         if new_level > old_level:
@@ -226,8 +232,42 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     async def before_cleanup_xp(self):
         await self.bot.wait_until_ready()
 
+    @tasks.loop(minutes=2)
+    async def flush_xp_cache(self):
+        """Flushes in-memory XP cache to disk every 2 minutes."""
+        try:
+            if not self._dirty_guilds:
+                return
+            dirty = set(self._dirty_guilds)
+            self._dirty_guilds.clear()
+            for guild_id in dirty:
+                if guild_id in self._xp_cache:
+                    await self.settings_manager.update_setting(
+                        guild_id, 'levels', self._xp_cache[guild_id]
+                    )
+            logger.info(f"XP cache flushed for {len(dirty)} guild(s)")
+        except Exception as e:
+            logger.error(f"flush_xp_cache crashed: {e}", exc_info=True)
+
+    @flush_xp_cache.before_loop
+    async def before_flush_xp(self):
+        await self.bot.wait_until_ready()
+
     def cog_unload(self):
         self.cleanup_xp_cooldowns.cancel()
+        self.flush_xp_cache.cancel()
+        # Synchronous flush on unload to prevent data loss
+        import asyncio
+        for guild_id in self._dirty_guilds:
+            if guild_id in self._xp_cache:
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        loop.create_task(
+                            self.settings_manager.update_setting(guild_id, 'levels', self._xp_cache[guild_id])
+                        )
+                except Exception as e:
+                    logger.error(f"Error flushing XP cache on unload: {e}")
 
 
 async def setup(bot: commands.Bot):
