@@ -270,26 +270,9 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     def cog_unload(self):
         self.cleanup_xp_cooldowns.cancel()
         self.flush_xp_cache.cancel()
-        # Synchronous flush on unload to prevent data loss
-        import asyncio
-        for guild_id in self._dirty_guilds:
-            if guild_id in self._xp_cache:
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        records = []
-                        for user_id_str, data in self._xp_cache[guild_id].items():
-                            records.append({
-                                'guild_id': guild_id,
-                                'user_id': int(user_id_str),
-                                'xp': data.get('xp', 0),
-                                'level': data.get('level', 0),
-                                'display_name': data.get('display_name', '')
-                            })
-                        if records:
-                            loop.create_task(self.bot.db.bulk_upsert_xp(records))
-                except Exception as e:
-                    logger.error(f"Error flushing XP cache on unload: {e}")
+        # Don't attempt DB write on unload - pool may already be closed
+        self._dirty_guilds.clear()
+        self._xp_cache.clear()
 
 
 async def setup(bot: commands.Bot):
