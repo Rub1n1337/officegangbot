@@ -237,43 +237,45 @@ class RedisManager:
 
     async def start_rpc_listener(self, channel: str, handler) -> None:
         """
-        Starts listening for RPC requests on a channel.
-        handler: async function(payload: dict) -> dict
-
-        Usage (in bot.py):
-            await redis.start_rpc_listener("bot:rpc", handle_rpc_request)
+        Starts listening for RPC requests with auto-reconnect.
+        Handles Upstash idle connection timeouts gracefully.
         """
-        pubsub = self.redis.pubsub()
-        await pubsub.subscribe(channel)
         logger.info(f"Redis RPC listener started on channel '{channel}'")
 
         async def listen():
-            try:
-                async for message in pubsub.listen():
-                    if message["type"] != "message":
-                        continue
-                    try:
-                        payload = json.loads(message["data"])
-                        request_id = payload.get("request_id")
-                        response_channel = payload.get("response_channel")
+            while True:
+                pubsub = None
+                try:
+                    pubsub = self.redis.pubsub()
+                    await pubsub.subscribe(channel)
 
-                        if not request_id or not response_channel:
+                    async for message in pubsub.listen():
+                        if message["type"] != "message":
                             continue
+                        try:
+                            payload = json.loads(message["data"])
+                            request_id = payload.get("request_id")
+                            response_channel = payload.get("response_channel")
 
-                        # Handle the request
-                        result = await handler(payload)
+                            if not request_id or not response_channel:
+                                continue
 
-                        # Send response back
-                        await self.publish(response_channel, {
-                            "request_id": request_id,
-                            "data": result
-                        })
-                    except Exception as e:
-                        logger.error(f"RPC handler error: {e}", exc_info=True)
-            except Exception as e:
-                logger.error(f"RPC listener crashed: {e}", exc_info=True)
-            finally:
-                await pubsub.aclose()
+                            result = await handler(payload)
+                            await self.publish(response_channel, {
+                                "request_id": request_id,
+                                "data": result
+                            })
+                        except Exception as e:
+                            logger.error(f"RPC handler error: {e}", exc_info=True)
 
-        # Run listener as background task
+                except Exception as e:
+                    logger.warning(f"RPC listener disconnected ({e}), reconnecting in 3s...")
+                    await asyncio.sleep(3)
+                finally:
+                    if pubsub:
+                        try:
+                            await pubsub.aclose()
+                        except Exception:
+                            pass
+
         asyncio.create_task(listen())
