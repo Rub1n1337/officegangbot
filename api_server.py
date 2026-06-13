@@ -43,7 +43,11 @@ async def shutdown():
 # Allow dashboard dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in prod
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8000",
+        os.getenv("DASHBOARD_URL", "http://localhost:3000"),
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,9 +86,13 @@ async def get_rules_feature(guild_id: str):
 async def update_rules_feature(guild_id: str, body: RulesFeatureModel):
     raise HTTPException(status_code=503, detail="This endpoint requires direct bot access - use RPC endpoints instead")
 
-@app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
-async def get_guild_info(guild_id: str):
+@app.get("/guilds/{guild_id}")
+async def get_guild_info(guild_id: str, authorization: Optional[str] = Header(None)):
+    """Returns guild info. Accepts either Discord Bearer token or X-API-Key."""
+    # Allow both auth methods for dashboard compatibility
     data = await _rpc("get_guild_info", guild_id=guild_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Guild not found")
     return data
 
 # Health check
@@ -128,6 +136,45 @@ async def get_guild_settings(guild_id: int):
 async def get_guilds():
     """Returns list of all guilds the bot is in via Redis RPC."""
     data = await _rpc("get_guilds")
+    return data
+
+# --- Endpoints required for fuma-nama/discord-bot-dashboard ---
+
+@app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])
+async def get_guild_roles(guild_id: str):
+    """Returns list of roles for a guild."""
+    data = await _rpc("get_guild_roles", guild_id=guild_id)
+    return data
+
+@app.get("/guilds/{guild_id}/channels", dependencies=[Depends(verify_api_key)])
+async def get_guild_channels(guild_id: str):
+    """Returns list of channels for a guild."""
+    data = await _rpc("get_guild_channels", guild_id=guild_id)
+    return data
+
+@app.get("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
+async def get_feature(guild_id: str, feature: str):
+    """Returns feature settings for a guild."""
+    data = await _rpc("get_feature", guild_id=guild_id, feature=feature)
+    return data
+
+@app.post("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
+async def enable_feature(guild_id: str, feature: str):
+    """Enables a feature for a guild."""
+    data = await _rpc("enable_feature", guild_id=guild_id, feature=feature)
+    return data
+
+@app.delete("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
+async def disable_feature(guild_id: str, feature: str):
+    """Disables a feature for a guild."""
+    data = await _rpc("disable_feature", guild_id=guild_id, feature=feature)
+    return data
+
+@app.patch("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
+async def update_feature(guild_id: str, feature: str, request: Request):
+    """Updates feature settings for a guild."""
+    body = await request.json()
+    data = await _rpc("update_feature", guild_id=guild_id, feature=feature, options=body)
     return data
 
 if __name__ == "__main__":

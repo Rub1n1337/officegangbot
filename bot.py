@@ -164,6 +164,125 @@ class MyBot(commands.Bot):
                 ]
             }
 
+        if action == "get_guild_roles":
+            guild_id = payload.get("guild_id")
+            guild = self.get_guild(int(guild_id)) if guild_id else None
+            if not guild:
+                return {"error": "Guild not found"}
+            return [
+                {
+                    "id": str(role.id),
+                    "name": role.name,
+                    "color": role.color.value,
+                    "position": role.position,
+                }
+                for role in guild.roles
+                if not role.is_default()
+            ]
+
+        if action == "get_guild_channels":
+            guild_id = payload.get("guild_id")
+            guild = self.get_guild(int(guild_id)) if guild_id else None
+            if not guild:
+                return {"error": "Guild not found"}
+            return [
+                {
+                    "id": str(ch.id),
+                    "name": ch.name,
+                    "type": ch.type.value,
+                    "category": str(ch.category_id) if ch.category_id else None,
+                }
+                for ch in guild.channels
+            ]
+
+        if action == "get_feature":
+            guild_id = payload.get("guild_id")
+            feature = payload.get("feature")
+            settings = self.settings_manager.get_all_settings(int(guild_id))
+            enabled_features = settings.get("enabled_features", [])
+
+            feature_data = {
+                "rules": {
+                    "channel": str(settings.get("rules_channel_id", "")) or None,
+                    "message": settings.get("rules_message", "Please follow the server rules."),
+                },
+                "welcome-message": {
+                    "channel": str(settings.get("welcome_channel_id", "")) or None,
+                    "message": settings.get("welcome_message", "Welcome {user.mention} to **{server.name}**!"),
+                },
+                "reaction-role": {
+                    "messageId": str(settings.get("rules_message_id", "")) or None,
+                    "channelId": str(settings.get("rules_channel_id", "")) or None,
+                    "emoji": settings.get("reaction_emoji", "✅"),
+                    "roleId": str(settings.get("reaction_role_id", "")) or None,
+                },
+                "moderation": {
+                    "modRoles": [],
+                    "adminRoles": [],
+                    "muteRole": None,
+                },
+                "logging": {
+                    "logChannel": str(settings.get("punishment_log_id", "")) or None,
+                    "events": ["ban", "kick", "mute", "warn"],
+                },
+            }
+            return feature_data.get(feature, {})
+
+        if action == "enable_feature":
+            guild_id = int(payload.get("guild_id"))
+            feature = payload.get("feature")
+            settings = self.settings_manager.get_all_settings(guild_id)
+            enabled = settings.get("enabled_features", [])
+            if feature not in enabled:
+                enabled.append(feature)
+                await self.settings_manager.update_setting(guild_id, "enabled_features", enabled)
+            return {"success": True, "enabled_features": enabled}
+
+        if action == "disable_feature":
+            guild_id = int(payload.get("guild_id"))
+            feature = payload.get("feature")
+            settings = self.settings_manager.get_all_settings(guild_id)
+            enabled = settings.get("enabled_features", [])
+            if feature in enabled:
+                enabled.remove(feature)
+                await self.settings_manager.update_setting(guild_id, "enabled_features", enabled)
+            return {"success": True, "enabled_features": enabled}
+
+        if action == "update_feature":
+            guild_id = int(payload.get("guild_id"))
+            feature = payload.get("feature")
+            options = payload.get("options", {})
+
+            # Map feature options to settings keys
+            mapping = {
+                "rules": {
+                    "channel": "rules_channel_id",
+                    "message": "rules_message",
+                },
+                "welcome-message": {
+                    "channel": "welcome_channel_id",
+                    "message": "welcome_message",
+                },
+                "reaction-role": {
+                    "messageId": "rules_message_id",
+                    "channelId": "rules_channel_id",
+                    "emoji": "reaction_emoji",
+                    "roleId": "reaction_role_id",
+                },
+                "logging": {
+                    "logChannel": "punishment_log_id",
+                },
+            }
+
+            if feature in mapping:
+                for option_key, setting_key in mapping[feature].items():
+                    if option_key in options and options[option_key] is not None:
+                        await self.settings_manager.update_setting(
+                            guild_id, setting_key, options[option_key]
+                        )
+
+            return {"success": True}
+
         return {"error": f"Unknown action: {action}"}
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):

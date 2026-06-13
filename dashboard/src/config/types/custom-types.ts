@@ -5,25 +5,22 @@
 import { z } from 'zod';
 import { GuildInfo } from './types';
 
-export type CustomGuildInfo = GuildInfo & {};
+export type CustomGuildInfo = GuildInfo & {
+  id: string;
+  name: string;
+  icon?: string;
+  owner_id: string;
+  member_count: number;
+};
 
-/**
- * Define feature ids and it's option types
- */
 export type CustomFeatures = {
-  // OfficeGangBot core features
   'rules': RulesFeature;
   'welcome-message': WelcomeMessageFeature;
   'reaction-role': ReactionRoleFeature;
   'moderation': ModerationFeature;
   'logging': LoggingFeature;
-  // Demo/extra features
-  music: {};
-  gaming: {};
-  meme: MemeFeature;
 };
 
-/** example only */
 export type WelcomeMessageFeature = {
   channel?: string;
   message: string;
@@ -38,7 +35,7 @@ export type ReactionRoleFeature = {
   messageId?: string;
   channelId?: string;
   emoji: string;
-  roleId: string;
+  roleId?: string;
 };
 
 export type ModerationFeature = {
@@ -52,9 +49,12 @@ export type LoggingFeature = {
   events: string[];
 };
 
-export const memeFeatureSchema = z.object({
+export const rulesFeatureSchema = z.object({
   channel: z.string().optional(),
-  source: z.enum(['youtube', 'twitter', 'discord']).optional(),
+  message: z.string().min(1),
 });
 
-export type MemeFeature = z.infer<typeof memeFeatureSchema>;
+export const welcomeFeatureSchema = z.object({
+  channel: z.string().optional(),
+  message: z.string().min(1),
+});

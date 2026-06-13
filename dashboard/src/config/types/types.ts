@@ -38,6 +38,10 @@ export type GuildConfig = {
 
 export interface GuildInfo {
   enabledFeatures: string[];
+  id?: string;
+  name?: string;
+  icon?: string;
+  member_count?: number;
 }
 
 export type FeaturesConfig = {

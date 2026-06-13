@@ -2,7 +2,8 @@ import { deepmerge } from 'deepmerge-ts';
 import { AccessToken } from '@/utils/auth/server';
 import { Options } from './core';
 
-const bot_api_endpoint = process.env.NEXT_PUBLIC_API_ENDPOINT ?? 'http://localhost:8080';
+// Our FastAPI runs on port 8000
+const bot_api_endpoint = process.env.NEXT_PUBLIC_BOT_API_URL ?? 'http://localhost:8000';
 const discord_api_endpoint = 'https://discord.com/api/v9';
 
 export function botRequest<T extends Options>(session: AccessToken, options: T): T {
@@ -13,6 +14,7 @@ export function botRequest<T extends Options>(session: AccessToken, options: T):
       {
         headers: {
           Authorization: `${session.token_type} ${session.access_token}`,
+          'X-API-Key': process.env.NEXT_PUBLIC_BOT_API_KEY ?? '',
         },
         credentials: 'include',
         mode: 'cors',
