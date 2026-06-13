@@ -46,3 +46,4 @@ data/
 data/guild_settings.json 
 officegangbot.zip 
 dashboard-tmp/ 
+.codex_tmp/ 
