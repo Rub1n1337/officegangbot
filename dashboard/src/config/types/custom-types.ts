@@ -8,7 +8,7 @@ import { GuildInfo } from './types';
 export type CustomGuildInfo = GuildInfo & {
   id: string;
   name: string;
-  icon?: string;
+  icon?: string | null;
   owner_id: string;
   member_count: number;
 };
@@ -22,39 +22,39 @@ export type CustomFeatures = {
 };
 
 export type WelcomeMessageFeature = {
-  channel?: string;
+  channel?: string | null;
   message: string;
 };
 
 export type RulesFeature = {
-  channel?: string;
+  channel?: string | null;
   message: string;
 };
 
 export type ReactionRoleFeature = {
-  messageId?: string;
-  channelId?: string;
+  messageId?: string | null;
+  channelId?: string | null;
   emoji: string;
-  roleId?: string;
+  roleId?: string | null;
 };
 
 export type ModerationFeature = {
   modRoles: string[];
   adminRoles: string[];
-  muteRole?: string;
+  muteRole?: string | null;
 };
 
 export type LoggingFeature = {
-  logChannel?: string;
+  logChannel?: string | null;
   events: string[];
 };
 
 export const rulesFeatureSchema = z.object({
-  channel: z.string().optional(),
+  channel: z.string().nullable().optional(),
   message: z.string().min(1),
 });
 
 export const welcomeFeatureSchema = z.object({
-  channel: z.string().optional(),
+  channel: z.string().nullable().optional(),
   message: z.string().min(1),
 });

@@ -22,7 +22,7 @@ export type GuildChannel = {
   /**
    * parent category of the channel
    */
-  category?: string;
+  category?: string | null;
 };
 
 /**

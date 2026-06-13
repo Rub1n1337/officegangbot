@@ -120,6 +120,39 @@ class MyBot(commands.Bot):
         logger.info('Bot is ready and listening for commands.')
         logger.warning("Manual command syncing via /sync is now the primary method.")
 
+    @staticmethod
+    def _snowflake_or_none(value) -> Optional[str]:
+        return str(value) if value else None
+
+    def _get_feature_payload(self, guild_id: int, feature: str) -> dict:
+        settings = self.settings_manager.get_all_settings(guild_id)
+        feature_data = {
+            "rules": {
+                "channel": self._snowflake_or_none(settings.get("rules_channel_id")),
+                "message": settings.get("rules_message") or "Please follow the server rules.",
+            },
+            "welcome-message": {
+                "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
+                "message": settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!",
+            },
+            "reaction-role": {
+                "messageId": self._snowflake_or_none(settings.get("rules_message_id")),
+                "channelId": self._snowflake_or_none(settings.get("rules_channel_id")),
+                "emoji": settings.get("reaction_emoji") or "✅",
+                "roleId": self._snowflake_or_none(settings.get("reaction_role_id")),
+            },
+            "moderation": {
+                "modRoles": [],
+                "adminRoles": [],
+                "muteRole": None,
+            },
+            "logging": {
+                "logChannel": self._snowflake_or_none(settings.get("punishment_log_id")),
+                "events": ["ban", "kick", "mute", "warn"],
+            },
+        }
+        return feature_data.get(feature, {})
+
     async def _handle_rpc_request(self, payload: dict) -> dict:
         """Handles RPC requests from the API server via Redis Pub/Sub."""
         action = payload.get("action")
@@ -197,37 +230,9 @@ class MyBot(commands.Bot):
             ]
 
         if action == "get_feature":
-            guild_id = payload.get("guild_id")
+            guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
-            settings = self.settings_manager.get_all_settings(int(guild_id))
-            enabled_features = settings.get("enabled_features", [])
-
-            feature_data = {
-                "rules": {
-                    "channel": str(settings.get("rules_channel_id", "")) or None,
-                    "message": settings.get("rules_message", "Please follow the server rules."),
-                },
-                "welcome-message": {
-                    "channel": str(settings.get("welcome_channel_id", "")) or None,
-                    "message": settings.get("welcome_message", "Welcome {user.mention} to **{server.name}**!"),
-                },
-                "reaction-role": {
-                    "messageId": str(settings.get("rules_message_id", "")) or None,
-                    "channelId": str(settings.get("rules_channel_id", "")) or None,
-                    "emoji": settings.get("reaction_emoji", "✅"),
-                    "roleId": str(settings.get("reaction_role_id", "")) or None,
-                },
-                "moderation": {
-                    "modRoles": [],
-                    "adminRoles": [],
-                    "muteRole": None,
-                },
-                "logging": {
-                    "logChannel": str(settings.get("punishment_log_id", "")) or None,
-                    "events": ["ban", "kick", "mute", "warn"],
-                },
-            }
-            return feature_data.get(feature, {})
+            return self._get_feature_payload(guild_id, feature)
 
         if action == "enable_feature":
             guild_id = int(payload.get("guild_id"))
@@ -282,7 +287,7 @@ class MyBot(commands.Bot):
                             guild_id, setting_key, options[option_key]
                         )
 
-            return {"success": True}
+            return self._get_feature_payload(guild_id, feature)
 
         return {"error": f"Unknown action: {action}"}
 

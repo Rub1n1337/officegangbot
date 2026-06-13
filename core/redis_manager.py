@@ -23,6 +23,7 @@ class RedisManager:
     def __init__(self):
         self._redis: Optional[aioredis.Redis] = None
         self._pubsub: Optional[aioredis.client.PubSub] = None
+        self._rpc_tasks: set[asyncio.Task] = set()
 
     async def connect(self) -> None:
         """Creates Redis connection pool. Call in bot.setup_hook() and api_server startup."""
@@ -42,6 +43,12 @@ class RedisManager:
 
     async def close(self) -> None:
         """Closes the Redis connection."""
+        for task in list(self._rpc_tasks):
+            task.cancel()
+        if self._rpc_tasks:
+            await asyncio.gather(*self._rpc_tasks, return_exceptions=True)
+            self._rpc_tasks.clear()
+
         if self._redis:
             await self._redis.aclose()
             logger.info("Redis connection closed.")
@@ -212,28 +219,44 @@ class RedisManager:
         await pubsub.subscribe(response_channel)
 
         try:
-            payload["request_id"] = request_id
-            payload["response_channel"] = response_channel
-            await self.publish(channel, payload)
+            rpc_payload = {
+                **payload,
+                "request_id": request_id,
+                "response_channel": response_channel,
+            }
+            await self.publish(channel, rpc_payload)
 
-            # Wait for response with timeout
-            deadline = asyncio.get_event_loop().time() + timeout
-            async for message in pubsub.listen():
-                if asyncio.get_event_loop().time() > deadline:
+            deadline = asyncio.get_running_loop().time() + timeout
+            while True:
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
                     logger.warning(f"RPC timeout for request {request_id}")
                     return None
-                if message["type"] == "message":
-                    try:
-                        return json.loads(message["data"])
-                    except json.JSONDecodeError:
-                        return None
-            return None
-        except asyncio.TimeoutError:
-            logger.warning(f"RPC timeout for request {request_id}")
-            return None
+
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=remaining,
+                )
+                if message is None:
+                    logger.warning(f"RPC timeout for request {request_id}")
+                    return None
+                if message["type"] != "message":
+                    continue
+
+                try:
+                    response = json.loads(message["data"])
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid RPC response JSON for request {request_id}")
+                    return None
+
+                if response.get("request_id") != request_id:
+                    continue
+                return response
         finally:
-            await pubsub.unsubscribe(response_channel)
-            await pubsub.aclose()
+            try:
+                await pubsub.unsubscribe(response_channel)
+            finally:
+                await pubsub.aclose()
 
     async def start_rpc_listener(self, channel: str, handler) -> None:
         """
@@ -252,6 +275,9 @@ class RedisManager:
                     async for message in pubsub.listen():
                         if message["type"] != "message":
                             continue
+                        payload = None
+                        request_id = None
+                        response_channel = None
                         try:
                             payload = json.loads(message["data"])
                             request_id = payload.get("request_id")
@@ -267,7 +293,14 @@ class RedisManager:
                             })
                         except Exception as e:
                             logger.error(f"RPC handler error: {e}", exc_info=True)
+                            if request_id and response_channel:
+                                await self.publish(response_channel, {
+                                    "request_id": request_id,
+                                    "error": "Bot RPC handler failed"
+                                })
 
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.warning(f"RPC listener disconnected ({e}), reconnecting in 3s...")
                     await asyncio.sleep(3)
@@ -278,4 +311,7 @@ class RedisManager:
                         except Exception:
                             pass
 
-        asyncio.create_task(listen())
+        task = asyncio.create_task(listen())
+        self._rpc_tasks.add(task)
+        task.add_done_callback(self._rpc_tasks.discard)
+        return task

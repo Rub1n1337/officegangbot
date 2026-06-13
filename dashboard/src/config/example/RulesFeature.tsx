@@ -19,7 +19,7 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
     resolver: zodResolver(schema),
     shouldUnregister: false,
     defaultValues: {
-      channel: data.channel,
+      channel: data.channel ?? undefined,
       message: data.message || '',
     },
   });

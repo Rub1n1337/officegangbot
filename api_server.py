@@ -1,17 +1,15 @@
 # api_server.py
 # REST API for OfficeGangBot dashboard integration (FastAPI, best practices)
 
-from fastapi import FastAPI, HTTPException, Path, Request, Header, Depends
+from fastapi import FastAPI, HTTPException, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
-import json
+from typing import Any, Optional
 import os
+import secrets
 from dotenv import load_dotenv
 load_dotenv()
-import threading
 import time
-import psutil
 from core.logger import logger
 from core.redis_manager import RedisManager
 
@@ -42,14 +40,16 @@ async def shutdown():
     if _redis:
         await _redis.close()
 
-# Allow dashboard dev server
+def _dashboard_origins() -> list[str]:
+    raw = os.getenv("DASHBOARD_URL", "http://localhost:3000")
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:3000"]
+
+
+# Allow the configured dashboard origin only.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:8000",
-        os.getenv("DASHBOARD_URL", "http://localhost:3000"),
-    ],
+    allow_origins=_dashboard_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,19 +60,27 @@ class RulesFeatureModel(BaseModel):
     message: str
 
 # --- API Authentication ---
-async def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != os.getenv("API_SECRET_KEY"):
+async def verify_api_key(x_api_key: Optional[str] = Header(None)):
+    api_secret = os.getenv("API_SECRET_KEY")
+    if not api_secret:
+        logger.error("API_SECRET_KEY is not configured.")
+        raise HTTPException(status_code=503, detail="API key is not configured")
+    if not x_api_key or not secrets.compare_digest(x_api_key, api_secret):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 # --- RPC Helper ---
-async def _rpc(action: str, **kwargs) -> dict:
+async def _rpc(action: str, **kwargs) -> Any:
     """Sends an RPC request to the bot via Redis and returns response."""
     if not _redis:
         raise HTTPException(status_code=503, detail="Redis not available")
-    result = await _redis.rpc_request("bot:rpc", {"action": action, **kwargs})
-    if result is None:
+    envelope = await _redis.rpc_request("bot:rpc", {"action": action, **kwargs})
+    if envelope is None:
         raise HTTPException(status_code=504, detail="Bot RPC timeout — bot may be offline")
-    if "error" in result:
+    if isinstance(envelope, dict) and "error" in envelope and "data" not in envelope:
+        raise HTTPException(status_code=502, detail=envelope["error"])
+
+    result = envelope.get("data", envelope) if isinstance(envelope, dict) else envelope
+    if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
@@ -88,10 +96,9 @@ async def get_rules_feature(guild_id: str):
 async def update_rules_feature(guild_id: str, body: RulesFeatureModel):
     raise HTTPException(status_code=503, detail="This endpoint requires direct bot access - use RPC endpoints instead")
 
-@app.get("/guilds/{guild_id}")
-async def get_guild_info(guild_id: str, authorization: Optional[str] = Header(None)):
-    """Returns guild info. Accepts either Discord Bearer token or X-API-Key."""
-    # Allow both auth methods for dashboard compatibility
+@app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
+async def get_guild_info(guild_id: str):
+    """Returns guild info via Redis RPC."""
     data = await _rpc("get_guild_info", guild_id=guild_id)
     if not data:
         raise HTTPException(status_code=404, detail="Guild not found")

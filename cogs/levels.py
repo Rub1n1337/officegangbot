@@ -240,14 +240,20 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             if not self._dirty_guilds or not self.bot.db:
                 return
 
-            dirty = set(self._dirty_guilds)
-            self._dirty_guilds.clear()
+            async with self._xp_lock:
+                dirty = set(self._dirty_guilds)
+                snapshot = {
+                    guild_id: {
+                        user_id: dict(data)
+                        for user_id, data in self._write_buffer.get(guild_id, {}).items()
+                    }
+                    for guild_id in dirty
+                    if guild_id in self._write_buffer
+                }
 
             records = []
-            for guild_id in dirty:
-                if guild_id not in self._write_buffer:
-                    continue
-                for user_id_str, data in self._write_buffer[guild_id].items():
+            for guild_id, users in snapshot.items():
+                for user_id_str, data in users.items():
                     records.append({
                         'guild_id': guild_id,
                         'user_id': int(user_id_str),
@@ -255,10 +261,25 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                         'level': data.get('level', 0),
                         'display_name': data.get('display_name', '')
                     })
-                del self._write_buffer[guild_id]
 
             if records:
                 await self.bot.db.bulk_upsert_xp(records)
+                async with self._xp_lock:
+                    for guild_id, users in snapshot.items():
+                        guild_buffer = self._write_buffer.get(guild_id)
+                        if not guild_buffer:
+                            self._dirty_guilds.discard(guild_id)
+                            continue
+
+                        for user_id_str, flushed_data in users.items():
+                            if guild_buffer.get(user_id_str) == flushed_data:
+                                del guild_buffer[user_id_str]
+
+                        if guild_buffer:
+                            self._dirty_guilds.add(guild_id)
+                        else:
+                            del self._write_buffer[guild_id]
+                            self._dirty_guilds.discard(guild_id)
                 logger.info(f"XP flush: {len(records)} records to PostgreSQL")
 
         except Exception as e:

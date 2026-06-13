@@ -12,7 +12,7 @@ import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 
 const schema = z.object({
   message: z.string().min(20),
-  channel: z.string(),
+  channel: z.string().optional(),
   color: z.string().optional(),
   date: z.date().optional(),
   file: z.custom<File[]>().optional(),
@@ -26,7 +26,7 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
     resolver: zodResolver(schema),
     shouldUnregister: false,
     defaultValues: {
-      channel: data.channel,
+      channel: data.channel ?? undefined,
       message: data.message ?? '',
       color: undefined,
       date: undefined,
