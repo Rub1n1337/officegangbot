@@ -136,7 +136,8 @@ class MyBot(commands.Bot):
                 "icon": str(guild.icon) if guild.icon else None,
                 "member_count": guild.member_count,
                 "owner_id": str(guild.owner_id),
-                "settings": settings
+                "settings": settings,
+                "enabledFeatures": settings.get("enabled_features", []),
             }
 
         if action == "get_stats":

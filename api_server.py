@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import threading
 import time
 import psutil
