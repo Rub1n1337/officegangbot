@@ -21,6 +21,6 @@ export const config: AppConfig = {
   inviteUrl:
     'https://discord.com/api/oauth2/authorize?client_id=1220462982384058370&permissions=8&scope=bot%20applications.commands&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fauth%2Fcallback&response_type=code',
   guild: {
-    filter: (guild) => (Number(guild.permissions) & PermissionFlags.ADMINISTRATOR) !== 0,
+    filter: (guild) => (BigInt(guild.permissions) & BigInt(PermissionFlags.ADMINISTRATOR)) !== BigInt(0),
   },
 };

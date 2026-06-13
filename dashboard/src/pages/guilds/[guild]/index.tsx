@@ -44,7 +44,7 @@ function GuildPanel({ guild: id, info }: { guild: string; info: CustomGuildInfo 
               key={feature.id}
               guild={id}
               feature={feature}
-              enabled={info.enabledFeatures.includes(feature.id)}
+              enabled={(info.enabledFeatures ?? []).includes(feature.id)}
             />
           ))}
         </SimpleGrid>
