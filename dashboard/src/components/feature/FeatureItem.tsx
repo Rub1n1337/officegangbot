@@ -56,6 +56,9 @@ export function FeatureItem({
                 children: t.bn['config feature'],
               }
             : {
+                variant: 'solid',
+                colorScheme: 'brand',
+                rounded: '2xl',
                 leftIcon: <IoOpen />,
                 onClick: () => mutation.mutate({ enabled: true, guild, feature: feature.id }),
                 children: t.bn['enable feature'],

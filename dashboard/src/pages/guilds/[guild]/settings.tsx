@@ -39,17 +39,6 @@ const GuildSettingsPage: NextPageWithLayout = () => {
         <Heading fontSize="2xl" fontWeight="600">
           Guild Settings
         </Heading>
-        <Text
-          fontSize="lg"
-          fontWeight="500"
-          as="code"
-          _light={{ color: 'cyan.500' }}
-          _dark={{ color: 'cyan.400' }}
-          cursor="pointer"
-          onClick={handleSubmit(() => console.log('submit'))}
-        >
-          {JSON.stringify(watch())}
-        </Text>
       </Box>
       <SimpleGrid mt={5} columns={{ base: 1, md: 2 }} gap={3}>
         <SwitchFieldForm
