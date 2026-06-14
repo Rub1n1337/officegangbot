@@ -101,7 +101,10 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
         })
       );
 
-      reset(data);
+      reset({
+  ...data,
+  channel: data.channel ?? undefined,
+});
     }),
     canSave: formState.isDirty,
     reset: () => reset(control._defaultValues),
