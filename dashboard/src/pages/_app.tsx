@@ -29,14 +29,20 @@ export default function App({ Component, pageProps }: AppPropsWithLayout) {
 
   // Don't render until mounted on client side
   if (!mounted) {
-    return null;
-  }
+    return (
+        <ChakraProvider theme={theme}>
+            <QueryClientProvider client={client}>
+                <Head><title>OfficeGangBot</title></Head>
+            </QueryClientProvider>
+        </ChakraProvider>
+    );
+}
 
   return (
     <ChakraProvider theme={theme}>
       <QueryClientProvider client={client}>
         <Head>
-          <title>Demo Bot</title>
+          <title>OfficeGangBot</title>
         </Head>
         {getLayout(<Component {...pageProps} />)}
       </QueryClientProvider>
