@@ -29,12 +29,14 @@ class RedisManager:
         """Creates Redis connection pool. Call in bot.setup_hook() and api_server startup."""
         url = os.getenv("REDIS_URL", "redis://localhost:6379")
         try:
-            self._redis = await aioredis.from_url(
-                url,
-                encoding="utf-8",
-                decode_responses=True,
-                max_connections=20
-            )
+            self._redis = aioredis.from_url(
+    url,
+    encoding="utf-8",
+    decode_responses=True,
+    max_connections=20,
+    health_check_interval=30,
+    socket_keepalive=True,
+)
             await self._redis.ping()
             logger.info("Redis connection established successfully.")
         except Exception as e:
