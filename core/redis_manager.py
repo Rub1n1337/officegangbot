@@ -2,7 +2,7 @@
 """
 Async Redis manager using redis.asyncio connection pool.
 Handles caching (XP, cooldowns, filter patterns, automod)
-and RPC communication between bot and API server via Pub/Sub.
+and RPC communication between bot and API server via Redis Streams.
 """
 
 import redis.asyncio as aioredis
@@ -195,125 +195,89 @@ class RedisManager:
         await self.delete(f"filter_pattern:{guild_id}")
 
     # -------------------------
-    # RPC via Pub/Sub
+    # RPC via Redis Streams
     # -------------------------
 
-    async def publish(self, channel: str, message: dict) -> None:
-        """Publishes a message to a Redis channel."""
-        try:
-            await self.redis.publish(channel, json.dumps(message))
-        except Exception as e:
-            logger.error(f"Redis PUBLISH error on channel '{channel}': {e}")
-
-    async def rpc_request(self, channel: str, payload: dict, timeout: float = 5.0) -> Optional[dict]:
+    async def rpc_request(self, channel: str, payload: dict, timeout: float = 8.0) -> Optional[dict]:
         """
-        Sends an RPC request and waits for a response via Redis Pub/Sub.
-        Returns the response dict or None on timeout.
-
-        Usage (from API server):
-            result = await redis.rpc_request("bot:rpc", {"action": "get_guild_info", "guild_id": 123})
+        Sends an RPC request via Redis Stream and polls for response.
+        More resilient to Upstash idle disconnects than Pub/Sub.
         """
+        import uuid
         request_id = str(uuid.uuid4())
-        response_channel = f"rpc:response:{request_id}"
+        response_key = f"rpc:response:{request_id}"
 
-        # Subscribe to response channel before publishing request
-        pubsub = self.redis.pubsub()
-        await pubsub.subscribe(response_channel)
+        payload["request_id"] = request_id
+        payload["response_key"] = response_key
 
         try:
-            rpc_payload = {
-                **payload,
-                "request_id": request_id,
-                "response_channel": response_channel,
-            }
-            await self.publish(channel, rpc_payload)
+            await self.redis.xadd(channel, {"data": json.dumps(payload)}, maxlen=1000)
+        except Exception as e:
+            logger.error(f"Redis XADD error: {e}")
+            return None
 
-            deadline = asyncio.get_running_loop().time() + timeout
-            while True:
-                remaining = deadline - asyncio.get_running_loop().time()
-                if remaining <= 0:
-                    logger.warning(f"RPC timeout for request {request_id}")
-                    return None
-
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True,
-                    timeout=remaining,
-                )
-                if message is None:
-                    logger.warning(f"RPC timeout for request {request_id}")
-                    return None
-                if message["type"] != "message":
-                    continue
-
-                try:
-                    response = json.loads(message["data"])
-                except json.JSONDecodeError:
-                    logger.warning(f"Invalid RPC response JSON for request {request_id}")
-                    return None
-
-                if response.get("request_id") != request_id:
-                    continue
-                return response
-        finally:
+        # Poll for response with short intervals (resilient to disconnects)
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
             try:
-                await pubsub.unsubscribe(response_channel)
-            finally:
-                await pubsub.aclose()
+                result = await self.redis.get(response_key)
+                if result:
+                    await self.redis.delete(response_key)
+                    return json.loads(result)
+            except Exception as e:
+                logger.warning(f"Redis GET poll error (will retry): {e}")
+            await asyncio.sleep(0.3)
+
+        logger.warning(f"RPC timeout for request {request_id}")
+        return None
 
     async def start_rpc_listener(self, channel: str, handler) -> None:
         """
-        Starts listening for RPC requests with auto-reconnect.
-        Handles Upstash idle connection timeouts gracefully.
+        Starts a Stream consumer that polls for RPC requests.
+        Uses XREAD with short blocking intervals instead of Pub/Sub listen(),
+        making it resilient to Upstash connection drops.
         """
-        logger.info(f"Redis RPC listener started on channel '{channel}'")
+        logger.info(f"Redis Stream RPC listener started on channel '{channel}'")
+        last_id = "$"  # Start from new messages only
 
         async def listen():
+            nonlocal last_id
             while True:
-                pubsub = None
                 try:
-                    pubsub = self.redis.pubsub()
-                    await pubsub.subscribe(channel)
+                    # Short block (2s) instead of infinite listen() - survives disconnects
+                    result = await self.redis.xread(
+                        {channel: last_id}, count=10, block=2000
+                    )
+                    if not result:
+                        continue
 
-                    async for message in pubsub.listen():
-                        if message["type"] != "message":
-                            continue
-                        payload = None
-                        request_id = None
-                        response_channel = None
-                        try:
-                            payload = json.loads(message["data"])
-                            request_id = payload.get("request_id")
-                            response_channel = payload.get("response_channel")
+                    for stream_name, messages in result:
+                        for message_id, fields in messages:
+                            last_id = message_id
+                            try:
+                                payload = json.loads(fields.get("data", "{}"))
+                                request_id = payload.get("request_id")
+                                response_key = payload.get("response_key")
 
-                            if not request_id or not response_channel:
-                                continue
+                                if not request_id or not response_key:
+                                    continue
 
-                            result = await handler(payload)
-                            await self.publish(response_channel, {
-                                "request_id": request_id,
-                                "data": result
-                            })
-                        except Exception as e:
-                            logger.error(f"RPC handler error: {e}", exc_info=True)
-                            if request_id and response_channel:
-                                await self.publish(response_channel, {
-                                    "request_id": request_id,
-                                    "error": "Bot RPC handler failed"
-                                })
+                                response = await handler(payload)
+                                await self.redis.set(
+                                    response_key, json.dumps(response), ex=15
+                                )
+                            except Exception as e:
+                                logger.error(f"RPC handler error: {e}", exc_info=True)
 
-                except asyncio.CancelledError:
-                    raise
                 except Exception as e:
-                    logger.warning(f"RPC listener disconnected ({e}), reconnecting in 3s...")
-                    await asyncio.sleep(3)
-                finally:
-                    if pubsub:
-                        try:
-                            await pubsub.aclose()
-                        except Exception:
-                            pass
+                    logger.warning(f"Stream read error (reconnecting): {e}")
+                    await asyncio.sleep(1)
 
-        task = asyncio.create_task(listen())
-        self._rpc_tasks.add(task)
-        task.add_done_callback(self._rpc_tasks.discard)
-        return task
+        asyncio.create_task(listen())
+
+    async def trim_rpc_stream(self, channel: str, maxlen: int = 1000) -> None:
+        """Trims the RPC stream to prevent unbounded growth."""
+        try:
+            await self.redis.xtrim(channel, maxlen=maxlen, approximate=True)
+        except Exception as e:
+            logger.error(f"Stream trim error: {e}")
