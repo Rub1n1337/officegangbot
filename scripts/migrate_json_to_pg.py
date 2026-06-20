@@ -43,6 +43,13 @@ async def migrate():
             guild_id = int(guild_id_str)
 
             # --- Migrate guild settings ---
+            # Build enabled_features array from JSON data
+            enabled_features = settings.get('enabled_features', [])
+            # Merge welcome_system.enabled state if welcome-message not in enabled_features
+            welcome_system = settings.get('welcome_system', {})
+            if welcome_system.get('enabled') and 'welcome-message' not in enabled_features:
+                enabled_features.append('welcome-message')
+
             await conn.execute("""
                 INSERT INTO guilds (
                     guild_id, prefix, punishment_log_id, usage_log_id,
@@ -51,14 +58,16 @@ async def migrate():
                     rules_channel_id, rules_message_id, rules_message,
                     reaction_emoji, reaction_role_id, setup_complete,
                     levels_enabled, level_up_channel_id, automod_enabled,
-                    filter_enabled, ticket_support_role_id, ticket_category_id
+                    filter_enabled, ticket_support_role_id, ticket_category_id,
+                    enabled_features
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+                    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
                 )
                 ON CONFLICT (guild_id) DO UPDATE SET
                     prefix = EXCLUDED.prefix,
                     punishment_log_id = EXCLUDED.punishment_log_id,
+                    enabled_features = EXCLUDED.enabled_features,
                     updated_at = NOW()
             """,
                 guild_id,
@@ -83,6 +92,7 @@ async def migrate():
                 bool(settings.get('filter_enabled', False)),
                 _to_int(settings.get('ticket_support_role_id')),
                 _to_int(settings.get('ticket_category_id')),
+                enabled_features,
             )
             guild_count += 1
 

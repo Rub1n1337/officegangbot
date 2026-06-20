@@ -147,8 +147,10 @@ class MyBot(commands.Bot):
     def _snowflake_or_none(value) -> Optional[str]:
         return str(value) if value else None
 
-    def _get_feature_payload(self, guild_id: int, feature: str) -> dict:
-        settings = self.settings_manager.get_all_settings(guild_id)
+    async def _get_feature_payload(self, guild_id: int, feature: str) -> dict:
+        if not self.db:
+            return {"error": "Database unavailable"}
+        settings = await self.db.get_all_guild_settings(guild_id)
         feature_data = {
             "rules": {
                 "channel": self._snowflake_or_none(settings.get("rules_channel_id")),
@@ -177,7 +179,7 @@ class MyBot(commands.Bot):
         return feature_data.get(feature, {})
 
     async def _handle_rpc_request(self, payload: dict) -> dict:
-        """Handles RPC requests from the API server via Redis Pub/Sub."""
+        """Handles RPC requests from the API server via Redis Streams."""
         action = payload.get("action")
 
         if action == "get_guild_info":
@@ -185,7 +187,10 @@ class MyBot(commands.Bot):
             guild = self.get_guild(int(guild_id)) if guild_id else None
             if not guild:
                 return {"error": "Guild not found"}
-            settings = self.settings_manager.get_all_settings(int(guild_id))
+            if not self.db:
+                return {"error": "Database unavailable"}
+            settings = await self.db.get_all_guild_settings(int(guild_id))
+            enabled_features = await self.db.get_enabled_features(int(guild_id))
             return {
                 "id": str(guild.id),
                 "name": guild.name,
@@ -193,7 +198,7 @@ class MyBot(commands.Bot):
                 "member_count": guild.member_count,
                 "owner_id": str(guild.owner_id),
                 "settings": settings,
-                "enabledFeatures": settings.get("enabled_features", []),
+                "enabledFeatures": enabled_features,
             }
 
         if action == "get_stats":
@@ -255,32 +260,38 @@ class MyBot(commands.Bot):
         if action == "get_feature":
             guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
-            return self._get_feature_payload(guild_id, feature)
+            if not self.db:
+                return {"error": "Database unavailable"}
+            # Check if feature is enabled first
+            enabled_features = await self.db.get_enabled_features(guild_id)
+            if feature not in enabled_features:
+                return {"error": "Feature not enabled"}
+            return await self._get_feature_payload(guild_id, feature)
 
         if action == "enable_feature":
             guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
-            settings = self.settings_manager.get_all_settings(guild_id)
-            enabled = settings.get("enabled_features", [])
-            if feature not in enabled:
-                enabled.append(feature)
-                await self.settings_manager.update_setting(guild_id, "enabled_features", enabled)
-            return {"success": True, "enabled_features": enabled}
+            if not self.db:
+                return {"error": "Database unavailable"}
+            await self.db.set_feature_enabled(guild_id, feature, True)
+            enabled_features = await self.db.get_enabled_features(guild_id)
+            return {"success": True, "enabled_features": enabled_features}
 
         if action == "disable_feature":
             guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
-            settings = self.settings_manager.get_all_settings(guild_id)
-            enabled = settings.get("enabled_features", [])
-            if feature in enabled:
-                enabled.remove(feature)
-                await self.settings_manager.update_setting(guild_id, "enabled_features", enabled)
-            return {"success": True, "enabled_features": enabled}
+            if not self.db:
+                return {"error": "Database unavailable"}
+            await self.db.set_feature_enabled(guild_id, feature, False)
+            enabled_features = await self.db.get_enabled_features(guild_id)
+            return {"success": True, "enabled_features": enabled_features}
 
         if action == "update_feature":
             guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
             options = payload.get("options", {})
+            if not self.db:
+                return {"error": "Database unavailable"}
 
             # Map feature options to settings keys
             mapping = {
@@ -306,11 +317,11 @@ class MyBot(commands.Bot):
             if feature in mapping:
                 for option_key, setting_key in mapping[feature].items():
                     if option_key in options and options[option_key] is not None:
-                        await self.settings_manager.update_setting(
+                        await self.db.set_guild_setting(
                             guild_id, setting_key, options[option_key]
                         )
 
-            return self._get_feature_payload(guild_id, feature)
+            return await self._get_feature_payload(guild_id, feature)
 
         return {"error": f"Unknown action: {action}"}
 

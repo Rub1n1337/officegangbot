@@ -106,6 +106,44 @@ class DatabaseManager:
             )
             return dict(row) if row else {}
 
+    async def get_enabled_features(self, guild_id: int) -> List[str]:
+        """Returns the list of enabled features for a guild."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT enabled_features FROM guilds WHERE guild_id = $1",
+                guild_id
+            )
+            if row is None:
+                return []
+            features = row['enabled_features']
+            return features if features else []
+
+    async def set_feature_enabled(self, guild_id: int, feature: str, enabled: bool) -> None:
+        """Enables or disables a feature for a guild by adding/removing it from enabled_features."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            if enabled:
+                await conn.execute(
+                    """
+                    UPDATE guilds
+                    SET enabled_features = array_append(enabled_features, $1),
+                        updated_at = NOW()
+                    WHERE guild_id = $2 AND NOT ($1 = ANY(enabled_features))
+                    """,
+                    feature, guild_id
+                )
+            else:
+                await conn.execute(
+                    """
+                    UPDATE guilds
+                    SET enabled_features = array_remove(enabled_features, $1),
+                        updated_at = NOW()
+                    WHERE guild_id = $2
+                    """,
+                    feature, guild_id
+                )
+
     # -------------------------
     # XP / Levels
     # -------------------------

@@ -90,3 +90,6 @@ CREATE TABLE IF NOT EXISTS mod_roles (
     PRIMARY KEY (guild_id, role_id),
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
+
+-- Migration: Add enabled_features column if it doesn't exist (for existing databases)
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
