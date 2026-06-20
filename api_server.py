@@ -20,6 +20,14 @@ BOT_START_TIME = time.time()
 # Redis manager for RPC communication with bot process
 _redis: Optional[RedisManager] = None
 
+# Global bot instance for direct access (when embedded in bot process)
+bot_instance = None
+
+def set_bot_instance(bot_obj):
+    """Set the global bot instance for direct access."""
+    global bot_instance
+    bot_instance = bot_obj
+
 app = FastAPI(title="OfficeGangBot API", version="1.0.0")
 
 @app.on_event("startup")

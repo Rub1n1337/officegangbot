@@ -17,6 +17,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import asyncio
+import uvicorn
 from core.logger import logger
 from config import load_config
 # from core.webserver import keep_alive
@@ -25,6 +26,7 @@ from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
 from cogs.utils import reply
+from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
 
@@ -64,6 +66,14 @@ class MyBot(commands.Bot):
         self.tree.on_error = self.on_app_command_error
 
     async def close(self):
+        if hasattr(self, '_uvicorn_server'):
+            self._uvicorn_server.should_exit = True
+            if hasattr(self, '_api_task'):
+                try:
+                    await asyncio.wait_for(self._api_task, timeout=5)
+                except asyncio.TimeoutError:
+                    self._api_task.cancel()
+            logger.info("FastAPI server stopped")
         if hasattr(self, 'db') and self.db:
             await self.db.close()
         if hasattr(self, 'redis') and self.redis:
@@ -91,6 +101,19 @@ class MyBot(commands.Bot):
         except Exception as e:
             logger.warning(f"Redis unavailable, continuing without it: {e}")
             self.redis = None
+
+        # Start FastAPI server as a background task within the same process
+        port = int(os.getenv("PORT", 8080))
+        config = uvicorn.Config(
+            fastapi_app,
+            host="0.0.0.0",
+            port=port,
+            log_level="info",
+            loop="asyncio"
+        )
+        self._uvicorn_server = uvicorn.Server(config)
+        self._api_task = asyncio.create_task(self._uvicorn_server.serve())
+        logger.info(f"FastAPI server starting on port {port} (embedded in bot process)")
 
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
@@ -373,7 +396,8 @@ async def main():
     bot.health_monitor = health_monitor
     health_monitor.start()
 
-    # API server now uses Redis RPC - no need to set bot_instance
+    # Set bot instance for API server access (when embedded)
+    set_bot_instance(bot)
 
     try:
         # Create the lock file
