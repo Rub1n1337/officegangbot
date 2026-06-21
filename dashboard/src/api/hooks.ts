@@ -12,6 +12,7 @@ import {
 } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
+import { useToast } from '@chakra-ui/react';
 
 export const client = new QueryClient({
   defaultOptions: {
@@ -89,6 +90,7 @@ export function useFeatureQuery<K extends keyof CustomFeatures>(guild: string, f
 export type EnableFeatureOptions = { guild: string; feature: string; enabled: boolean };
 export function useEnableFeatureMutation() {
   const { session } = useSession();
+  const toast = useToast();
 
   return useMutation(
     async ({ enabled, guild, feature }: EnableFeatureOptions) => {
@@ -115,6 +117,26 @@ export function useEnableFeatureMutation() {
             };
           }
         });
+        toast({
+          title: enabled ? 'Feature enabled' : 'Feature disabled',
+          description: enabled
+            ? 'The feature has been successfully enabled.'
+            : 'The feature has been successfully disabled.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError(_err, { enabled }) {
+        toast({
+          title: enabled ? 'Failed to enable feature' : 'Failed to disable feature',
+          description: 'An error occurred. Please try again.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
       },
     }
   );
@@ -127,6 +149,7 @@ export type UpdateFeatureOptions = {
 };
 export function useUpdateFeatureMutation() {
   const { session } = useSession();
+  const toast = useToast();
 
   return useMutation(
     (options: UpdateFeatureOptions) =>
@@ -134,8 +157,25 @@ export function useUpdateFeatureMutation() {
     {
       onSuccess(updated, options) {
         const key = Keys.features(options.guild, options.feature);
-
-        return client.setQueryData(key, updated);
+        client.setQueryData(key, updated);
+        toast({
+          title: 'Settings saved',
+          description: 'Your changes have been saved successfully.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError() {
+        toast({
+          title: 'Failed to save settings',
+          description: 'An error occurred while saving. Please try again.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
       },
     }
   );

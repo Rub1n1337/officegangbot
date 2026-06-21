@@ -19,6 +19,7 @@ BOT_START_TIME = time.time()
 
 # Redis manager for RPC communication with bot process
 _redis: Optional[RedisManager] = None
+_redis_last_ok: float = 0.0  # timestamp of last successful RPC call
 
 # Global bot instance for direct access (when embedded in bot process)
 bot_instance = None
@@ -39,7 +40,7 @@ async def startup():
         await _redis.connect()
         logger.info("API server Redis connected.")
     except Exception as e:
-        logger.warning(f"API Redis unavailable: {e}")
+        logger.warning(f"API Redis unavailable at startup: {e}")
         _redis = None
 
 @app.on_event("shutdown")
@@ -63,10 +64,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class RulesFeatureModel(BaseModel):
-    channel: Optional[str] = None
-    message: str
-
 # --- API Authentication ---
 async def verify_api_key(x_api_key: Optional[str] = Header(None)):
     api_secret = os.getenv("API_SECRET_KEY")
@@ -77,11 +74,46 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 # --- RPC Helper ---
+async def _ensure_redis() -> Optional[RedisManager]:
+    """
+    Returns the current Redis manager, attempting a reconnect if it is None.
+    This handles the case where the initial startup connection failed or
+    the connection was lost after startup.
+    """
+    global _redis
+    if _redis is not None:
+        return _redis
+    # Attempt lazy reconnect
+    logger.warning("Redis is None in _rpc — attempting lazy reconnect...")
+    try:
+        new_redis = RedisManager()
+        await new_redis.connect()
+        _redis = new_redis
+        logger.info("Redis lazy reconnect succeeded.")
+        return _redis
+    except Exception as e:
+        logger.error(f"Redis lazy reconnect failed: {e}")
+        return None
+
 async def _rpc(action: str, **kwargs) -> Any:
     """Sends an RPC request to the bot via Redis and returns response."""
-    if not _redis:
+    global _redis_last_ok
+    redis = await _ensure_redis()
+    if not redis:
+        elapsed = time.time() - _redis_last_ok if _redis_last_ok else None
+        logger.error(
+            f"_rpc called with action='{action}' but Redis is unavailable. "
+            f"Last successful RPC: {f'{elapsed:.1f}s ago' if elapsed else 'never'}. "
+            f"_redis object is None after reconnect attempt."
+        )
         raise HTTPException(status_code=503, detail="Redis not available")
-    envelope = await _redis.rpc_request("bot:rpc", {"action": action, **kwargs})
+    try:
+        envelope = await redis.rpc_request("bot:rpc", {"action": action, **kwargs})
+    except Exception as e:
+        logger.error(f"Redis rpc_request raised exception for action='{action}': {e}", exc_info=True)
+        # Mark redis as potentially broken so next call will attempt reconnect
+        _redis = None
+        raise HTTPException(status_code=503, detail="Redis connection error during RPC")
     if envelope is None:
         raise HTTPException(status_code=504, detail="Bot RPC timeout — bot may be offline")
     if isinstance(envelope, dict) and "error" in envelope and "data" not in envelope:
@@ -90,19 +122,11 @@ async def _rpc(action: str, **kwargs) -> Any:
     result = envelope.get("data", envelope) if isinstance(envelope, dict) else envelope
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
+    _redis_last_ok = time.time()
     return result
 
 
 # --- API Endpoints ---
-@app.get("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
-async def get_rules_feature(guild_id: str):
-    # This endpoint still uses settings_manager - will need to be migrated to RPC later
-    # For now, we'll keep it as is since it's not critical
-    raise HTTPException(status_code=503, detail="This endpoint requires direct bot access - use RPC endpoints instead")
-
-@app.patch("/guilds/{guild_id}/features/rules", response_model=RulesFeatureModel, dependencies=[Depends(verify_api_key)])
-async def update_rules_feature(guild_id: str, body: RulesFeatureModel):
-    raise HTTPException(status_code=503, detail="This endpoint requires direct bot access - use RPC endpoints instead")
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
 async def get_guild_info(guild_id: str):

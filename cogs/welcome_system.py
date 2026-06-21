@@ -11,7 +11,7 @@ What it does:
   - Enable or disable the welcome system (`/welcome toggle`).
   - Set the welcome channel (`/welcome channel #channel-name`).
   - Customize the welcome message (`/welcome message ...`).
-- It uses placeholders like `{member.mention}` and `{guild.name}` to create
+- It uses placeholders like `{user.mention}` and `{server.name}` to create
   dynamic and personal welcome messages.
 """
 
@@ -22,7 +22,7 @@ from core.permissions import has_permission
 from typing import Optional
 from .utils import reply
 
-DEFAULT_WELCOME_MESSAGE = "Welcome {member.mention} to {guild.name}! We're glad to have you."
+DEFAULT_WELCOME_MESSAGE = "Welcome {user.mention} to {server.name}! We're glad to have you."
 
 class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
     """Manages welcome messages and auto-roles for new members."""
@@ -58,7 +58,7 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
 
         message_format = await self.bot.db.get_guild_setting(guild.id, "welcome_message", DEFAULT_WELCOME_MESSAGE)
         try:
-            formatted_message = message_format.format(member=member, guild=guild)
+            formatted_message = message_format.format(user=member, server=guild)
             await channel.send(formatted_message)
             logger.info(f"Sent welcome message for {member} in {guild.name}.")
         except discord.Forbidden:
@@ -167,7 +167,7 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             return await reply(ctx, "❌ Welcome message cannot exceed 1500 characters.")
         # Pre-validate placeholders
         try:
-            _ = message.format(member=ctx.author, guild=ctx.guild)
+            _ = message.format(user=ctx.author, server=ctx.guild)
         except Exception as e:
             return await reply(ctx, f"❌ Invalid placeholder in message: {e}")
 
@@ -219,8 +219,8 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
         """Shows available placeholders for the welcome message."""
         embed = discord.Embed(title="Welcome Message Placeholders", color=discord.Color.teal())
         embed.description = "Use these placeholders in your welcome message to include dynamic information."
-        embed.add_field(name="Member", value="`{member.mention}` - Mentions the user\n`{member.name}` - The user's name\n`{member.id}` - The user's ID", inline=False)
-        embed.add_field(name="Server", value="`{guild.name}` - The server's name\n`{guild.member_count}` - The server's member count", inline=False)
+        embed.add_field(name="Member", value="`{user.mention}` - Mentions the user\n`{user.name}` - The user's name\n`{user.id}` - The user's ID", inline=False)
+        embed.add_field(name="Server", value="`{server.name}` - The server's name\n`{server.member_count}` - The server's member count", inline=False)
         await reply(ctx, embed=embed)
 
     # Local error handler removed. The global handler in bot.py will now manage errors.

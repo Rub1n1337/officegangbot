@@ -4,19 +4,11 @@ import { UseFormRender, WelcomeMessageFeature } from '@/config/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ColorPickerForm, SmallColorPickerForm } from '@/components/forms/ColorPicker';
-import { DatePickerForm } from '@/components/forms/DatePicker';
-import { FilePickerForm } from '@/components/forms/FilePicker';
-import { SwitchFieldForm } from '@/components/forms/SwitchField';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 
 const schema = z.object({
-  message: z.string().min(20),
+  message: z.string().min(1),
   channel: z.string().optional(),
-  color: z.string().optional(),
-  date: z.date().optional(),
-  file: z.custom<File[]>().optional(),
-  danger: z.boolean(),
 });
 
 type Input = z.infer<typeof schema>;
@@ -28,10 +20,6 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
     defaultValues: {
       channel: data.channel ?? undefined,
       message: data.message ?? '',
-      color: undefined,
-      date: undefined,
-      file: [],
-      danger: false,
     },
   });
 
@@ -48,48 +36,11 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
         <TextAreaForm
           control={{
             label: 'Message',
-            description: 'The message to send',
+            description: 'The welcome message. Use {user.mention} to mention the new member and {server.name} for the server name.',
             error: formState.errors.message?.message,
           }}
-          placeholder="Type some text here..."
+          placeholder="Welcome {user.mention} to {server.name}! We're glad to have you."
           {...register('message')}
-        />
-        <SmallColorPickerForm
-          control={{
-            label: 'Color',
-            description: 'The color of message',
-          }}
-          supportAlpha
-          controller={{ control, name: 'color' }}
-        />
-        <FilePickerForm
-          control={{
-            label: 'File',
-            description: 'The file to upload',
-          }}
-          options={{ accept: { 'image/*': [] }, multiple: false }}
-          controller={{ control, name: 'file' }}
-        />
-        <ColorPickerForm
-          control={{
-            label: 'Color',
-            description: 'The color of message',
-          }}
-          controller={{ control, name: 'color' }}
-        />
-        <DatePickerForm
-          control={{
-            label: 'Date',
-            description: 'The date of today',
-          }}
-          controller={{ control, name: 'date' }}
-        />
-        <SwitchFieldForm
-          control={{ label: 'Turn on', description: 'Enable something' }}
-          controller={{
-            control,
-            name: 'danger',
-          }}
         />
       </SimpleGrid>
     ),
@@ -102,9 +53,9 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
       );
 
       reset({
-  ...data,
-  channel: data.channel ?? undefined,
-});
+        ...data,
+        channel: data.channel ?? undefined,
+      });
     }),
     canSave: formState.isDirty,
     reset: () => reset(control._defaultValues),
