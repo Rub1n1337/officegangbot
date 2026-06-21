@@ -293,6 +293,12 @@ class MyBot(commands.Bot):
             if not self.db:
                 return {"error": "Database unavailable"}
 
+            # Settings keys that map to BIGINT columns in Postgres and need int conversion
+            BIGINT_SETTINGS = {
+                "rules_channel_id", "rules_message_id", "welcome_channel_id",
+                "reaction_role_id", "punishment_log_id",
+            }
+
             # Map feature options to settings keys
             mapping = {
                 "rules": {
@@ -317,8 +323,14 @@ class MyBot(commands.Bot):
             if feature in mapping:
                 for option_key, setting_key in mapping[feature].items():
                     if option_key in options and options[option_key] is not None:
+                        value = options[option_key]
+                        if setting_key in BIGINT_SETTINGS:
+                            try:
+                                value = int(value)
+                            except (TypeError, ValueError):
+                                return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
                         await self.db.set_guild_setting(
-                            guild_id, setting_key, options[option_key]
+                            guild_id, setting_key, value
                         )
 
             return await self._get_feature_payload(guild_id, feature)
