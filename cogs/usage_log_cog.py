@@ -9,20 +9,23 @@ class UsageLogCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
 
     @commands.Cog.listener()
     async def on_command_completion(self, ctx: commands.Context) -> None:
-        if not ctx.guild:
+        if not ctx.guild or not self.bot.db:
             return
 
-        log_channel_id = self.settings_manager.get_setting(ctx.guild.id, 'usage_log_id')
+        # Check if logging feature is enabled
+        enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
+        if "logging" not in enabled_features:
+            return
+
+        log_channel_id = await self.bot.db.get_guild_setting(ctx.guild.id, 'usage_log_id')
         if not log_channel_id:
             return
 
-        log_channel = self.bot.get_channel(log_channel_id)
+        log_channel = self.bot.get_channel(int(log_channel_id))
         if not log_channel:
-            logger.warning(f"Usage log channel ID {log_channel_id} not found in guild {ctx.guild.id}.")
             return
 
         # Truncate fields for Discord embed limits
@@ -47,7 +50,7 @@ class UsageLogCog(commands.Cog):
         embed = discord.Embed(
             title="Command Used",
             color=discord.Color.light_grey(),
-            timestamp=ctx.message.created_at
+            timestamp=ctx.message.created_at if ctx.message else datetime.datetime.now(datetime.timezone.utc)
         )
         embed.set_author(name=f"{ctx.author.name} ({ctx.author.id})", icon_url=ctx.author.display_avatar.url)
         embed.add_field(name="Command", value=command_name)
@@ -58,7 +61,7 @@ class UsageLogCog(commands.Cog):
         try:
             await log_channel.send(embed=embed)
         except discord.Forbidden:
-            logger.warning(f"Missing permissions to send usage log to channel {log_channel_id} in guild {ctx.guild.id}.")
+            pass
         except Exception as e:
             logger.error(f"Failed to send usage log embed: {e}", exc_info=True)
 

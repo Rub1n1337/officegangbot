@@ -12,7 +12,7 @@ VALID_PERMISSIONS = ["config", "kick", "ban", "mute", "warn", "clear"]
 VALID_LOG_TYPES = {
     "punishment": "punishment_log_id",
     "usage": "usage_log_id",
-    "message": "message_log_id",
+    "message": "audit_log_id",  # Dashboard uses audit_log_id for message logs
     "leave": "leave_log_id"
 }
 
@@ -42,11 +42,16 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
     @commands.hybrid_command(name="settings", description="Displays a summary of all current bot settings for this server.")
     @has_permission("config")
     async def view_settings(self, ctx: commands.Context):
-        settings = self.settings_manager.get_guild_settings(ctx.guild.id)
+        if not self.bot.db:
+            return await reply(ctx, "❌ Database unavailable.", ephemeral=True)
+            
+        settings = await self.bot.db.get_all_guild_settings(ctx.guild.id)
+        enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
+        
         embed = discord.Embed(title=f"⚙️ Settings for {ctx.guild.name}", color=discord.Color.blurple())
         embed.set_footer(text="Use /config to manage these settings.")
 
-        # Permissions
+        # Permissions (still in JSON for now as Postgres schema doesn't have these columns yet)
         perm_text = "\n".join([
             f"`{perm_name.title()}`: {ctx.guild.get_role(self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id')).mention if self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id') and ctx.guild.get_role(self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id')) else '❌ Not Set'}"
             for perm_name in VALID_PERMISSIONS
@@ -54,18 +59,14 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         embed.add_field(name="🛡️ Permission Roles", value=perm_text or 'No permissions configured.', inline=False)
 
         # Logging
-        log_channels = {name: self.bot.get_channel(settings.get(key, 0)) for name, key in VALID_LOG_TYPES.items()}
-        all_channels = list(log_channels.values())
-        set_channels = [ch for ch in all_channels if ch]
-        unique_channels = set(set_channels)
-        log_text = ""
-        if len(unique_channels) == 1 and set_channels:
-            only_channel = next(iter(unique_channels))
-            log_text = f"All logs will be sent to {only_channel.mention}"
-        else:
-            for name, channel in log_channels.items():
-                log_text += f"`{name.title()}`: {channel.mention if channel else '❌ Not Set'}\n"
-        embed.add_field(name="📝 Logging Channels", value=log_text or 'No log channels configured.', inline=False)
+        is_logging_enabled = "logging" in enabled_features
+        log_channels = {name: self.bot.get_channel(int(settings.get(key))) if settings.get(key) else None for name, key in VALID_LOG_TYPES.items()}
+        
+        log_text = f"Feature Status: {'✅ **Enabled**' if is_logging_enabled else '❌ **Disabled**'}\n\n"
+        for name, channel in log_channels.items():
+            log_text += f"`{name.title()}`: {channel.mention if channel else '❌ Not Set'}\n"
+        
+        embed.add_field(name="📝 Logging Channels", value=log_text, inline=False)
 
         # Section divider
         embed.add_field(name="\u200b", value="━━━━━━━━━━━━━━", inline=False)
@@ -92,6 +93,12 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
     async def config_prefix(self, ctx: commands.Context, new_prefix: str):
         if len(new_prefix) > 5:
             return await reply(ctx, "❌ Prefix cannot be longer than 5 characters.", ephemeral=True)
+            
+        # Update Postgres
+        if self.bot.db:
+            await self.bot.db.set_guild_setting(ctx.guild.id, 'prefix', new_prefix)
+            
+        # Update JSON (legacy sync)
         await self.settings_manager.update_setting(ctx.guild.id, 'prefix', new_prefix)
         await reply(ctx, f"✅ Command prefix has been updated to `{new_prefix}`.", ephemeral=True)
 
@@ -100,11 +107,22 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
     @has_permission("config")
     async def config_logs(self, ctx: commands.Context, log_type: Literal["punishment", "usage", "message", "leave"], channel: discord.TextChannel = None):
         key = VALID_LOG_TYPES[log_type]
+        value = channel.id if channel else None
+        
+        if self.bot.db:
+            await self.bot.db.set_guild_setting(ctx.guild.id, key, value)
+            # Also ensure 'logging' feature is enabled if setting a channel
+            if channel:
+                await self.bot.db.set_feature_enabled(ctx.guild.id, "logging", True)
+        
+        # Legacy JSON sync
+        # Note: 'message' maps to 'audit_log_id' in DB but 'message_log_id' in JSON
+        json_key = "message_log_id" if log_type == "message" else key
+        await self.settings_manager.update_setting(ctx.guild.id, json_key, value)
+        
         if channel:
-            await self.settings_manager.update_setting(ctx.guild.id, key, channel.id)
             await reply(ctx, f"✅ Logs for `{log_type}` will now be sent to {channel.mention}.", ephemeral=True)
         else:
-            await self.settings_manager.update_setting(ctx.guild.id, key, None)
             await reply(ctx, f"✅ Logging for `{log_type}` has been disabled.", ephemeral=True)
 
     @config.command(name="role", description="Assigns a permission level to a role.")

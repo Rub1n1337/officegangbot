@@ -2,24 +2,36 @@
 import discord
 from discord.ext import commands
 import datetime
+from core.logger import logger
 
 class AuditLogCog(commands.Cog):
     """Handles logging for message edits and deletions."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
+
+    async def _get_log_channel(self, guild_id: int):
+        if not self.bot.db:
+            return None
+            
+        # Check if logging feature is enabled
+        enabled_features = await self.bot.db.get_enabled_features(guild_id)
+        if "logging" not in enabled_features:
+            return None
+            
+        # Use audit_log_id for message logs
+        log_channel_id = await self.bot.db.get_guild_setting(guild_id, 'audit_log_id')
+        if not log_channel_id:
+            return None
+            
+        return self.bot.get_channel(int(log_channel_id))
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
         if not message.guild or message.author.bot:
             return
 
-        log_channel_id = self.settings_manager.get_setting(message.guild.id, 'message_log_id')
-        if not log_channel_id:
-            return
-
-        log_channel = self.bot.get_channel(log_channel_id)
+        log_channel = await self._get_log_channel(message.guild.id)
         if not log_channel:
             return
 
@@ -36,17 +48,15 @@ class AuditLogCog(commands.Cog):
             await log_channel.send(embed=embed)
         except discord.Forbidden:
             pass
+        except Exception as e:
+            logger.error(f"Error sending delete log: {e}")
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         if not after.guild or after.author.bot or before.content == after.content:
             return
 
-        log_channel_id = self.settings_manager.get_setting(after.guild.id, 'message_log_id')
-        if not log_channel_id:
-            return
-
-        log_channel = self.bot.get_channel(log_channel_id)
+        log_channel = await self._get_log_channel(after.guild.id)
         if not log_channel:
             return
 
@@ -64,6 +74,8 @@ class AuditLogCog(commands.Cog):
             await log_channel.send(embed=embed)
         except discord.Forbidden:
             pass
+        except Exception as e:
+            logger.error(f"Error sending edit log: {e}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AuditLogCog(bot))

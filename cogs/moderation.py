@@ -7,7 +7,6 @@ import time
 import uuid
 from core.logger import logger
 from core.permissions import has_permission
-from core.settings_manager import SettingsManager
 from typing import Optional, Literal
 from .utils import reply
 from discord.ui import View, Button
@@ -63,7 +62,6 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         """Handles errors for all commands in this cog."""
@@ -111,8 +109,20 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
             return False
 
     async def _log_action(self, ctx: commands.Context, action: str, target: discord.abc.User, reason: str, **kwargs):
-        log_channel_id = self.settings_manager.get_setting(ctx.guild.id, 'punishment_log_id')
-        if not log_channel_id or not (log_channel := ctx.guild.get_channel(log_channel_id)):
+        if not self.bot.db:
+            return
+
+        # Check if logging feature is enabled
+        enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
+        if "logging" not in enabled_features:
+            return
+
+        log_channel_id = await self.bot.db.get_guild_setting(ctx.guild.id, 'punishment_log_id')
+        if not log_channel_id:
+            return
+
+        log_channel = ctx.guild.get_channel(int(log_channel_id))
+        if not log_channel:
             return
 
         timestamp = discord.utils.utcnow()
@@ -127,7 +137,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         try:
             await log_channel.send(embed=embed)
         except discord.Forbidden:
-            logger.warning(f"Could not log punishment to channel {log_channel_id} in guild {ctx.guild.id}.")
+            pass
 
     @commands.hybrid_command(name="clear", description="Delete a specified number of messages.")
     @app_commands.describe(amount="Number of messages to delete (1-100).")
@@ -222,4 +232,3 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
-

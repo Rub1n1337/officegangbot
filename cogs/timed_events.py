@@ -84,9 +84,9 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                     if punishment_type == 'mute':
                         member = guild.get_member(user_id)
                         if member:
-                            mute_role = discord.utils.get(guild.roles, name="Muted")
-                            if mute_role and mute_role in member.roles:
-                                await member.remove_roles(mute_role, reason="Timed mute expired")
+                            # Use modern timeout instead of "Muted" role
+                            if member.is_timed_out():
+                                await member.timeout(None, reason="Timed mute expired")
                                 logger.info(f"Auto-unmuted {member} in {guild.name}")
                     elif punishment_type == 'ban':
                         try:
@@ -103,12 +103,12 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                     # Log to punishment channel
                     log_channel_id = await self.bot.db.get_guild_setting(guild_id, 'punishment_log_id')
                     if log_channel_id:
-                        channel = guild.get_channel(log_channel_id)
+                        channel = guild.get_channel(int(log_channel_id))
                         if channel:
                             embed = discord.Embed(
                                 title=f"⏰ Timed {punishment_type.title()} Expired",
                                 color=discord.Color.green(),
-                                timestamp=datetime.datetime.utcnow()
+                                timestamp=datetime.datetime.now(datetime.timezone.utc)
                             )
                             embed.add_field(name="User ID", value=f"`{user_id}`", inline=True)
                             embed.add_field(
@@ -178,6 +178,12 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         embed.add_field(name="Reason", value=reason, inline=False)
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
         await reply(ctx, embed=embed)
+        
+        # Log to punishment channel via common helper if possible (Moderation cog)
+        mod_cog = self.bot.get_cog("🛡️ Moderation")
+        if mod_cog:
+            await mod_cog._log_action(ctx, "🔇 Temp Mute", member, reason, duration=format_duration(seconds))
+            
         logger.info(f"Temp-muted {member} in {ctx.guild.name} for {format_duration(seconds)} by {ctx.author}")
 
     @commands.hybrid_command(name="tempban", description="Temporarily ban a member.")
@@ -197,9 +203,6 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                 ephemeral=True
             )
 
-        expires_at = (datetime.datetime.utcnow() +
-                      datetime.timedelta(seconds=seconds)).timestamp()
-
         # DM user before ban
         try:
             dm_embed = discord.Embed(
@@ -214,7 +217,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
 
         await member.ban(reason=f"{reason} | Moderator: {ctx.author} | Duration: {format_duration(seconds)}")
 
-        expires_at_dt = datetime.datetime.utcnow() + datetime.timedelta(seconds=seconds)
+        expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=seconds)
         expires_at = expires_at_dt.timestamp()
 
         if self.bot.db:
@@ -222,7 +225,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                 guild_id=ctx.guild.id,
                 user_id=member.id,
                 punishment_type='ban',
-                expires_at=expires_at_dt.replace(tzinfo=datetime.timezone.utc),
+                expires_at=expires_at_dt,
                 reason=reason,
                 moderator_id=ctx.author.id
             )
@@ -238,6 +241,11 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         embed.add_field(name="Reason", value=reason, inline=False)
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
         await reply(ctx, embed=embed)
+
+        # Log to punishment channel
+        mod_cog = self.bot.get_cog("🛡️ Moderation")
+        if mod_cog:
+            await mod_cog._log_action(ctx, "🔨 Temp Ban", member, reason, duration=format_duration(seconds))
 
         logger.info(f"Temp-banned {member} in {ctx.guild.name} for {format_duration(seconds)} by {ctx.author}")
 

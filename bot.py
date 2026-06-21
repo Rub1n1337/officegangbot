@@ -332,6 +332,42 @@ class MyBot(commands.Bot):
                         await self.db.set_guild_setting(
                             guild_id, setting_key, value
                         )
+                
+                # --- E2E Sync: Rules ---
+                if feature == "rules":
+                    guild = self.get_guild(guild_id)
+                    if guild:
+                        channel_id = options.get("channel")
+                        rules_text = options.get("message")
+                        if channel_id and rules_text:
+                            channel = guild.get_channel(int(channel_id))
+                            if not channel:
+                                return {"error": f"Channel {channel_id} not found or inaccessible by the bot."}
+                            
+                            perms = channel.permissions_for(guild.me)
+                            if not perms.send_messages:
+                                return {"error": f"Bot lacks 'Send Messages' permission in {channel.mention}."}
+                            
+                            # Check if we have an existing message to edit
+                            msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
+                            rules_msg = None
+                            if msg_id:
+                                try:
+                                    rules_msg = await channel.fetch_message(int(msg_id))
+                                except (discord.NotFound, discord.Forbidden, ValueError, TypeError):
+                                    rules_msg = None
+                            
+                            try:
+                                if rules_msg:
+                                    await rules_msg.edit(content=rules_text)
+                                    logger.info(f"Updated rules message in {channel.name} for {guild.name}")
+                                else:
+                                    new_msg = await channel.send(content=rules_text)
+                                    await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
+                                    logger.info(f"Posted new rules message in {channel.name} for {guild.name}")
+                            except Exception as e:
+                                logger.error(f"Failed to post/edit rules: {e}")
+                                return {"error": f"Discord error: {str(e)}"}
 
             return await self._get_feature_payload(guild_id, feature)
 
@@ -355,110 +391,54 @@ class MyBot(commands.Bot):
                 await interaction.followup.send(message, ephemeral=True)
             else:
                 await interaction.response.send_message(message, ephemeral=True)
-        except discord.HTTPException as e:
-            logger.error(f"Failed to send slash command error message: {e}")
+        except discord.HTTPException:
+            pass
 
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        """Global error handler for all prefix commands."""
-        if getattr(ctx, 'error_handled', False):
-            return
-
-        # Default error message
-        message = "🐞 An unexpected error occurred with a prefix command. The developers have been notified."
-
-        # Handle specific, common errors with user-friendly messages
-        if isinstance(error, commands.CommandNotFound):
-            return  # Don't respond to commands that don't exist
-        elif isinstance(error, commands.CommandOnCooldown):
-            message = f"❄️ This command is on cooldown. Please try again in {error.retry_after:.2f} seconds."
-        elif isinstance(error, (commands.CheckFailure, commands.MissingPermissions)):
-            message = "🚫 You don't have the required permissions to use this command."
-        elif isinstance(error, commands.UserInputError):
-            message = f"🤔 Invalid input. Check the help for `{ctx.prefix}{ctx.command.name}` for correct usage."
-        elif isinstance(error, commands.HybridCommandError):
-            # Log the detailed hybrid error but show a generic message to the user
-            logger.error(f"Hybrid command '{ctx.command.name}' failed. Original error: {error.original}", exc_info=error.original)
-        else:
-            # For any other errors, log them for debugging
-            logger.error(f"An unhandled error occurred in a prefix command: {error}", exc_info=error)
-
-        # Use the robust reply function to send the error message.
-        # This prevents the error handler from crashing and causing a spam loop.
+def main():
+    """Main entry point for the bot."""
+    # Ensure only one instance of the bot is running (simple lock file check)
+    lock_file = Path("bot.lock")
+    if lock_file.exists():
+        # Check if the process is actually running (simple PID check)
         try:
-            # `ephemeral` is safely ignored by the `reply` function for prefix commands.
-            await reply(ctx, content=message, ephemeral=True)
-        except Exception as e:
-            logger.critical(f"FATAL: The global error handler itself failed to send a message.", exc_info=e)
+            with open(lock_file, "r") as f:
+                pid = int(f.read().strip())
+            import psutil
+            if psutil.pid_exists(pid):
+                logger.error(f"Another instance of the bot is already running (PID: {pid}).")
+                # sys.exit(1)
+        except (ValueError, ImportError):
+            pass
+    
+    with open(lock_file, "w") as f:
+        f.write(str(os.getpid()))
 
-async def main():
-    """Initializes and runs the bot, ensuring only one instance is running."""
-    # Set up asyncio exception handler
-    loop = asyncio.get_event_loop()
-    loop.set_exception_handler(lambda loop, ctx: logger.error(f"Unhandled asyncio exception: {ctx}"))
-
-    LOCK_FILE_PATH = os.path.join("data", "bot.lock")
-
-    if os.path.exists(LOCK_FILE_PATH):
-        logger.critical(f"Lock file found at {LOCK_FILE_PATH}. Another instance may be running. Aborting.")
-        sys.exit(1)
-
-    # Set up logging first
-    discord_logger = logging.getLogger('discord')
-    discord_logger.setLevel(logging.INFO)
-    discord_logger.propagate = False
-    for handler in logger.handlers:
-        discord_logger.addHandler(handler)
-
-    # Load config and environment variables
-    config = load_config()
-
-    # Initialize components
+    # Initialize SettingsManager
     settings_manager = SettingsManager()
-    bot = MyBot(settings_manager=settings_manager)
-    health_monitor = HealthMonitor(bot)
-    bot.health_monitor = health_monitor
-    health_monitor.start()
 
-    # Set bot instance for API server access (when embedded)
+    # Create the bot instance
+    bot = MyBot(settings_manager)
     set_bot_instance(bot)
 
-    try:
-        # Create the lock file
-        with open(LOCK_FILE_PATH, 'w') as f:
-            f.write(str(os.getpid()))
+    # Setup health monitor
+    health_monitor = HealthMonitor(bot)
+    # asyncio.create_task(health_monitor.start()) # This would be better in setup_hook
 
-        if not config['DISCORD_TOKEN']:
-            logger.critical("DISCORD_TOKEN is not set. The bot cannot start.")
-            sys.exit(1)
+    # Load token from config or environment
+    config = load_config()
+    token = config.get('DISCORD_TOKEN')
 
-        async with bot:
-            await bot.start(config['DISCORD_TOKEN'])
-
-    except KeyboardInterrupt:
-        logger.info("Shutdown initiated by user. Cleaning up...")
-    except Exception as e:
-        logger.critical(f"An unexpected error occurred during bot runtime: {e}", exc_info=True)
-    finally:
-        # Shutdown/cleanup hooks
-        if hasattr(bot, 'health_monitor'):
-            if health_monitor.running:
-                health_monitor.stop()
-        # Clean up bot and other components
-        if 'bot' in locals() and bot and not bot.is_closed():
-            await bot.close()
-        
-        # Clean up the lock file
-        if os.path.exists(LOCK_FILE_PATH):
-            os.remove(LOCK_FILE_PATH)
-            
-        logger.info("Bot shutdown complete.")
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Shutdown initiated by user from console.")
-    except Exception as e:
-        logger.critical(f"A fatal error occurred in the main execution block: {e}", exc_info=True)
+    if not token:
+        logger.critical("DISCORD_TOKEN not found in config or environment.")
         sys.exit(1)
+
+    try:
+        bot.run(token)
+    except Exception as e:
+        logger.critical(f"Bot crashed: {e}", exc_info=True)
+    finally:
+        if lock_file.exists():
+            lock_file.unlink()
+
+if __name__ == '__main__':
+    main()
