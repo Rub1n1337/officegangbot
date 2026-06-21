@@ -335,39 +335,62 @@ class MyBot(commands.Bot):
                 
                 # --- E2E Sync: Rules ---
                 if feature == "rules":
+                    logger.info(f"Starting Rules E2E sync for guild {guild_id}")
                     guild = self.get_guild(guild_id)
+                    if not guild:
+                        try:
+                            guild = await self.fetch_guild(guild_id)
+                            logger.info(f"Guild {guild_id} fetched from API (not in cache)")
+                        except discord.NotFound:
+                            logger.error(f"Guild {guild_id} not found during Rules sync")
+                            return {"error": "Guild not found"}
+                    
                     if guild:
                         channel_id = options.get("channel")
                         rules_text = options.get("message")
+                        logger.info(f"Sync details: channel={channel_id}, text_len={len(rules_text) if rules_text else 0}")
+                        
                         if channel_id and rules_text:
-                            channel = guild.get_channel(int(channel_id))
-                            if not channel:
-                                return {"error": f"Channel {channel_id} not found or inaccessible by the bot."}
-                            
-                            perms = channel.permissions_for(guild.me)
-                            if not perms.send_messages:
-                                return {"error": f"Bot lacks 'Send Messages' permission in {channel.mention}."}
-                            
-                            # Check if we have an existing message to edit
-                            msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
-                            rules_msg = None
-                            if msg_id:
-                                try:
-                                    rules_msg = await channel.fetch_message(int(msg_id))
-                                except (discord.NotFound, discord.Forbidden, ValueError, TypeError):
-                                    rules_msg = None
-                            
                             try:
-                                if rules_msg:
-                                    await rules_msg.edit(content=rules_text)
-                                    logger.info(f"Updated rules message in {channel.name} for {guild.name}")
-                                else:
-                                    new_msg = await channel.send(content=rules_text)
-                                    await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
-                                    logger.info(f"Posted new rules message in {channel.name} for {guild.name}")
-                            except Exception as e:
-                                logger.error(f"Failed to post/edit rules: {e}")
-                                return {"error": f"Discord error: {str(e)}"}
+                                channel_id_int = int(channel_id)
+                                channel = guild.get_channel(channel_id_int)
+                                if not channel:
+                                    channel = await guild.fetch_channel(channel_id_int)
+                                    logger.info(f"Channel {channel_id_int} fetched from API")
+                            except (discord.NotFound, discord.Forbidden, ValueError, TypeError) as e:
+                                logger.error(f"Channel {channel_id} not found or inaccessible: {e}")
+                                return {"error": f"Channel {channel_id} not found or inaccessible."}
+                            
+                            if channel:
+                                perms = channel.permissions_for(guild.me)
+                                if not perms.send_messages:
+                                    logger.error(f"Missing send_messages perms in {channel.id}")
+                                    return {"error": f"Bot lacks 'Send Messages' permission in {channel.mention}."}
+                                
+                                # Check if we have an existing message to edit
+                                msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
+                                rules_msg = None
+                                if msg_id:
+                                    try:
+                                        rules_msg = await channel.fetch_message(int(msg_id))
+                                        logger.info(f"Found existing rules message {msg_id}")
+                                    except (discord.NotFound, discord.Forbidden, ValueError, TypeError):
+                                        logger.info(f"Existing rules message {msg_id} not found, will post new one")
+                                        rules_msg = None
+                                
+                                try:
+                                    if rules_msg:
+                                        await rules_msg.edit(content=rules_text)
+                                        logger.info(f"Updated rules message in {channel.name} for {guild.name}")
+                                    else:
+                                        new_msg = await channel.send(content=rules_text)
+                                        await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
+                                        logger.info(f"Posted new rules message in {channel.name} for {guild.name}")
+                                except Exception as e:
+                                    logger.error(f"Failed to post/edit rules: {e}")
+                                    return {"error": f"Discord error: {str(e)}"}
+                        else:
+                            logger.warning(f"Missing channel_id or rules_text in options: {options}")
 
             return await self._get_feature_payload(guild_id, feature)
 
