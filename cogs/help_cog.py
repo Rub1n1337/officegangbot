@@ -22,7 +22,9 @@ class HelpCog(commands.Cog, name="❓ Help"):
         prefix = self.bot.settings_manager.get_setting(ctx.guild.id, 'prefix', '!')
         embed = discord.Embed(
             title="Bot Help Desk",
-            description=f"Use `{prefix}help <category>` to see commands in that category.\nUse `{prefix}help <command>` for details on a specific command.",
+            description="I support both **Slash Commands** (`/`) and **Prefix Commands**.\n"
+                        f"Use `/help <category>` or `{prefix}help <category>` to see commands in a category.\n"
+                        f"Use `/help <command>` or `{prefix}help <command>` for details on a specific command.",
             color=discord.Color.blue()
         )
 
@@ -67,25 +69,30 @@ class HelpCog(commands.Cog, name="❓ Help"):
         )
         visible_commands = sorted([cmd for cmd in cog.get_commands() if not cmd.hidden], key=lambda c: c.name)
         for cmd in visible_commands:
-            signature = f"{prefix}{cmd.name} {cmd.signature}".strip()
+            is_hybrid = isinstance(cmd, commands.HybridCommand) or isinstance(cmd, commands.HybridGroup)
+            cmd_prefix = "/" if is_hybrid else prefix
+            signature = f"{cmd_prefix}{cmd.name} {cmd.signature}".strip()
             embed.add_field(name=f"`{signature}`", value=cmd.short_doc or "No description.", inline=False)
         await reply(ctx, embed=embed, ephemeral=True)
 
     async def send_command_help(self, ctx: commands.Context, command: commands.Command):
         """Sends detailed help for a specific command."""
         prefix = self.bot.settings_manager.get_setting(ctx.guild.id, 'prefix', '!')
+        is_hybrid = isinstance(command, commands.HybridCommand) or isinstance(command, commands.HybridGroup)
+        cmd_prefix = "/" if is_hybrid else prefix
+        
         embed = discord.Embed(
-            title=f"Help: `{prefix}{command.name}`",
+            title=f"Help: `{cmd_prefix}{command.name}`",
             description=command.help or command.short_doc or "No description available.",
             color=discord.Color.gold()
         )
-        signature = f"{prefix}{command.qualified_name} {command.signature}".strip()
+        signature = f"{cmd_prefix}{command.qualified_name} {command.signature}".strip()
         embed.add_field(name="Usage", value=f"```\n{signature}\n```", inline=False)
 
         if isinstance(command, (commands.HybridGroup, commands.Group)):
             subcommands = sorted([sub for sub in command.commands if not sub.hidden], key=lambda c: c.name)
             if subcommands:
-                sub_list = "\n".join([f"**`{prefix}{sub.qualified_name}`** - {sub.short_doc}" for sub in subcommands])
+                sub_list = "\n".join([f"**`{cmd_prefix}{sub.qualified_name}`** - {sub.short_doc}" for sub in subcommands])
                 embed.add_field(name="Subcommands", value=sub_list, inline=False)
         await reply(ctx, embed=embed, ephemeral=True)
 

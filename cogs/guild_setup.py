@@ -44,15 +44,18 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
         embed.add_field(name="🚀 Setup Command", value=f"In a channel of your choice, please type:\n```{prefix}setup```", inline=False)
         await channel.send(embed=embed)
 
-    @commands.command(name="setup", description="Interactive server setup.")
+    @commands.hybrid_command(name="setup", description="Interactive server setup.")
     @commands.has_guild_permissions(administrator=True)
     @commands.guild_only()
     async def setup(self, ctx: commands.Context):
         """Guides the admin through a multi-stage interactive server setup wizard."""
+        if not ctx.guild:
+            return await reply(ctx, "❌ This command can only be used in a server.", ephemeral=True)
+            
         guild_id = ctx.guild.id
         async with self._setup_lock:
             if guild_id in self._active_setups:
-                await reply(ctx, "A setup is already in progress for this server. Please wait for it to finish or cancel it.")
+                await reply(ctx, "❌ A setup is already in progress for this server. Please wait for it to finish or cancel it.", ephemeral=True)
                 return
             self._active_setups.add(guild_id)
         try:
@@ -268,6 +271,23 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         continue
                     if confirm_msg.content.lower() == "confirm":
                         # Save all settings
+                        if self.bot.db:
+                            # Save to Postgres
+                            await self.bot.db.set_guild_setting(guild_id, 'prefix', step_data.get('prefix'))
+                            if step_data.get('rules_channel_id'):
+                                await self.bot.db.set_guild_setting(guild_id, 'rules_channel_id', step_data.get('rules_channel_id'))
+                            if step_data.get('welcome_message'):
+                                await self.bot.db.set_guild_setting(guild_id, 'welcome_message', step_data.get('welcome_message'))
+                            if step_data.get('punishment_log_id'):
+                                await self.bot.db.set_guild_setting(guild_id, 'punishment_log_id', step_data.get('punishment_log_id'))
+                            if step_data.get('usage_log_id'):
+                                await self.bot.db.set_guild_setting(guild_id, 'usage_log_id', step_data.get('usage_log_id'))
+                            if step_data.get('message_log_id'):
+                                await self.bot.db.set_guild_setting(guild_id, 'audit_log_id', step_data.get('message_log_id'))
+                            if step_data.get('leave_log_id'):
+                                await self.bot.db.set_guild_setting(guild_id, 'leave_log_id', step_data.get('leave_log_id'))
+
+                        # Save to JSON (legacy sync)
                         await self.settings_manager.update_setting(guild_id, 'prefix', step_data.get('prefix'))
                         if step_data.get('rules_channel_id'):
                             await self.settings_manager.update_setting(guild_id, 'rules_channel_id', step_data.get('rules_channel_id'))
@@ -364,6 +384,7 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                 if not usage_log_channel:
                     await reply(ctx, "Invalid channel. Please mention a valid text channel.")
                     return
+                await self.bot.db.set_guild_setting(guild_id, 'usage_log_id', usage_log_channel.id)
                 await self.settings_manager.update_setting(guild_id, 'usage_log_id', usage_log_channel.id)
                 await reply(ctx, f"Bot usage log channel set to {usage_log_channel.mention}.")
             else:

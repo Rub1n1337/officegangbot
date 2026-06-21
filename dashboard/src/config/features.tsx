@@ -3,6 +3,9 @@ import { MdMessage, MdSecurity, MdHistory, MdAddReaction, MdPeople } from 'react
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './example/WelcomeMessageFeature';
 import { useRulesFeature } from './example/RulesFeature';
+import { useReactionRoleFeature } from './example/ReactionRoleFeature';
+import { useLoggingFeature } from './example/LoggingFeature';
+import { useModerationFeature } from './example/ModerationFeature';
 
 export const features: FeaturesConfig = {
   'rules': {
@@ -21,33 +24,18 @@ export const features: FeaturesConfig = {
     name: 'Reaction Role',
     description: 'Assign roles when users react to a message',
     icon: <Icon as={MdAddReaction} />,
-    useRender() {
-      return {
-        component: <p style={{color: 'gray'}}>Reaction Role configuration coming soon.</p>,
-        onSubmit: () => {},
-      };
-    },
+    useRender: useReactionRoleFeature,
   },
   'moderation': {
     name: 'Moderation',
     description: 'Configure moderation roles and settings',
     icon: <Icon as={MdSecurity} />,
-    useRender() {
-      return {
-        component: <p style={{color: 'gray'}}>Moderation configuration coming soon.</p>,
-        onSubmit: () => {},
-      };
-    },
+    useRender: useModerationFeature,
   },
   'logging': {
     name: 'Logging',
     description: 'Configure logging channels for moderation events',
     icon: <Icon as={MdHistory} />,
-    useRender() {
-      return {
-        component: <p style={{color: 'gray'}}>Logging configuration coming soon.</p>,
-        onSubmit: () => {},
-      };
-    },
+    useRender: useLoggingFeature,
   },
 };

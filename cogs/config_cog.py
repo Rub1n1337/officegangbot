@@ -68,6 +68,45 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         
         embed.add_field(name="📝 Logging Channels", value=log_text, inline=False)
 
+        # Rules
+        is_rules_enabled = "rules" in enabled_features
+        rules_channel = ctx.guild.get_channel(settings.get("rules_channel_id")) if settings.get("rules_channel_id") else None
+        rules_text = settings.get("rules_message") or "Not Set"
+        if len(rules_text) > 100: rules_text = rules_text[:97] + "..."
+        embed.add_field(
+            name="📜 Rules System",
+            value=f"**Status:** {'✅ Enabled' if is_rules_enabled else '❌ Disabled'}\n"
+                  f"**Channel:** {rules_channel.mention if rules_channel else '❌ Not Set'}\n"
+                  f"**Message:** `{rules_text}`",
+            inline=False
+        )
+
+        # Welcome Message
+        is_welcome_enabled = "welcome-message" in enabled_features
+        welcome_channel = ctx.guild.get_channel(settings.get("welcome_channel_id")) if settings.get("welcome_channel_id") else None
+        welcome_text = settings.get("welcome_message") or "Not Set"
+        if len(welcome_text) > 100: welcome_text = welcome_text[:97] + "..."
+        embed.add_field(
+            name="👋 Welcome System",
+            value=f"**Status:** {'✅ Enabled' if is_welcome_enabled else '❌ Enabled (via legacy)' if settings.get('welcome_enabled') else '❌ Disabled'}\n"
+                  f"**Channel:** {welcome_channel.mention if welcome_channel else '❌ Not Set'}\n"
+                  f"**Message:** `{welcome_text}`",
+            inline=False
+        )
+
+        # Reaction Role
+        is_rr_enabled = "reaction-role" in enabled_features
+        rr_channel = ctx.guild.get_channel(settings.get("rules_channel_id")) if settings.get("rules_channel_id") else None
+        rr_role = ctx.guild.get_role(settings.get("reaction_role_id")) if settings.get("reaction_role_id") else None
+        embed.add_field(
+            name="🎭 Reaction Role",
+            value=f"**Status:** {'✅ Enabled' if is_rr_enabled else '❌ Disabled'}\n"
+                  f"**Channel:** {rr_channel.mention if rr_channel else '❌ Not Set'}\n"
+                  f"**Role:** {rr_role.mention if rr_role else '❌ Not Set'}\n"
+                  f"**Emoji:** {settings.get('reaction_emoji') or '❌ Not Set'}",
+            inline=False
+        )
+
         # Section divider
         embed.add_field(name="\u200b", value="━━━━━━━━━━━━━━", inline=False)
         embed.description = (

@@ -17,10 +17,28 @@ class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
         if payload.user_id == self.bot.user.id or not payload.guild_id:
             return
 
-        guild_settings = self.settings_manager.get_guild_settings(payload.guild_id)
-        rules_message_id = guild_settings.get('rules_message_id')
-        reaction_emoji = guild_settings.get('reaction_emoji')
-        role_id = guild_settings.get('reaction_role_id')
+        # Check if reaction-role feature is enabled
+        enabled_features = await self.bot.db.get_enabled_features(payload.guild_id)
+        if "reaction-role" not in enabled_features:
+            return
+
+        # Fetch settings from Postgres
+        rules_message_id = await self.bot.db.get_guild_setting(payload.guild_id, 'rules_message_id')
+        reaction_emoji = await self.bot.db.get_guild_setting(payload.guild_id, 'reaction_emoji')
+        role_id = await self.bot.db.get_guild_setting(payload.guild_id, 'reaction_role_id')
+        
+        # Ensure rules_message_id and role_id are integers
+        if rules_message_id:
+            try:
+                rules_message_id = int(rules_message_id)
+            except (ValueError, TypeError):
+                rules_message_id = None
+                
+        if role_id:
+            try:
+                role_id = int(role_id)
+            except (ValueError, TypeError):
+                role_id = None
 
         def emoji_match(payload_emoji, config_emoji):
             # Match unicode or custom emoji by id or string
