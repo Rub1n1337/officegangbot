@@ -97,14 +97,19 @@ class DatabaseManager:
             )
 
     async def get_all_guild_settings(self, guild_id: int) -> Dict[str, Any]:
-        """Returns all settings for a guild as a dict."""
+        """Returns all settings for a guild as a dict (excludes internal timestamp columns)."""
         await self.ensure_guild(guild_id)
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 "SELECT * FROM guilds WHERE guild_id = $1",
                 guild_id
             )
-            return dict(row) if row else {}
+            if not row:
+                return {}
+            data = dict(row)
+            data.pop("created_at", None)
+            data.pop("updated_at", None)
+            return data
 
     async def get_enabled_features(self, guild_id: int) -> List[str]:
         """Returns the list of enabled features for a guild."""

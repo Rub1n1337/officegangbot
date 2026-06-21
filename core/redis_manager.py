@@ -10,8 +10,19 @@ import os
 import json
 import asyncio
 import uuid
+import datetime
+from decimal import Decimal
 from typing import Any, Optional
 from core.logger import logger
+
+
+def _json_default(obj):
+    """Fallback serializer for types json.dumps can't handle natively (e.g. asyncpg datetime/Decimal)."""
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 
 class RedisManager:
@@ -77,7 +88,7 @@ class RedisManager:
     async def set(self, key: str, value: Any, ttl: int = None) -> None:
         """Sets a JSON-encoded value in Redis with optional TTL in seconds."""
         try:
-            encoded = json.dumps(value)
+            encoded = json.dumps(value, default=_json_default)
             if ttl:
                 await self.redis.setex(key, ttl, encoded)
             else:
@@ -211,7 +222,7 @@ class RedisManager:
         payload["response_key"] = response_key
 
         try:
-            await self.redis.xadd(channel, {"data": json.dumps(payload)}, maxlen=1000)
+            await self.redis.xadd(channel, {"data": json.dumps(payload, default=_json_default)}, maxlen=1000)
         except Exception as e:
             logger.error(f"Redis XADD error: {e}")
             return None
@@ -264,7 +275,7 @@ class RedisManager:
 
                                 response = await handler(payload)
                                 await self.redis.set(
-                                    response_key, json.dumps(response), ex=15
+                                    response_key, json.dumps(response, default=_json_default), ex=15
                                 )
                             except Exception as e:
                                 logger.error(f"RPC handler error: {e}", exc_info=True)
