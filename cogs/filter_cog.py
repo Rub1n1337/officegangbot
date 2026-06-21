@@ -38,7 +38,9 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         # Build pattern from settings
         words = await self.bot.db.get_guild_setting(guild_id, 'filter_words')
         if words is None:
+            # Final fallback to legacy JSON if DB has no entry yet
             words = self.settings_manager.get_setting(guild_id, 'filter_words', [])
+        
         if not words:
             return None
 
@@ -67,10 +69,6 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         # Check if filter is enabled via dashboard
         enabled_features = await self.bot.db.get_enabled_features(message.guild.id)
         if "filter" not in enabled_features:
-            # Fallback to legacy check
-            settings = self.settings_manager.get_setting(message.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-            if not settings.get('filter_enabled'):
-                return
             return
 
         pattern = await self._get_pattern(message.guild.id)
@@ -98,8 +96,6 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
             except Exception as e:
                 logger.error(f"Error in on_message for filter cog in guild {message.guild.id}: {e}", exc_info=True)
 
-    # Local error handler removed. The global handler in bot.py will now manage errors.
-
     @commands.hybrid_group(name="filter")
     @has_permission("config")
     async def filter(self, ctx: commands.Context):
@@ -119,11 +115,6 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         
         await self.bot.db.set_feature_enabled(ctx.guild.id, "filter", new_status)
         
-        # Keep legacy JSON in sync
-        settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        settings['filter_enabled'] = new_status
-        await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
-        
         await reply(ctx, f"✅ The profanity filter has been **{'enabled' if new_status else 'disabled'}**.")
 
     @filter.command(name="add", description="Adds a word to the filter.")
@@ -140,32 +131,24 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         current_words.append(word)
         await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
         
-        # Keep legacy JSON in sync
-        settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        banned_words = settings.setdefault('filter_words', [])
-        if word not in banned_words:
-            banned_words.append(word)
-            await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
-            
         await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ The word `{word}` has been added to the filter.")
 
     @filter.command(name="add_defaults", description="Adds the default list of profanities to the filter.")
     async def filter_add_defaults(self, ctx: commands.Context):
         """Adds a predefined list of common profanities to the server's filter."""
-        # The `reply` helper will handle deferring automatically.
-        settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        banned_words = settings.setdefault('filter_words', [])
+        # Get current words from DB
+        current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
         
-        new_words = [word for word in DEFAULT_BANNED_WORDS if word not in banned_words]
+        new_words = [word for word in DEFAULT_BANNED_WORDS if word not in current_words]
         added_count = len(new_words)
         
         if added_count == 0:
             await reply(ctx, "✅ All default profanities are already in your filter list.")
             return
         
-        banned_words.extend(new_words)
-        await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
+        current_words.extend(new_words)
+        await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
         await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ Added **{added_count}** new words from the default profanity list to your filter.")
 
@@ -174,20 +157,25 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     @has_permission("config")
     async def filter_remove(self, ctx: commands.Context, word: str):
         word = word.lower()
-        settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        banned_words = settings.get('filter_words', [])
-        if word not in banned_words:
+        
+        # Get current words from DB
+        current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
+        
+        if word not in current_words:
             await reply(ctx, f"The word `{word}` is not in the filter.")
             return
-        banned_words.remove(word)
-        await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
+            
+        current_words.remove(word)
+        await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
         await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ The word `{word}` has been removed from the filter.")
 
     @filter.command(name="list", description="Lists all words in the filter.")
     @has_permission("config")
     async def filter_list(self, ctx: commands.Context):
-        banned_words = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', {}).get('filter_words', [])
+        # Get words from DB
+        banned_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
+        
         if not banned_words:
             await reply(ctx, "There are no words in the filter.")
             return
