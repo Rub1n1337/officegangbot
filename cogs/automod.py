@@ -51,23 +51,28 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                     reason=reason,
                     moderator_id=self.bot.user.id
                 )
-            else:
-                # Fallback to JSON if DB unavailable
-                timed = self.bot.settings_manager.get_setting(guild.id, 'timed_punishments', {})
-                timed[str(member.id)] = {
-                    'type': 'mute',
-                    'expires_at': expires_at_dt.timestamp(),
-                    'reason': reason,
-                    'moderator_id': self.bot.user.id
-                }
-                await self.bot.settings_manager.update_setting(guild.id, 'timed_punishments', timed)
+            
+            # Keep legacy JSON in sync
+            timed = self.bot.settings_manager.get_setting(guild.id, 'timed_punishments', {})
+            timed[str(member.id)] = {
+                'type': 'mute',
+                'expires_at': expires_at_dt.timestamp(),
+                'reason': reason,
+                'moderator_id': self.bot.user.id
+            }
+            await self.settings_manager.update_setting(guild.id, 'timed_punishments', timed)
 
         except discord.Forbidden:
             logger.warning(f"AutoMod: Cannot mute {member} in {guild.name} — missing permissions")
 
     async def _log_automod(self, guild: discord.Guild, description: str):
         """Sends a log message to the moderation log channel."""
-        log_channel_id = self.settings_manager.get_setting(guild.id, 'punishment_log_id')
+        # Check if logging feature is enabled
+        enabled_features = await self.bot.db.get_enabled_features(guild.id)
+        if "logging" not in enabled_features:
+            return
+
+        log_channel_id = await self.bot.db.get_guild_setting(guild.id, 'punishment_log_id')
         if not log_channel_id:
             return
         channel = guild.get_channel(int(log_channel_id))
@@ -90,7 +95,11 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             return
 
         # Check automod is enabled
-        if not self.settings_manager.get_setting(message.guild.id, 'automod_enabled', True):
+        enabled_features = await self.bot.db.get_enabled_features(message.guild.id)
+        if "automod" not in enabled_features:
+            # Fallback to legacy check if needed, but dashboard uses enabled_features
+            if not self.settings_manager.get_setting(message.guild.id, 'automod_enabled', True):
+                return
             return
 
         guild_id = message.guild.id

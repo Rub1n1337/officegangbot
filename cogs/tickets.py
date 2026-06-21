@@ -180,10 +180,12 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
     ):
         # Save settings
         if support_role:
+            await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_support_role_id', support_role.id)
             await self.settings_manager.update_setting(
                 ctx.guild.id, 'ticket_support_role_id', str(support_role.id)
             )
         if category:
+            await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_category_id', category.id)
             await self.settings_manager.update_setting(
                 ctx.guild.id, 'ticket_category_id', str(category.id)
             )

@@ -74,9 +74,14 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
     async def _check_role_rewards(self, member: discord.Member, level: int):
         """Assigns role rewards for reaching a level."""
-        role_rewards = self.settings_manager.get_setting(
-            member.guild.id, 'level_roles', {}
-        )
+        # Try to get from DB first
+        role_rewards = await self.bot.db.get_level_roles(member.guild.id)
+        if not role_rewards:
+            # Fallback to legacy JSON
+            role_rewards = self.settings_manager.get_setting(
+                member.guild.id, 'level_roles', {}
+            )
+            
         for level_str, role_id in role_rewards.items():
             if level >= int(level_str):
                 role = member.guild.get_role(int(role_id))
@@ -99,7 +104,11 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             return
 
         # Check XP system is enabled for this guild
-        if not self.settings_manager.get_setting(message.guild.id, 'levels_enabled', True):
+        enabled_features = await self.bot.db.get_enabled_features(message.guild.id)
+        if "levels" not in enabled_features:
+            # Fallback to legacy check
+            if not self.settings_manager.get_setting(message.guild.id, 'levels_enabled', True):
+                return
             return
 
         guild_id = message.guild.id
@@ -136,9 +145,13 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
         # Level up notification
         if new_level > old_level:
-            level_up_channel_id = self.settings_manager.get_setting(
+            level_up_channel_id = await self.bot.db.get_guild_setting(
                 guild_id, 'level_up_channel_id'
             )
+            if not level_up_channel_id:
+                level_up_channel_id = self.settings_manager.get_setting(
+                    guild_id, 'level_up_channel_id'
+                )
             channel = (
                 message.guild.get_channel(int(level_up_channel_id))
                 if level_up_channel_id
@@ -200,6 +213,10 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         if level < 1:
             return await reply(ctx, "❌ Level must be at least 1.", ephemeral=True)
 
+        # Save to DB - method name fix: add_level_role -> set_level_role
+        await self.bot.db.set_level_role(ctx.guild.id, level, role.id)
+        
+        # Keep legacy JSON in sync
         level_roles = self.settings_manager.get_setting(ctx.guild.id, 'level_roles', {})
         level_roles[str(level)] = str(role.id)
         await self.settings_manager.update_setting(ctx.guild.id, 'level_roles', level_roles)

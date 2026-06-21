@@ -36,7 +36,9 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
                 return re.compile(cached, re.IGNORECASE)
 
         # Build pattern from settings
-        words = self.settings_manager.get_setting(guild_id, 'filter_words', [])
+        words = await self.bot.db.get_guild_setting(guild_id, 'filter_words')
+        if words is None:
+            words = self.settings_manager.get_setting(guild_id, 'filter_words', [])
         if not words:
             return None
 
@@ -62,8 +64,13 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         if not message.guild or message.author.bot or message.author.guild_permissions.administrator:
             return
 
-        settings = self.settings_manager.get_setting(message.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        if not settings.get('filter_enabled'):
+        # Check if filter is enabled via dashboard
+        enabled_features = await self.bot.db.get_enabled_features(message.guild.id)
+        if "filter" not in enabled_features:
+            # Fallback to legacy check
+            settings = self.settings_manager.get_setting(message.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
+            if not settings.get('filter_enabled'):
+                return
             return
 
         pattern = await self._get_pattern(message.guild.id)
@@ -73,8 +80,8 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
                 await message.channel.send(f"{message.author.mention}, your message contained inappropriate language and was deleted.", delete_after=10)
                 logger.info(f"Deleted a message from {message.author} in {message.guild.name} due to profanity.")
                 
-                log_channel_id = self.settings_manager.get_setting(message.guild.id, 'punishment_log_id')
-                if log_channel_id and (log_channel := self.bot.get_channel(log_channel_id)):
+                log_channel_id = await self.bot.db.get_guild_setting(message.guild.id, 'punishment_log_id')
+                if log_channel_id and (log_channel := self.bot.get_channel(int(log_channel_id))):
                     embed = discord.Embed(
                         title="Moderation Action: Message Filtered",
                         color=discord.Color.magenta(),
@@ -106,10 +113,17 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     @filter.command(name="toggle", description="Enables or disables the profanity filter.")
     @has_permission("config")
     async def filter_toggle(self, ctx: commands.Context):
+        enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
+        is_enabled = "filter" in enabled_features
+        new_status = not is_enabled
+        
+        await self.bot.db.set_feature_enabled(ctx.guild.id, "filter", new_status)
+        
+        # Keep legacy JSON in sync
         settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        new_status = not settings.get('filter_enabled', False)
         settings['filter_enabled'] = new_status
         await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
+        
         await reply(ctx, f"✅ The profanity filter has been **{'enabled' if new_status else 'disabled'}**.")
 
     @filter.command(name="add", description="Adds a word to the filter.")
@@ -117,13 +131,22 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     @has_permission("config")
     async def filter_add(self, ctx: commands.Context, word: str):
         word = word.lower()
-        settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
-        banned_words = settings.setdefault('filter_words', [])
-        if word in banned_words:
+        
+        # Save to DB
+        current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
+        if word in current_words:
             await reply(ctx, f"The word `{word}` is already in the filter.")
             return
-        banned_words.append(word)
-        await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
+        current_words.append(word)
+        await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
+        
+        # Keep legacy JSON in sync
+        settings = self.settings_manager.get_setting(ctx.guild.id, 'message_filter', DEFAULT_FILTER_SETTINGS)
+        banned_words = settings.setdefault('filter_words', [])
+        if word not in banned_words:
+            banned_words.append(word)
+            await self.settings_manager.update_setting(ctx.guild.id, 'message_filter', settings)
+            
         await self._invalidate_pattern(ctx.guild.id)
         await reply(ctx, f"✅ The word `{word}` has been added to the filter.")
 

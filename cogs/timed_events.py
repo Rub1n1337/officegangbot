@@ -229,10 +229,11 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                 reason=reason,
                 moderator_id=ctx.author.id
             )
-        else:
-            timed = self.settings_manager.get_setting(ctx.guild.id, 'timed_punishments', {})
-            timed[str(member.id)] = {'type': 'ban', 'expires_at': expires_at, 'reason': reason, 'moderator_id': ctx.author.id}
-            await self.settings_manager.update_setting(ctx.guild.id, 'timed_punishments', timed)
+        
+        # Keep legacy JSON in sync
+        timed = self.settings_manager.get_setting(ctx.guild.id, 'timed_punishments', {})
+        timed[str(member.id)] = {'type': 'ban', 'expires_at': expires_at, 'reason': reason, 'moderator_id': ctx.author.id}
+        await self.settings_manager.update_setting(ctx.guild.id, 'timed_punishments', timed)
 
         embed = discord.Embed(title="🔨 Temporary Ban", color=discord.Color.red())
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
