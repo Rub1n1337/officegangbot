@@ -85,8 +85,6 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                     await reply(ctx,
                         f"**Step 2/{total_steps}: Rules Channel**\n"
                         "> Please mention the channel for posting server rules (e.g., #rules).\n"
-                        "> Here is an example rules message you can use or edit:\n"
-                        f"{DEFAULT_RULES_TEXT}\n"
                         "> Type `skip` to skip this step or `back` to return to the previous step."
                     )
                     rules_channel_msg = await self._wait_for_response(ctx)
@@ -102,39 +100,6 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                             await reply(ctx, "> Invalid channel. Please mention a valid text channel.")
                             continue
                         step_data['rules_channel_id'] = rules_channel.id
-                        step_data['rules_text'] = DEFAULT_RULES_TEXT
-                        # Новый шаг: запрос emoji и роли для реакции
-                        await reply(ctx, "> Please enter the emoji to use for accepting the rules (e.g. ✅):")
-                        emoji_msg = await self._wait_for_response(ctx)
-                        if not emoji_msg or emoji_msg.content.lower() == "cancel":
-                            await reply(ctx, "Setup cancelled.")
-                            return
-                        emoji = emoji_msg.content.strip()
-                        await reply(ctx, "> Please mention the role to give when the user reacts (e.g. @Member):")
-                        role_msg = await self._wait_for_response(ctx)
-                        if not role_msg or role_msg.content.lower() == "cancel":
-                            await reply(ctx, "Setup cancelled.")
-                            return
-                        role = None
-                        if role_msg.role_mentions:
-                            role = role_msg.role_mentions[0]
-                        else:
-                            # Try to find by name
-                            role_name = role_msg.content.strip().lstrip('@')
-                            role = discord.utils.get(ctx.guild.roles, name=role_name)
-                        if not role:
-                            await reply(ctx, "> Invalid role. Please mention a valid role.")
-                            continue
-                        step_data['reaction_emoji'] = emoji
-                        step_data['reaction_role_id'] = role.id
-                        # Публикуем правила и добавляем реакцию
-                        rules_message = await rules_channel.send(DEFAULT_RULES_TEXT)
-                        await rules_message.add_reaction(emoji)
-                        # Сохраняем параметры для reaction_roles_cog
-                        await self.settings_manager.update_setting(ctx.guild.id, 'rules_message_id', rules_message.id)
-                        await self.settings_manager.update_setting(ctx.guild.id, 'reaction_emoji', emoji)
-                        await self.settings_manager.update_setting(ctx.guild.id, 'reaction_role_id', role.id)
-                        await reply(ctx, f"> Rules posted in {rules_channel.mention}. Users must react with {emoji} to get {role.mention}.")
                     step += 1
 
                 elif step == 3:
@@ -306,125 +271,9 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                     else:
                         await reply(ctx, "Invalid response. Type `confirm`, `back`, or `cancel`.")
 
-            
-            rules_example = (
-                "Be respectful - You must respect all users, regardless of your liking towards them. Treat others the way you want to be treated.\n\n"
-                "No Inappropriate Language - The use of profanity should be kept to a minimum. However, any derogatory language towards any user is prohibited.\n\n"
-                "No Spamming - Do not send a lot of small messages right after each other. Do not disrupt chat by spamming.\n\n"
-                "No NSFW Material - This is a community server and not meant to share pornographic/adult/other NSFW material.\n\n"
-                "No Advertisements - We do not tolerate any kind of advertisements, whether it be for other communities or streams.\n\n"
-                "No Server Raiding - Raiding or mentions of raiding are not allowed.\n\n"
-                "Direct & Indirect Threats - Threats to other users of DDoS, Death, DoX, abuse, and other malicious threats are absolutely prohibited and disallowed.\n\n"
-                "Follow the Discord Community Guidelines - You can find them here: https://discordapp.com/guidelines\n\n"
-                "Your presence in this server implies accepting these rules, including all further changes. These changes might be done at any time without notice, it is your responsibility to check for them."
-            )
-            await reply(ctx, f"**Step 2/9: Rules Channel**\nPlease mention the channel for posting server rules (e.g., #rules).\nHere is an example rules message you can use or edit:\n```\n{rules_example}\n```\nType `skip` to skip this step.")
-            rules_channel_msg = await self._wait_for_response(ctx)
-            if rules_channel_msg is None or rules_channel_msg.content.lower() == "cancel":
-                await reply(ctx, "Setup cancelled.")
-                return
-            if rules_channel_msg.content.lower() != "skip":
-                rules_channel = await self._extract_channel(ctx, rules_channel_msg.content)
-                if not rules_channel:
-                    await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                    return
-                await self.settings_manager.update_setting(guild_id, 'rules_channel_id', rules_channel.id)
-                await rules_channel.send(rules_example)
-                await reply(ctx, f"Rules channel set to {rules_channel.mention} and example rules posted.")
-            else:
-                await reply(ctx, "Skipped rules channel setup.")
-
-            
-            await reply(ctx, "**Step 3/9: Welcome Message**\nPlease enter the welcome message template.\nYou can use placeholders like `{user.mention}` and `{server.name}`.\nType `skip` to use the default message.")
-            welcome_msg = await self._wait_for_response(ctx)
-            if welcome_msg is None or welcome_msg.content.lower() == "cancel":
-                await reply(ctx, "Setup cancelled.")
-                return
-            if welcome_msg.content.lower() != "skip":
-                await self.settings_manager.update_setting(guild_id, 'welcome_message', welcome_msg.content.strip())
-                await reply(ctx, "Welcome message set!")
-            else:
-                await self.settings_manager.update_setting(guild_id, 'welcome_message', DEFAULT_WELCOME_MESSAGE)
-                await reply(ctx, "Default welcome message will be used.")
-
-            # 4. Moderation roles overview
-            admin_roles = [role for role in ctx.guild.roles if role.permissions.administrator]
-            mod_roles = [role for role in ctx.guild.roles if (role.permissions.manage_guild or role.permissions.kick_members or role.permissions.ban_members) and not role.permissions.administrator]
-            admin_roles_str = ", ".join([role.mention for role in admin_roles]) or "None"
-            mod_roles_str = ", ".join([role.mention for role in mod_roles]) or "None"
-            await reply(ctx, f"**Step 4/9: Moderation Roles Overview**\nRoles with ADMINISTRATOR permission: {admin_roles_str}\nRoles with moderation permissions (manage_guild, kick, ban): {mod_roles_str}")
-
-            # 5. Admin roles overview (repeat admin_roles)
-            await reply(ctx, f"**Step 5/9: Admin Roles Overview**\nRoles with ADMINISTRATOR permission: {admin_roles_str}")
-
-            # 6. Punishments log channel
-            await reply(ctx, "**Step 6/9: Punishments Log Channel**\nPlease mention the channel for punishment logs (e.g., #punishments). Type `skip` to skip.")
-            punish_log_msg = await self._wait_for_response(ctx)
-            if punish_log_msg is None or punish_log_msg.content.lower() == "cancel":
-                await reply(ctx, "Setup cancelled.")
-                return
-            if punish_log_msg.content.lower() != "skip":
-                punish_log_channel = await self._extract_channel(ctx, punish_log_msg.content)
-                if not punish_log_channel:
-                    await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                    return
-                await self.settings_manager.update_setting(guild_id, 'punishment_log_id', punish_log_channel.id)
-                await reply(ctx, f"Punishments log channel set to {punish_log_channel.mention}.")
-            else:
-                await reply(ctx, "Skipped punishments log channel setup.")
-
-            # 7. Usage log channel
-            await reply(ctx, "**Step 7/9: Bot Usage Log Channel**\nPlease mention the channel for bot usage logs (e.g., #bot-usage). Type `skip` to skip.")
-            usage_log_msg = await self._wait_for_response(ctx)
-            if usage_log_msg is None or usage_log_msg.content.lower() == "cancel":
-                await reply(ctx, "Setup cancelled.")
-                return
-            if usage_log_msg.content.lower() != "skip":
-                usage_log_channel = await self._extract_channel(ctx, usage_log_msg.content)
-                if not usage_log_channel:
-                    await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                    return
-                await self.bot.db.set_guild_setting(guild_id, 'usage_log_id', usage_log_channel.id)
-                await self.settings_manager.update_setting(guild_id, 'usage_log_id', usage_log_channel.id)
-                await reply(ctx, f"Bot usage log channel set to {usage_log_channel.mention}.")
-            else:
-                await reply(ctx, "Skipped bot usage log channel setup.")
-
-            # 8. Edited/deleted messages log channel
-            await reply(ctx, "**Step 8/9: Edited/Deleted Messages Log Channel**\nPlease mention the channel for edited/deleted messages logs (e.g., #message-logs). Type `skip` to skip.")
-            msg_log_msg = await self._wait_for_response(ctx)
-            if msg_log_msg is None or msg_log_msg.content.lower() == "cancel":
-                await reply(ctx, "Setup cancelled.")
-                return
-            if msg_log_msg.content.lower() != "skip":
-                msg_log_channel = await self._extract_channel(ctx, msg_log_msg.content)
-                if not msg_log_channel:
-                    await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                    return
-                await self.settings_manager.update_setting(guild_id, 'message_log_id', msg_log_channel.id)
-                await reply(ctx, f"Message log channel set to {msg_log_channel.mention}.")
-            else:
-                await reply(ctx, "Skipped edited/deleted messages log channel setup.")
-
-            # 9. Leave notifications channel
-            await reply(ctx, "**Step 9/9: Leave Notifications Channel**\nPlease mention the channel for leave notifications (e.g., #leaves). Type `skip` to skip.")
-            leave_log_msg = await self._wait_for_response(ctx)
-            if leave_log_msg is None or leave_log_msg.content.lower() == "cancel":
-                await reply(ctx, "Setup cancelled.")
-                return
-            if leave_log_msg.content.lower() != "skip":
-                leave_log_channel = await self._extract_channel(ctx, leave_log_msg.content)
-                if not leave_log_channel:
-                    await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                    return
-                await self.settings_manager.update_setting(guild_id, 'leave_log_id', leave_log_channel.id)
-                await reply(ctx, f"Leave notifications channel set to {leave_log_channel.mention}.")
-            else:
-                await reply(ctx, "Skipped leave notifications channel setup.")
-
-            await reply(ctx, "✅ Setup complete! The bot is now configured for your server.")
         except Exception as e:
             await reply(ctx, f"An error occurred during setup: {e}")
+            logger.error(f"Setup error for guild {guild_id}: {e}", exc_info=True)
         finally:
             self._active_setups.discard(guild_id)
 
