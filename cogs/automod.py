@@ -1,69 +1,33 @@
 # cogs/automod.py
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from core.logger import logger
 import datetime
-import asyncio
-
 
 class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
     """
     Basic auto-moderation:
-    - Anti-spam: mutes users sending 5+ messages in 3 seconds for 10 minutes.
+    - Anti-spam: timeouts users sending 5+ messages in 3 seconds for 10 minutes.
     - Anti-mention-spam: deletes messages with 5+ user/role mentions.
     """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
-        # Message log now handled by Redis (no in-memory dict needed)
-        # Fallback if Redis unavailable
-        self._message_log: dict = {}
+        self._message_log: dict = {} # Fallback if Redis unavailable
 
-    async def _apply_mute(self, member: discord.Member, guild: discord.Guild, reason: str):
-        """Applies mute and saves to timed_punishments for auto-expiry via TimedEventsCog."""
-        mute_role = discord.utils.get(guild.roles, name="Muted")
-        if not mute_role:
-            try:
-                mute_role = await guild.create_role(name="Muted", reason="AutoMod mute role")
-                for channel in guild.channels:
-                    try:
-                        await channel.set_permissions(mute_role, send_messages=False, speak=False)
-                    except discord.Forbidden:
-                        pass
-            except discord.Forbidden:
-                logger.warning(f"AutoMod: Cannot create Muted role in {guild.name}")
-                return
-
+    async def _apply_timeout(self, member: discord.Member, reason: str):
+        """Applies native Discord timeout (10 minutes)."""
+        duration = datetime.timedelta(minutes=10)
         try:
-            await member.add_roles(mute_role, reason=reason)
-            logger.info(f"AutoMod: Muted {member} in {guild.name} for 10 minutes. Reason: {reason}")
-
-            # Save to PostgreSQL for auto-expiry via TimedEventsCog
-            expires_at_dt = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
-
-            if self.bot.db:
-                await self.bot.db.add_timed_punishment(
-                    guild_id=guild.id,
-                    user_id=member.id,
-                    punishment_type='mute',
-                    expires_at=expires_at_dt.replace(tzinfo=datetime.timezone.utc),
-                    reason=reason,
-                    moderator_id=self.bot.user.id
-                )
+            await member.timeout(duration, reason=reason)
+            logger.info(f"AutoMod: Timed out {member} in {member.guild.name} for 10 minutes. Reason: {reason}")
             
-            # Keep legacy JSON in sync
-            timed = self.bot.settings_manager.get_setting(guild.id, 'timed_punishments', {})
-            timed[str(member.id)] = {
-                'type': 'mute',
-                'expires_at': expires_at_dt.timestamp(),
-                'reason': reason,
-                'moderator_id': self.bot.user.id
-            }
-            await self.settings_manager.update_setting(guild.id, 'timed_punishments', timed)
-
+            # Note: We don't need to add to timed_punishments table for timeouts
+            # as Discord handles the expiry natively.
         except discord.Forbidden:
-            logger.warning(f"AutoMod: Cannot mute {member} in {guild.name} — missing permissions")
+            logger.warning(f"AutoMod: Cannot timeout {member} in {member.guild.name} — missing permissions")
+        except Exception as e:
+            logger.error(f"AutoMod: Error timing out {member}: {e}")
 
     async def _log_automod(self, guild: discord.Guild, description: str):
         """Sends a log message to the moderation log channel."""
@@ -75,14 +39,20 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         log_channel_id = await self.bot.db.get_guild_setting(guild.id, 'punishment_log_id')
         if not log_channel_id:
             return
+            
         channel = guild.get_channel(int(log_channel_id))
         if not channel:
-            return
+            # Try to fetch if not in cache
+            try:
+                channel = await guild.fetch_channel(int(log_channel_id))
+            except:
+                return
+
         embed = discord.Embed(
             title="🛡️ AutoMod Action",
             description=description,
             color=discord.Color.red(),
-            timestamp=datetime.datetime.utcnow()
+            timestamp=datetime.datetime.now(datetime.timezone.utc)
         )
         try:
             await channel.send(embed=embed)
@@ -94,17 +64,18 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         if message.author.bot or not message.guild:
             return
 
+        # Check if user is admin or has manage_messages (bypass automod)
+        if message.author.guild_permissions.manage_messages:
+            return
+
         # Check automod is enabled
         enabled_features = await self.bot.db.get_enabled_features(message.guild.id)
         if "automod" not in enabled_features:
-            # Fallback to legacy check if needed, but dashboard uses enabled_features
-            if not self.settings_manager.get_setting(message.guild.id, 'automod_enabled', True):
-                return
             return
 
         guild_id = message.guild.id
         user_id = message.author.id
-        now = datetime.datetime.utcnow().timestamp()
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         # --- Anti-mention spam ---
         total_mentions = len(message.mentions) + len(message.role_mentions)
@@ -132,7 +103,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 try:
                     await message.channel.send(
                         f"⚠️ {message.author.mention} You are sending messages too fast. "
-                        f"You have been muted for **10 minutes**.",
+                        f"You have been timed out for **10 minutes**.",
                         delete_after=10
                     )
                 except discord.Forbidden:
@@ -140,9 +111,9 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self._log_automod(
                     message.guild,
                     f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                    f"Sent 5+ messages in 3 seconds. Auto-muted for **10 minutes**."
+                    f"Sent 5+ messages in 3 seconds. Auto-timeout for **10 minutes**."
                 )
-                await self._apply_mute(message.author, message.guild, "AutoMod: spam detection")
+                await self._apply_timeout(message.author, "AutoMod: spam detection")
         else:
             # Fallback to in-memory if Redis unavailable
             guild_log = self._message_log.setdefault(guild_id, {})
@@ -157,7 +128,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 try:
                     await message.channel.send(
                         f"⚠️ {message.author.mention} You are sending messages too fast. "
-                        f"You have been muted for **10 minutes**.",
+                        f"You have been timed out for **10 minutes**.",
                         delete_after=10
                     )
                 except discord.Forbidden:
@@ -166,12 +137,9 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self._log_automod(
                     message.guild,
                     f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                    f"Sent 5+ messages in 3 seconds. Auto-muted for **10 minutes**."
+                    f"Sent 5+ messages in 3 seconds. Auto-timeout for **10 minutes**."
                 )
-                await self._apply_mute(message.author, message.guild, "AutoMod: spam detection")
-
-
-
+                await self._apply_timeout(message.author, "AutoMod: spam detection")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoModCog(bot))

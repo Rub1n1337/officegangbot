@@ -8,12 +8,8 @@ from .utils import reply
 import datetime
 import re
 
-
 def parse_duration(duration_str: str) -> int | None:
-    """
-    Parses a duration string like '30m', '2h', '1d' into seconds.
-    Returns None if the format is invalid.
-    """
+    """Parses a duration string like '30m', '2h', '1d' into seconds."""
     pattern = re.compile(r'^(\d+)(s|m|h|d)$')
     match = pattern.match(duration_str.lower().strip())
     if not match:
@@ -25,7 +21,6 @@ def parse_duration(duration_str: str) -> int | None:
         return None
     return seconds
 
-
 def format_duration(seconds: int) -> str:
     """Formats seconds into a human-readable string like '2h 30m'."""
     periods = [('d', 86400), ('h', 3600), ('m', 60), ('s', 1)]
@@ -36,13 +31,11 @@ def format_duration(seconds: int) -> str:
             seconds %= secs
     return ' '.join(parts) if parts else '0s'
 
-
 class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
-    """Handles timed punishments: temp mute and temp ban with auto-expiry."""
+    """Handles timed punishments: temp ban with auto-expiry (timeouts handled by Discord)."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
         self.check_expired_punishments.start()
 
     def cog_unload(self):
@@ -63,7 +56,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
 
     @tasks.loop(seconds=60)
     async def check_expired_punishments(self):
-        """Checks PostgreSQL for expired punishments and lifts them."""
+        """Checks PostgreSQL for expired punishments (bans) and lifts them."""
         try:
             if not self.bot.db:
                 return
@@ -81,14 +74,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                     continue
 
                 try:
-                    if punishment_type == 'mute':
-                        member = guild.get_member(user_id)
-                        if member:
-                            # Use modern timeout instead of "Muted" role
-                            if member.is_timed_out():
-                                await member.timeout(None, reason="Timed mute expired")
-                                logger.info(f"Auto-unmuted {member} in {guild.name}")
-                    elif punishment_type == 'ban':
+                    if punishment_type == 'ban':
                         try:
                             await guild.unban(
                                 discord.Object(id=user_id),
@@ -97,13 +83,22 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                             logger.info(f"Auto-unbanned {user_id} in {guild.name}")
                         except discord.NotFound:
                             pass
-
+                    
+                    # Note: Mutes are now native timeouts, so they expire automatically
+                    # If we still have 'mute' records in DB, we just clear them
+                    
                     await self.bot.db.remove_timed_punishment(guild_id, user_id)
 
                     # Log to punishment channel
                     log_channel_id = await self.bot.db.get_guild_setting(guild_id, 'punishment_log_id')
                     if log_channel_id:
                         channel = guild.get_channel(int(log_channel_id))
+                        if not channel:
+                            try:
+                                channel = await guild.fetch_channel(int(log_channel_id))
+                            except:
+                                pass
+                        
                         if channel:
                             embed = discord.Embed(
                                 title=f"⏰ Timed {punishment_type.title()} Expired",
@@ -179,7 +174,6 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
         await reply(ctx, embed=embed)
         
-        # Log to punishment channel via common helper if possible (Moderation cog)
         mod_cog = self.bot.get_cog("🛡️ Moderation")
         if mod_cog:
             await mod_cog._log_action(ctx, "🔇 Temp Mute", member, reason, duration=format_duration(seconds))
@@ -230,11 +224,6 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                 moderator_id=ctx.author.id
             )
         
-        # Keep legacy JSON in sync
-        timed = self.settings_manager.get_setting(ctx.guild.id, 'timed_punishments', {})
-        timed[str(member.id)] = {'type': 'ban', 'expires_at': expires_at, 'reason': reason, 'moderator_id': ctx.author.id}
-        await self.settings_manager.update_setting(ctx.guild.id, 'timed_punishments', timed)
-
         embed = discord.Embed(title="🔨 Temporary Ban", color=discord.Color.red())
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
         embed.add_field(name="Duration", value=format_duration(seconds), inline=True)
@@ -243,13 +232,11 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
         await reply(ctx, embed=embed)
 
-        # Log to punishment channel
         mod_cog = self.bot.get_cog("🛡️ Moderation")
         if mod_cog:
             await mod_cog._log_action(ctx, "🔨 Temp Ban", member, reason, duration=format_duration(seconds))
 
         logger.info(f"Temp-banned {member} in {ctx.guild.name} for {format_duration(seconds)} by {ctx.author}")
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TimedEventsCog(bot))
