@@ -344,3 +344,49 @@ class DatabaseManager:
                 guild_id
             )
             return {r['level']: r['role_id'] for r in rows}
+
+    # -------------------------
+    # Mod Roles
+    # -------------------------
+
+    async def set_mod_role(self, guild_id: int, role_id: int, role_type: str) -> None:
+        """Adds a role to mod_roles table for a specific permission type."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO mod_roles (guild_id, role_id, role_type)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (guild_id, role_id, role_type) DO NOTHING
+                """,
+                guild_id, role_id, role_type
+            )
+
+    async def remove_mod_role(self, guild_id: int, role_type: str, role_id: int = None) -> None:
+        """Removes roles from mod_roles. If role_id is provided, removes specific role; otherwise removes all roles of that type."""
+        async with self.pool.acquire() as conn:
+            if role_id:
+                await conn.execute(
+                    "DELETE FROM mod_roles WHERE guild_id = $1 AND role_type = $2 AND role_id = $3",
+                    guild_id, role_type, role_id
+                )
+            else:
+                await conn.execute(
+                    "DELETE FROM mod_roles WHERE guild_id = $1 AND role_type = $2",
+                    guild_id, role_type
+                )
+
+    async def get_mod_roles(self, guild_id: int) -> Dict[str, List[int]]:
+        """Returns a mapping of role_type to list of role_ids."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT role_id, role_type FROM mod_roles WHERE guild_id = $1",
+                guild_id
+            )
+            result = {}
+            for r in rows:
+                rtype = r['role_type']
+                if rtype not in result:
+                    result[rtype] = []
+                result[rtype].append(r['role_id'])
+            return result

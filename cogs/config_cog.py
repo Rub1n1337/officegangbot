@@ -47,16 +47,26 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
             
         settings = await self.bot.db.get_all_guild_settings(ctx.guild.id)
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
+        mod_roles = await self.bot.db.get_mod_roles(ctx.guild.id)
         
         embed = discord.Embed(title=f"⚙️ Settings for {ctx.guild.name}", color=discord.Color.blurple())
         embed.set_footer(text="Use /config to manage these settings.")
 
-        # Permissions (still in JSON for now as Postgres schema doesn't have these columns yet)
-        perm_text = "\n".join([
-            f"`{perm_name.title()}`: {ctx.guild.get_role(self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id')).mention if self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id') and ctx.guild.get_role(self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id')) else '❌ Not Set'}"
-            for perm_name in VALID_PERMISSIONS
-        ])
-        embed.add_field(name="🛡️ Permission Roles", value=perm_text or 'No permissions configured.', inline=False)
+        # Permissions from Postgres mod_roles
+        perm_lines = []
+        for perm_name in VALID_PERMISSIONS:
+            role_ids = mod_roles.get(perm_name, [])
+            if role_ids:
+                roles = [ctx.guild.get_role(rid) for rid in role_ids if ctx.guild.get_role(rid)]
+                role_mentions = ", ".join([r.mention for r in roles]) if roles else "❌ Not Set"
+                perm_lines.append(f"`{perm_name.title()}`: {role_mentions}")
+            else:
+                # Fallback to legacy JSON for display if nothing in Postgres
+                legacy_id = self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id')
+                legacy_role = ctx.guild.get_role(legacy_id) if legacy_id else None
+                perm_lines.append(f"`{perm_name.title()}`: {legacy_role.mention if legacy_role else '❌ Not Set'}")
+
+        embed.add_field(name="🛡️ Permission Roles", value="\n".join(perm_lines) or 'No permissions configured.', inline=False)
 
         # Logging
         is_logging_enabled = "logging" in enabled_features
@@ -165,18 +175,30 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
             await reply(ctx, f"✅ Logging for `{log_type}` has been disabled.", ephemeral=True)
 
     @config.command(name="role", description="Assigns a permission level to a role.")
-    @app_commands.describe(permission="The permission level to assign.", role="The role to grant this permission to. Leave empty to remove.")
+    @app_commands.describe(permission="The permission level to assign.", role="The role to grant this permission to. Leave empty to remove ALL roles for this level.")
     @has_permission("config")
     async def config_role(self, ctx: commands.Context, permission: Literal["config", "kick", "ban", "mute", "warn", "clear"], role: discord.Role = None):
-        key = f"{permission}_role_id"
         if role:
             if role.is_default() or role.is_bot_managed() or role.is_premium_subscriber() or role.is_integration():
                 return await reply(ctx, f"❌ The role `{role.name}` cannot be used for permissions.", ephemeral=True)
-            await self.settings_manager.update_setting(ctx.guild.id, key, role.id)
+            
+            # Save to Postgres
+            if self.bot.db:
+                await self.bot.db.set_mod_role(ctx.guild.id, role.id, permission)
+            
+            # Legacy JSON sync (only supports one role, so we overwrite)
+            await self.settings_manager.update_setting(ctx.guild.id, f"{permission}_role_id", role.id)
+            
             await reply(ctx, f"✅ The `{permission}` permission has been assigned to {role.mention}.", ephemeral=True)
         else:
-            await self.settings_manager.update_setting(ctx.guild.id, key, None)
-            await reply(ctx, f"✅ The `{permission}` permission has been unassigned.", ephemeral=True)
+            # Remove from Postgres
+            if self.bot.db:
+                await self.bot.db.remove_mod_role(ctx.guild.id, permission)
+            
+            # Legacy JSON sync
+            await self.settings_manager.update_setting(ctx.guild.id, f"{permission}_role_id", None)
+            
+            await reply(ctx, f"✅ All roles for `{permission}` permission have been unassigned.", ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Configuration(bot))

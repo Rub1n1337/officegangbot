@@ -22,18 +22,25 @@ def has_permission(permission_level: str) -> Callable:
             logger.warning(f"Permission check for '{permission_level}' failed: command used in DM by {ctx.author}.")
             raise NoPrivateMessage("This command cannot be used in private messages.")
 
+        # 1. Try Postgres (mod_roles table)
+        if hasattr(ctx.bot, 'db') and ctx.bot.db:
+            mod_roles = await ctx.bot.db.get_mod_roles(ctx.guild.id)
+            allowed_role_ids = mod_roles.get(permission_level, [])
+            if allowed_role_ids:
+                has_role = any(role.id in allowed_role_ids for role in ctx.author.roles)
+                if has_role:
+                    return True
+
+        # 2. Fallback to Legacy JSON (single role per permission)
         settings_manager = getattr(ctx.bot, 'settings_manager', None)
-        if not settings_manager:
-            logger.error("SettingsManager is not attached to the bot instance!")
-            return False
-        required_role_id = settings_manager.get_setting(ctx.guild.id, f'{permission_level}_role_id')
-        if not required_role_id:
-            logger.warning(f"No role configured for permission '{permission_level}' in guild {ctx.guild.id}.")
-            return False
-        # Check if the user has the required role
-        has_role = any(role.id == required_role_id for role in ctx.author.roles)
-        if not has_role:
-            logger.info(f"User {ctx.author} lacks required role ID {required_role_id} for '{permission_level}' in guild {ctx.guild.id}.")
-        return has_role
+        if settings_manager:
+            required_role_id = settings_manager.get_setting(ctx.guild.id, f'{permission_level}_role_id')
+            if required_role_id:
+                has_role = any(role.id == required_role_id for role in ctx.author.roles)
+                if has_role:
+                    return True
+        
+        logger.info(f"User {ctx.author} lacks required permissions for '{permission_level}' in guild {ctx.guild.id}.")
+        return False
 
     return commands.check(predicate)
