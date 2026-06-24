@@ -114,7 +114,39 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
                   f"**Channel:** {rr_channel.mention if rr_channel else '❌ Not Set'}\n"
                   f"**Role:** {rr_role.mention if rr_role else '❌ Not Set'}\n"
                   f"**Emoji:** {settings.get('reaction_emoji') or '❌ Not Set'}",
-            inline=False
+            inline=True
+        )
+
+        # Automod
+        is_automod_enabled = "automod" in enabled_features
+        embed.add_field(
+            name="🤖 Automod",
+            value=f"**Status:** {'✅ Enabled' if is_automod_enabled else '❌ Disabled'}",
+            inline=True
+        )
+
+        # Tickets
+        is_tickets_enabled = "tickets" in enabled_features
+        embed.add_field(
+            name="🎫 Tickets",
+            value=f"**Status:** {'✅ Enabled' if is_tickets_enabled else '❌ Disabled'}",
+            inline=True
+        )
+
+        # Levels
+        is_levels_enabled = "levels" in enabled_features
+        embed.add_field(
+            name="📈 Levels",
+            value=f"**Status:** {'✅ Enabled' if is_levels_enabled else '❌ Disabled'}",
+            inline=True
+        )
+
+        # Filter
+        is_filter_enabled = "filter" in enabled_features
+        embed.add_field(
+            name="🚫 Message Filter",
+            value=f"**Status:** {'✅ Enabled' if is_filter_enabled else '❌ Disabled'}",
+            inline=True
         )
 
         # Section divider
@@ -122,7 +154,7 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         embed.description = (
             "**Legend:**\n"
             "❌ Not Set — No role or channel configured.\n"
-            "Use `/config` to change permissions and log channels."
+            "Use `/config` to manage permissions and log channels."
         )
         await reply(ctx, embed=embed, ephemeral=True)
 
