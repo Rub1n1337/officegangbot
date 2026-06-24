@@ -377,7 +377,7 @@ class DatabaseManager:
                 )
 
     async def get_mod_roles(self, guild_id: int) -> Dict[str, List[int]]:
-        """Returns a mapping of role_type to list of role_ids."""
+        """Returns all mod roles for a guild grouped by type."""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 "SELECT role_id, role_type FROM mod_roles WHERE guild_id = $1",
