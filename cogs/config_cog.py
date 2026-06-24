@@ -122,7 +122,7 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         embed.description = (
             "**Legend:**\n"
             "❌ Not Set — No role or channel configured.\n"
-            "Use `/config` or `!config` to change permissions and log channels."
+            "Use `/config` to change permissions and log channels."
         )
         await reply(ctx, embed=embed, ephemeral=True)
 
@@ -136,20 +136,6 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
                 await help_cog.send_command_help(ctx, ctx.command)
             else:
                 await reply(ctx, "The help command is currently unavailable.", ephemeral=True)
-
-    @config.command(name="prefix", description="Changes the bot's command prefix.")
-    @has_permission("config")
-    async def config_prefix(self, ctx: commands.Context, new_prefix: str):
-        if len(new_prefix) > 5:
-            return await reply(ctx, "❌ Prefix cannot be longer than 5 characters.", ephemeral=True)
-            
-        # Update Postgres
-        if self.bot.db:
-            await self.bot.db.set_guild_setting(ctx.guild.id, 'prefix', new_prefix)
-            
-        # Update JSON (legacy sync)
-        await self.settings_manager.update_setting(ctx.guild.id, 'prefix', new_prefix)
-        await reply(ctx, f"✅ Command prefix has been updated to `{new_prefix}`.", ephemeral=True)
 
     @config.command(name="logs", description="Sets or disables a channel for a specific log type.")
     @app_commands.describe(log_type="The type of log to configure.", channel="The channel to send logs to. Leave empty to disable.")
