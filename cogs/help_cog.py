@@ -4,7 +4,7 @@ from discord.ext import commands
 from .utils import reply
 
 class HelpCog(commands.Cog, name="❓ Help"):
-    """Provides a detailed and organized help command."""
+    """Provides a detailed and organized help command focusing on Slash Commands."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -19,12 +19,10 @@ class HelpCog(commands.Cog, name="❓ Help"):
 
     async def send_main_help(self, ctx: commands.Context):
         """Sends the main help page with all command categories."""
-        prefix = self.bot.settings_manager.get_setting(ctx.guild.id, 'prefix', '!')
         embed = discord.Embed(
             title="Bot Help Desk",
-            description="I support both **Slash Commands** (`/`) and **Prefix Commands**.\n"
-                        f"Use `/help <category>` or `{prefix}help <category>` to see commands in a category.\n"
-                        f"Use `/help <command>` or `{prefix}help <command>` for details on a specific command.",
+            description="All commands are available as **Slash Commands** (`/`).\n"
+                        "Use `/help <category>` or `/help <command>` for more details.",
             color=discord.Color.blue()
         )
 
@@ -42,7 +40,6 @@ class HelpCog(commands.Cog, name="❓ Help"):
 
     async def send_specific_help(self, ctx: commands.Context, query: str):
         """Sends help for a specific command or cog."""
-        prefix = self.bot.settings_manager.get_setting(ctx.guild.id, 'prefix', '!')
         query_lower = query.lower()
 
         # Check if query is a cog
@@ -61,7 +58,6 @@ class HelpCog(commands.Cog, name="❓ Help"):
 
     async def send_cog_help(self, ctx: commands.Context, cog: commands.Cog):
         """Sends help for a specific cog (category)."""
-        prefix = self.bot.settings_manager.get_setting(ctx.guild.id, 'prefix', '!')
         embed = discord.Embed(
             title=f"{cog.qualified_name} Help",
             description=cog.description or "No description available for this category.",
@@ -69,17 +65,17 @@ class HelpCog(commands.Cog, name="❓ Help"):
         )
         visible_commands = sorted([cmd for cmd in cog.get_commands() if not cmd.hidden], key=lambda c: c.name)
         for cmd in visible_commands:
-            is_hybrid = isinstance(cmd, commands.HybridCommand) or isinstance(cmd, commands.HybridGroup)
-            cmd_prefix = "/" if is_hybrid else prefix
+            # Most commands are hybrid, show as slash
+            is_slash = isinstance(cmd, (commands.HybridCommand, commands.HybridGroup, discord.app_commands.Command))
+            cmd_prefix = "/" if is_slash else "!" # Use ! for internal/owner commands like !testall
             signature = f"{cmd_prefix}{cmd.name} {cmd.signature}".strip()
             embed.add_field(name=f"`{signature}`", value=cmd.short_doc or "No description.", inline=False)
         await reply(ctx, embed=embed, ephemeral=True)
 
     async def send_command_help(self, ctx: commands.Context, command: commands.Command):
         """Sends detailed help for a specific command."""
-        prefix = self.bot.settings_manager.get_setting(ctx.guild.id, 'prefix', '!')
-        is_hybrid = isinstance(command, commands.HybridCommand) or isinstance(command, commands.HybridGroup)
-        cmd_prefix = "/" if is_hybrid else prefix
+        is_slash = isinstance(command, (commands.HybridCommand, commands.HybridGroup, discord.app_commands.Command))
+        cmd_prefix = "/" if is_slash else "!"
         
         embed = discord.Embed(
             title=f"Help: `{cmd_prefix}{command.name}`",
