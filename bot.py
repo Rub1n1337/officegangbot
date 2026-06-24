@@ -30,15 +30,6 @@ from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
 
-async def get_prefix(bot: "MyBot", message: discord.Message) -> List[str]:
-    """A callable to retrieve the prefix for a given guild."""
-    if not message.guild:
-        return commands.when_mentioned_or('!')(bot, message)
-    
-    # The bot instance is passed to this function, so we can get the manager from it.
-    prefix = bot.settings_manager.get_setting(message.guild.id, 'prefix', default='!')
-    return commands.when_mentioned_or(prefix)(bot, message)
-
 class MyBot(commands.Bot):
     """Custom Bot class to handle setup, cogs, and command tree."""
     def __init__(self, settings_manager: SettingsManager):
@@ -51,7 +42,7 @@ class MyBot(commands.Bot):
         owner_id = config.get('OWNER_ID', 0)
 
         super().__init__(
-            command_prefix=get_prefix,
+            command_prefix=commands.when_mentioned,
             intents=intents,
             help_command=None,
             application_id=config.get('APPLICATION_ID', 0),
@@ -355,113 +346,73 @@ class MyBot(commands.Bot):
                                 channel_id_int = int(channel_id)
                                 channel = guild.get_channel(channel_id_int)
                                 if not channel:
-                                    channel = await guild.fetch_channel(channel_id_int)
-                                    logger.info(f"Channel {channel_id_int} fetched from API")
-                            except (discord.NotFound, discord.Forbidden, ValueError, TypeError) as e:
-                                logger.error(f"Channel {channel_id} not found or inaccessible: {e}")
-                                return {"error": f"Channel {channel_id} not found or inaccessible."}
-                            
-                            if channel:
-                                perms = channel.permissions_for(guild.me)
-                                if not perms.send_messages:
-                                    logger.error(f"Missing send_messages perms in {channel.id}")
-                                    return {"error": f"Bot lacks 'Send Messages' permission in {channel.mention}."}
-                                
-                                # Check if we have an existing message to edit
-                                msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
-                                rules_msg = None
-                                if msg_id:
                                     try:
-                                        rules_msg = await channel.fetch_message(int(msg_id))
-                                        logger.info(f"Found existing rules message {msg_id}")
-                                    except (discord.NotFound, discord.Forbidden, ValueError, TypeError):
-                                        logger.info(f"Existing rules message {msg_id} not found, will post new one")
-                                        rules_msg = None
+                                        channel = await guild.fetch_channel(channel_id_int)
+                                        logger.info(f"Channel {channel_id_int} fetched from API")
+                                    except discord.NotFound:
+                                        logger.error(f"Channel {channel_id_int} not found")
+                                        return {"error": "Channel not found"}
                                 
-                                try:
-                                    if rules_msg:
-                                        await rules_msg.edit(content=rules_text)
-                                        logger.info(f"Updated rules message in {channel.name} for {guild.name}")
+                                if channel and isinstance(channel, discord.TextChannel):
+                                    # Check for existing message ID to edit
+                                    message_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
+                                    if message_id:
+                                        try:
+                                            msg = await channel.fetch_message(int(message_id))
+                                            await msg.edit(content=rules_text)
+                                            logger.info(f"Rules message {message_id} edited successfully")
+                                        except (discord.NotFound, discord.Forbidden, ValueError):
+                                            # If not found or can't edit, post new one
+                                            new_msg = await channel.send(content=rules_text)
+                                            await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
+                                            logger.info(f"Rules message not found/editable, posted new: {new_msg.id}")
                                     else:
                                         new_msg = await channel.send(content=rules_text)
                                         await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
-                                        logger.info(f"Posted new rules message in {channel.name} for {guild.name}")
-                                except Exception as e:
-                                    logger.error(f"Failed to post/edit rules: {e}")
-                                    return {"error": f"Discord error: {str(e)}"}
-                        else:
-                            logger.warning(f"Missing channel_id or rules_text in options: {options}")
+                                        logger.info(f"No previous rules message, posted new: {new_msg.id}")
+                            except Exception as e:
+                                logger.error(f"Error during Rules E2E sync: {e}", exc_info=True)
+                                return {"error": f"Failed to sync with Discord: {str(e)}"}
 
-            return await self._get_feature_payload(guild_id, feature)
+                return {"success": True}
 
-        return {"error": f"Unknown action: {action}"}
+        return {"error": "Unknown action"}
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        """Global error handler for all slash commands."""
-        logger.error(f"An error occurred in a slash command: {error}", exc_info=error)
-
+        """Global error handler for slash commands."""
         if isinstance(error, app_commands.CommandOnCooldown):
-            message = f"❄️ This command is on cooldown. Please try again in {error.retry_after:.2f} seconds."
+            await interaction.response.send_message(f"⏳ Command is on cooldown. Try again in {error.retry_after:.2f}s.", ephemeral=True)
         elif isinstance(error, app_commands.MissingPermissions):
-            message = f"🚫 You don't have the required permissions: `{', '.join(error.missing_permissions)}`"
-        elif isinstance(error, app_commands.CheckFailure):
-            message = "🚫 You don't have the required permissions to use this command."
+            await interaction.response.send_message("❌ You don't have the required permissions to use this command.", ephemeral=True)
+        elif isinstance(error, app_commands.BotMissingPermissions):
+            perms = ", ".join(error.missing_permissions)
+            await interaction.response.send_message(f"❌ I'm missing the following permissions: `{perms}`", ephemeral=True)
         else:
-            message = "🐞 An unexpected error occurred. The developers have been notified."
-
-        try:
-            if interaction.response.is_done():
-                await interaction.followup.send(message, ephemeral=True)
+            logger.error(f"Unhandled slash command error: {error}", exc_info=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("🐞 An unexpected error occurred.", ephemeral=True)
             else:
-                await interaction.response.send_message(message, ephemeral=True)
-        except discord.HTTPException:
-            pass
+                await interaction.followup.send("🐞 An unexpected error occurred.", ephemeral=True)
 
-def main():
-    """Main entry point for the bot."""
-    # Ensure only one instance of the bot is running (simple lock file check)
-    lock_file = Path("bot.lock")
-    if lock_file.exists():
-        # Check if the process is actually running (simple PID check)
-        try:
-            with open(lock_file, "r") as f:
-                pid = int(f.read().strip())
-            import psutil
-            if psutil.pid_exists(pid):
-                logger.error(f"Another instance of the bot is already running (PID: {pid}).")
-                # sys.exit(1)
-        except (ValueError, ImportError):
-            pass
-    
-    with open(lock_file, "w") as f:
-        f.write(str(os.getpid()))
-
-    # Initialize SettingsManager
+async def main():
+    # Set up settings manager (JSON-based, but being phased out for DB)
     settings_manager = SettingsManager()
-
-    # Create the bot instance
+    
     bot = MyBot(settings_manager)
-    set_bot_instance(bot)
-
-    # Setup health monitor
-    health_monitor = HealthMonitor(bot)
-    # asyncio.create_task(health_monitor.start()) # This would be better in setup_hook
-
-    # Load token from config or environment
+    set_bot_instance(bot) # Share bot instance with FastAPI app
+    
     config = load_config()
     token = config.get('DISCORD_TOKEN')
-
+    
     if not token:
-        logger.critical("DISCORD_TOKEN not found in config or environment.")
-        sys.exit(1)
+        logger.critical("DISCORD_TOKEN not found in environment variables.")
+        return
 
+    async with bot:
+        await bot.start(token)
+
+if __name__ == "__main__":
     try:
-        bot.run(token)
-    except Exception as e:
-        logger.critical(f"Bot crashed: {e}", exc_info=True)
-    finally:
-        if lock_file.exists():
-            lock_file.unlink()
-
-if __name__ == '__main__':
-    main()
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
