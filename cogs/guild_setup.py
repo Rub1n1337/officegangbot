@@ -295,69 +295,6 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
             await reply(ctx, "⏰ Время ожидания истекло. Попробуйте снова.")
             return None
 
-    async def _configure_logs(self, ctx):
-        """Guides the user through setting up various log channels."""
-        await reply(ctx, embed=discord.Embed(title="📝 Log Channels Setup", description="Now, let's set up channels for different logs. You can `skip` any of them.", color=discord.Color.orange()))
-
-        log_types = {
-            "punishment_log_id": "for **punishment logs** (ban, kick, etc.)",
-            "usage_log_id": "for **command usage logs**",
-            "message_log_id": "for **edited/deleted message logs**",
-            "leave_log_id": "for **user leave notifications**"
-        }
-
-        for key, desc in log_types.items():
-            channel_id = await self._ask_for(ctx, desc, "e.g., `#bot-logs`", str, is_channel=True, default_value='skip')
-            if channel_id is None: raise asyncio.CancelledError
-
-            if channel_id != 'skip':
-                await self.settings_manager.update_setting(ctx.guild.id, key, int(channel_id))
-                await ctx.send(f"✅ {desc.replace('**','')} will be sent to <#{channel_id}>.")
-
-    async def _ask_for(self, ctx: commands.Context, question: str, guide: str, response_type: type, default_value=None, is_channel=False, is_role=False):
-        """A helper function to ask a question and wait for a valid response."""
-        embed = discord.Embed(description=f"Please provide {question}.\n*Example: {guide}*\n\nType `skip` to use the default, or `cancel` to stop.", color=discord.Color.blurple())
-        prompt_message = await ctx.send(embed=embed)
-
-        def check(m):
-            return m.author == ctx.author and m.channel == ctx.channel
-
-        while True:
-            try:
-                msg = await self.bot.wait_for('message', timeout=120.0, check=check)
-                content = msg.content.strip()
-
-                if content.lower() == 'cancel':
-                    return None
-                if content.lower() == 'skip':
-                    await ctx.send(f"Skipped.")
-                    return 'skip'
-
-                if is_channel:
-                    try:
-                        channel = await commands.TextChannelConverter().convert(ctx, content)
-                        return channel.id
-                    except commands.ChannelNotFound:
-                        await ctx.send(f"❌ Could not find the channel `{content}`. Please provide a valid channel mention, ID, or exact name.")
-                        continue
-                elif is_role:
-                    try:
-                        role = await commands.RoleConverter().convert(ctx, content)
-                        return role.id
-                    except commands.RoleNotFound:
-                        await ctx.send("Invalid role. Please mention the role (e.g., @Member) or provide its ID.")
-                        continue
-                else:
-                    try:
-                        return response_type(content)
-                    except (ValueError, TypeError):
-                        await ctx.send(f"Invalid input. Please provide a valid {response_type.__name__}.")
-                        continue
-
-            except asyncio.TimeoutError:
-                await prompt_message.edit(content="Setup timed out.", embed=None)
-                raise asyncio.TimeoutError
-
     @setup.error
     async def setup_error(self, ctx, error):
         """Error handler specific to the setup command."""
