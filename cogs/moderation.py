@@ -91,8 +91,10 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
             raise HierarchyError("I cannot moderate myself.")
         if target.id == ctx.guild.owner_id:
             raise HierarchyError("You cannot moderate the server owner.")
-        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role <= target.top_role:
-            raise HierarchyError("You cannot moderate a member with an equal or higher role.")
+        # Moderators may act on members with an EQUAL top role; only a strictly
+        # higher target is blocked. (Bot-side check below stays <= on purpose.)
+        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role < target.top_role:
+            raise HierarchyError("You cannot moderate a member with a higher role.")
         if ctx.guild.me.top_role <= target.top_role:
             raise HierarchyError("I cannot moderate a member with an equal or higher role than me.")
 
