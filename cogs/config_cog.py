@@ -21,7 +21,6 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         """Handles errors for commands in this cog."""
@@ -61,10 +60,7 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
                 role_mentions = ", ".join([r.mention for r in roles]) if roles else "❌ Not Set"
                 perm_lines.append(f"`{perm_name.title()}`: {role_mentions}")
             else:
-                # Fallback to legacy JSON for display if nothing in Postgres
-                legacy_id = self.settings_manager.get_setting(ctx.guild.id, f'{perm_name}_role_id')
-                legacy_role = ctx.guild.get_role(legacy_id) if legacy_id else None
-                perm_lines.append(f"`{perm_name.title()}`: {legacy_role.mention if legacy_role else '❌ Not Set'}")
+                perm_lines.append(f"`{perm_name.title()}`: ❌ Not Set")
 
         embed.add_field(name="🛡️ Permission Roles", value="\n".join(perm_lines) or 'No permissions configured.', inline=False)
 
@@ -182,11 +178,6 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
             if channel:
                 await self.bot.db.set_feature_enabled(ctx.guild.id, "logging", True)
         
-        # Legacy JSON sync
-        # Note: 'message' maps to 'audit_log_id' in DB but 'message_log_id' in JSON
-        json_key = "message_log_id" if log_type == "message" else key
-        await self.settings_manager.update_setting(ctx.guild.id, json_key, value)
-        
         if channel:
             await reply(ctx, f"✅ Logs for `{log_type}` will now be sent to {channel.mention}.", ephemeral=True)
         else:
@@ -204,17 +195,11 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
             if self.bot.db:
                 await self.bot.db.set_mod_role(ctx.guild.id, role.id, permission)
             
-            # Legacy JSON sync (only supports one role, so we overwrite)
-            await self.settings_manager.update_setting(ctx.guild.id, f"{permission}_role_id", role.id)
-            
             await reply(ctx, f"✅ The `{permission}` permission has been assigned to {role.mention}.", ephemeral=True)
         else:
             # Remove from Postgres
             if self.bot.db:
                 await self.bot.db.remove_mod_role(ctx.guild.id, permission)
-            
-            # Legacy JSON sync
-            await self.settings_manager.update_setting(ctx.guild.id, f"{permission}_role_id", None)
             
             await reply(ctx, f"✅ All roles for `{permission}` permission have been unassigned.", ephemeral=True)
 
