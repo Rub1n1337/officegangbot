@@ -320,6 +320,8 @@ class MyBot(commands.Bot):
                                 value = int(value)
                             except (TypeError, ValueError):
                                 return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
+                        if setting_key == "welcome_message":
+                            value = str(value) # Ensure welcome_message is always a string
                         await self.db.set_guild_setting(
                             guild_id, setting_key, value
                         )
