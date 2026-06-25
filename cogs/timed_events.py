@@ -214,15 +214,14 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=seconds)
         expires_at = expires_at_dt.timestamp()
 
-        if self.bot.db:
-            await self.bot.db.add_timed_punishment(
-                guild_id=ctx.guild.id,
-                user_id=member.id,
-                punishment_type='ban',
-                expires_at=expires_at_dt,
-                reason=reason,
-                moderator_id=ctx.author.id
-            )
+        await self.bot.db.add_timed_punishment(
+            guild_id=ctx.guild.id,
+            user_id=member.id,
+            punishment_type='ban',
+            expires_at=expires_at_dt,
+            reason=reason,
+            moderator_id=ctx.author.id
+        )
         
         embed = discord.Embed(title="🔨 Temporary Ban", color=discord.Color.red())
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)

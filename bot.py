@@ -21,7 +21,7 @@ import uvicorn
 from core.logger import logger
 from config import load_config
 # from core.webserver import keep_alive
-from core.settings_manager import SettingsManager
+
 from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
@@ -32,7 +32,7 @@ from api_server import app as fastapi_app, set_bot_instance
 
 class MyBot(commands.Bot):
     """Custom Bot class to handle setup, cogs, and command tree."""
-    def __init__(self, settings_manager: SettingsManager):
+    def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -49,7 +49,6 @@ class MyBot(commands.Bot):
             owner_id=owner_id
         )
 
-        self.settings_manager = settings_manager
         self.db = None
         self.redis = None
 
@@ -149,7 +148,7 @@ class MyBot(commands.Bot):
             },
             "welcome-message": {
                 "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
-                "message": settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!",
+                "message": str(settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!"),
             },
             "reaction-role": {
                 "messageId": self._snowflake_or_none(settings.get("rules_message_id")),
@@ -288,6 +287,9 @@ class MyBot(commands.Bot):
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",
                 "reaction_role_id", "punishment_log_id",
+                "usage_log_id", "audit_log_id", "leave_log_id",
+                "config_role_id", "kick_role_id", "ban_role_id",
+                "mute_role_id", "warn_role_id", "clear_role_id",
             }
 
             # Map feature options to settings keys
@@ -395,10 +397,7 @@ class MyBot(commands.Bot):
                 await interaction.followup.send("🐞 An unexpected error occurred.", ephemeral=True)
 
 async def main():
-    # Set up settings manager (JSON-based, but being phased out for DB)
-    settings_manager = SettingsManager()
-    
-    bot = MyBot(settings_manager)
+    bot = MyBot()
     set_bot_instance(bot) # Share bot instance with FastAPI app
     
     config = load_config()

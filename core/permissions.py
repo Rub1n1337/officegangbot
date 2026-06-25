@@ -1,7 +1,7 @@
 # core/permissions.py
 from discord.ext import commands
 from discord.ext.commands.errors import NoPrivateMessage
-from core.settings_manager import SettingsManager
+
 from core.logger import logger
 from typing import Callable
 
@@ -31,14 +31,7 @@ def has_permission(permission_level: str) -> Callable:
                 if has_role:
                     return True
 
-        # 2. Fallback to Legacy JSON (single role per permission)
-        settings_manager = getattr(ctx.bot, 'settings_manager', None)
-        if settings_manager:
-            required_role_id = settings_manager.get_setting(ctx.guild.id, f'{permission_level}_role_id')
-            if required_role_id:
-                has_role = any(role.id == required_role_id for role in ctx.author.roles)
-                if has_role:
-                    return True
+
         
         logger.info(f"User {ctx.author} lacks required permissions for '{permission_level}' in guild {ctx.guild.id}.")
         return False

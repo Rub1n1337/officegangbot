@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
-from core.settings_manager import SettingsManager
+
 from .utils import reply
 
 # A default list of profanities. This can be expanded.
@@ -24,7 +24,6 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
         self._pattern_cache: dict = {}  # Local fallback if Redis unavailable
 
     async def _get_pattern(self, guild_id: int):
@@ -37,9 +36,6 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
 
         # Build pattern from settings
         words = await self.bot.db.get_guild_setting(guild_id, 'filter_words')
-        if words is None:
-            # Final fallback to legacy JSON if DB has no entry yet
-            words = self.settings_manager.get_setting(guild_id, 'filter_words', [])
         
         if not words:
             return None

@@ -82,9 +82,14 @@ async def _ensure_redis() -> Optional[RedisManager]:
     """
     global _redis
     if _redis is not None:
-        return _redis
+        try:
+            await _redis.redis.ping()
+            return _redis
+        except Exception as e:
+            logger.warning(f"Existing Redis connection failed ping check: {e}. Attempting reconnect.")
+            _redis = None
     # Attempt lazy reconnect
-    logger.warning("Redis is None in _rpc — attempting lazy reconnect...")
+    logger.warning("Redis is unavailable or connection is stale — attempting lazy reconnect...")
     try:
         new_redis = RedisManager()
         await new_redis.connect()
@@ -102,9 +107,9 @@ async def _rpc(action: str, **kwargs) -> Any:
     if not redis:
         elapsed = time.time() - _redis_last_ok if _redis_last_ok else None
         logger.error(
-            f"_rpc called with action='{action}' but Redis is unavailable. "
+            f"_rpc called with action=\'{action}\' but Redis is unavailable. "
             f"Last successful RPC: {f'{elapsed:.1f}s ago' if elapsed else 'never'}. "
-            f"_redis object is None after reconnect attempt."
+            f"_redis object is None after reconnect attempt. Current _redis state: {redis}"
         )
         raise HTTPException(status_code=503, detail="Redis not available")
     try:

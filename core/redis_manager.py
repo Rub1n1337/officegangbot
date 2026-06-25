@@ -51,7 +51,7 @@ class RedisManager:
             await self._redis.ping()
             logger.info("Redis connection established successfully.")
         except Exception as e:
-            logger.critical(f"Failed to connect to Redis: {e}", exc_info=True)
+            logger.critical(f"Failed to connect to Redis at {url}: {e}", exc_info=True)
             raise
 
     async def close(self) -> None:
@@ -64,7 +64,7 @@ class RedisManager:
 
         if self._redis:
             await self._redis.aclose()
-            logger.info("Redis connection closed.")
+            logger.info("Redis connection closed gracefully.")
 
     @property
     def redis(self) -> aioredis.Redis:

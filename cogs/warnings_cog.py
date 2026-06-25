@@ -13,7 +13,6 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
 
 
     @commands.hybrid_command(name="warn", description="Issue a warning to a server member.")
