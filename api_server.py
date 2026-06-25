@@ -10,6 +10,9 @@ import secrets
 from dotenv import load_dotenv
 load_dotenv()
 import time
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from core.logger import logger
 from core.redis_manager import RedisManager
 
@@ -30,6 +33,11 @@ def set_bot_instance(bot_obj):
     bot_instance = bot_obj
 
 app = FastAPI(title="OfficeGangBot API", version="1.0.0")
+
+# Rate limiting (per client IP). Health check is intentionally left unlimited.
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.on_event("startup")
 async def startup():
@@ -60,8 +68,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_dashboard_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
 # --- API Authentication ---
@@ -134,7 +142,8 @@ async def _rpc(action: str, **kwargs) -> Any:
 # --- API Endpoints ---
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
-async def get_guild_info(guild_id: str):
+@limiter.limit("30/minute")
+async def get_guild_info(request: Request, guild_id: str):
     """Returns guild info via Redis RPC."""
     data = await _rpc("get_guild_info", guild_id=guild_id)
     if not data:
@@ -160,7 +169,8 @@ async def health_check():
 
 
 @app.get("/api/stats", dependencies=[Depends(verify_api_key)])
-async def get_bot_stats():
+@limiter.limit("30/minute")
+async def get_bot_stats(request: Request):
     """Returns bot statistics via Redis RPC."""
     data = await _rpc("get_stats")
     # Add uptime since API server doesn't track it
@@ -173,13 +183,15 @@ async def get_bot_stats():
 
 
 @app.get("/api/guild/{guild_id}", dependencies=[Depends(verify_api_key)])
-async def get_guild_settings(guild_id: int):
+@limiter.limit("30/minute")
+async def get_guild_settings(request: Request, guild_id: int):
     """Returns guild info and settings via Redis RPC."""
     data = await _rpc("get_guild_info", guild_id=guild_id)
     return data
 
 @app.get("/api/guilds", dependencies=[Depends(verify_api_key)])
-async def get_guilds():
+@limiter.limit("30/minute")
+async def get_guilds(request: Request):
     """Returns list of all guilds the bot is in via Redis RPC."""
     data = await _rpc("get_guilds")
     return data
@@ -187,37 +199,43 @@ async def get_guilds():
 # --- Endpoints required for fuma-nama/discord-bot-dashboard ---
 
 @app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])
-async def get_guild_roles(guild_id: str):
+@limiter.limit("30/minute")
+async def get_guild_roles(request: Request, guild_id: str):
     """Returns list of roles for a guild."""
     data = await _rpc("get_guild_roles", guild_id=guild_id)
     return data
 
 @app.get("/guilds/{guild_id}/channels", dependencies=[Depends(verify_api_key)])
-async def get_guild_channels(guild_id: str):
+@limiter.limit("30/minute")
+async def get_guild_channels(request: Request, guild_id: str):
     """Returns list of channels for a guild."""
     data = await _rpc("get_guild_channels", guild_id=guild_id)
     return data
 
 @app.get("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
-async def get_feature(guild_id: str, feature: str):
+@limiter.limit("30/minute")
+async def get_feature(request: Request, guild_id: str, feature: str):
     """Returns feature settings for a guild."""
     data = await _rpc("get_feature", guild_id=guild_id, feature=feature)
     return data
 
 @app.post("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
-async def enable_feature(guild_id: str, feature: str):
+@limiter.limit("10/minute")
+async def enable_feature(request: Request, guild_id: str, feature: str):
     """Enables a feature for a guild."""
     data = await _rpc("enable_feature", guild_id=guild_id, feature=feature)
     return data
 
 @app.delete("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
-async def disable_feature(guild_id: str, feature: str):
+@limiter.limit("10/minute")
+async def disable_feature(request: Request, guild_id: str, feature: str):
     """Disables a feature for a guild."""
     data = await _rpc("disable_feature", guild_id=guild_id, feature=feature)
     return data
 
 @app.patch("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
-async def update_feature(guild_id: str, feature: str, request: Request):
+@limiter.limit("10/minute")
+async def update_feature(request: Request, guild_id: str, feature: str):
     """Updates feature settings for a guild."""
     body = await request.json()
     data = await _rpc("update_feature", guild_id=guild_id, feature=feature, options=body)
