@@ -6,19 +6,10 @@ from core.logger import logger
 
 from cogs.utils import reply
 
-DEFAULT_RULES_TEXT = (
-    "> 1. **Be respectful** - You must respect all users, regardless of your liking towards them. Treat others the way you want to be treated.\n"
-    "> 2. **No Inappropriate Language** - The use of profanity should be kept to a minimum. However, any derogatory language towards any user is prohibited.\n"
-    "> 3. **No Spamming** - Do not send a lot of small messages right after each other. Do not disrupt chat by spamming.\n"
-    "> 4. **No NSFW Material** - This is a community server and not meant to share pornographic/adult/other NSFW material.\n"
-    "> 5. **No Advertisements** - We do not tolerate any kind of advertisements, whether it be for other communities or streams.\n"
-    "> 6. **Follow the Discord Community Guidelines** - You can find them here: https://discordapp.com/guidelines\n\n"
-    "> **Your presence in this server implies accepting these rules, including all further changes.**"
-)
 DEFAULT_WELCOME_MESSAGE = "Welcome {user.mention} to **{server.name}**! We're glad to have you."
 
 class SetupCog(commands.Cog, name="🛠️ Server Setup"):
-    """Interactive server setup for admins. Guides through prefix and log channel configuration. Uses centralized reply function for all responses and ensures thread safety for concurrent setups."""
+    """Interactive server setup for admins. Guides through rules, welcome and log channel configuration. Uses centralized reply function for all responses and ensures thread safety for concurrent setups."""
 
     _active_setups = set()
     _setup_lock = asyncio.Lock()
@@ -30,11 +21,10 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         logger.info(f"Joined new guild: {guild.name} ({guild.id}).")
-        prefix = "!" # Default prefix until configured via DB
         channel = next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
         if not channel: return
         embed = discord.Embed(title=f"👋 Hello, {guild.name}!", description="Thank you for adding me! To get started, an administrator needs to run the setup command.", color=discord.Color.blue())
-        embed.add_field(name="🚀 Setup Command", value=f"In a channel of your choice, please type:\n```{prefix}setup```", inline=False)
+        embed.add_field(name="🚀 Setup Command", value="In a channel of your choice, use the slash command:\n```/setup```", inline=False)
         await channel.send(embed=embed)
 
     @commands.hybrid_command(name="setup", description="Interactive server setup.")
@@ -56,36 +46,20 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
 
             step_data = {}
             step = 1
-            total_steps = 10
+            total_steps = 9
             while step <= total_steps:
                 if step == 1:
-                    await reply(ctx, f"**Step 1/{total_steps}: Command Prefix**\nPlease enter a command prefix (1-5 characters, no spaces):")
-                    prefix_msg = await self._wait_for_response(ctx)
-                    if not prefix_msg or prefix_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if prefix_msg.content.lower() == "back":
-                        await reply(ctx, "You are at the first step.")
-                        continue
-                    prefix = prefix_msg.content.strip()
-                    if not (1 <= len(prefix) <= 5) or " " in prefix or not prefix.isprintable():
-                        await reply(ctx, "Invalid prefix. Please use 1-5 printable characters, no spaces.")
-                        continue
-                    step_data['prefix'] = prefix
-                    step += 1
-
-                elif step == 2:
                     await reply(ctx,
-                        f"**Step 2/{total_steps}: Rules Channel**\n"
+                        f"**Step 1/{total_steps}: Rules Channel**\n"
                         "> Please mention the channel for posting server rules (e.g., #rules).\n"
-                        "> Type `skip` to skip this step or `back` to return to the previous step."
+                        "> Type `skip` to skip this step or `cancel` to exit."
                     )
                     rules_channel_msg = await self._wait_for_response(ctx)
                     if not rules_channel_msg or rules_channel_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
                         return
                     if rules_channel_msg.content.lower() == "back":
-                        step -= 1
+                        await reply(ctx, "You are at the first step.")
                         continue
                     if rules_channel_msg.content.lower() != "skip":
                         rules_channel = await self._extract_channel(ctx, rules_channel_msg.content)
@@ -95,8 +69,8 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         step_data['rules_channel_id'] = rules_channel.id
                     step += 1
 
-                elif step == 3:
-                    await reply(ctx, f"**Step 3/{total_steps}: Welcome Message**\nPlease enter the welcome message template.\nYou can use placeholders like `{{user.mention}}` and `{{server.name}}`.\nType `skip` to use the default message or `back` to return.")
+                elif step == 2:
+                    await reply(ctx, f"**Step 2/{total_steps}: Welcome Message**\nPlease enter the welcome message template.\nYou can use placeholders like `{{user.mention}}` and `{{server.name}}`.\nType `skip` to use the default message or `back` to return.")
                     welcome_msg = await self._wait_for_response(ctx)
                     if not welcome_msg or welcome_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
@@ -113,12 +87,12 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                     await reply(ctx, f"Preview: {preview}")
                     step += 1
 
-                elif step == 4:
+                elif step == 3:
                     admin_roles = [role for role in ctx.guild.roles if role.permissions.administrator]
                     mod_roles = [role for role in ctx.guild.roles if (role.permissions.manage_guild or role.permissions.kick_members or role.permissions.ban_members) and not role.permissions.administrator]
                     admin_roles_str = ", ".join([role.mention for role in admin_roles]) or "None"
                     mod_roles_str = ", ".join([role.mention for role in mod_roles]) or "None"
-                    await reply(ctx, f"**Step 4/{total_steps}: Moderation Roles Overview**\nRoles with moderation permissions (manage_guild, kick, ban): {mod_roles_str}\nType `back` to return.")
+                    await reply(ctx, f"**Step 3/{total_steps}: Moderation Roles Overview**\nRoles with moderation permissions (manage_guild, kick, ban): {mod_roles_str}\nType `back` to return.")
                     # Save for summary
                     step_data['mod_roles'] = mod_roles_str
                     mod_roles_msg = await self._wait_for_response(ctx)
@@ -127,10 +101,10 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         continue
                     step += 1
 
-                elif step == 5:
+                elif step == 4:
                     admin_roles = [role for role in ctx.guild.roles if role.permissions.administrator]
                     admin_roles_str = ", ".join([role.mention for role in admin_roles]) or "None"
-                    await reply(ctx, f"**Step 5/{total_steps}: Admin Roles Overview**\nRoles with ADMINISTRATOR permission: {admin_roles_str}\nType `back` to return.")
+                    await reply(ctx, f"**Step 4/{total_steps}: Admin Roles Overview**\nRoles with ADMINISTRATOR permission: {admin_roles_str}\nType `back` to return.")
                     step_data['admin_roles'] = admin_roles_str
                     admin_roles_msg = await self._wait_for_response(ctx)
                     if admin_roles_msg and admin_roles_msg.content.lower() == "back":
@@ -138,8 +112,8 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         continue
                     step += 1
 
-                elif step == 6:
-                    await reply(ctx, f"**Step 6/{total_steps}: Punishments Log Channel**\nPlease mention the channel for punishment logs (e.g., #punishments). Type `skip` to skip or `back` to return.")
+                elif step == 5:
+                    await reply(ctx, f"**Step 5/{total_steps}: Punishments Log Channel**\nPlease mention the channel for punishment logs (e.g., #punishments). Type `skip` to skip or `back` to return.")
                     punish_log_msg = await self._wait_for_response(ctx)
                     if not punish_log_msg or punish_log_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
@@ -155,8 +129,8 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         step_data['punishment_log_id'] = punish_log_channel.id
                     step += 1
 
-                elif step == 7:
-                    await reply(ctx, f"**Step 7/{total_steps}: Bot Usage Log Channel**\nPlease mention the channel for bot usage logs (e.g., #bot-usage). Type `skip` to skip or `back` to return.")
+                elif step == 6:
+                    await reply(ctx, f"**Step 6/{total_steps}: Bot Usage Log Channel**\nPlease mention the channel for bot usage logs (e.g., #bot-usage). Type `skip` to skip or `back` to return.")
                     usage_log_msg = await self._wait_for_response(ctx)
                     if not usage_log_msg or usage_log_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
@@ -172,8 +146,8 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         step_data['usage_log_id'] = usage_log_channel.id
                     step += 1
 
-                elif step == 8:
-                    await reply(ctx, f"**Step 8/{total_steps}: Edited/Deleted Messages Log Channel**\nPlease mention the channel for edited/deleted messages logs (e.g., #message-logs). Type `skip` to skip or `back` to return.")
+                elif step == 7:
+                    await reply(ctx, f"**Step 7/{total_steps}: Edited/Deleted Messages Log Channel**\nPlease mention the channel for edited/deleted messages logs (e.g., #message-logs). Type `skip` to skip or `back` to return.")
                     msg_log_msg = await self._wait_for_response(ctx)
                     if not msg_log_msg or msg_log_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
@@ -189,8 +163,8 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         step_data['message_log_id'] = msg_log_channel.id
                     step += 1
 
-                elif step == 9:
-                    await reply(ctx, f"**Step 9/{total_steps}: Leave Notifications Channel**\nPlease mention the channel for leave notifications (e.g., #leaves). Type `skip` to skip or `back` to return.")
+                elif step == 8:
+                    await reply(ctx, f"**Step 8/{total_steps}: Leave Notifications Channel**\nPlease mention the channel for leave notifications (e.g., #leaves). Type `skip` to skip or `back` to return.")
                     leave_log_msg = await self._wait_for_response(ctx)
                     if not leave_log_msg or leave_log_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
@@ -206,10 +180,9 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         step_data['leave_log_id'] = leave_log_channel.id
                     step += 1
 
-                elif step == 10:
+                elif step == 9:
                     # Summary and confirmation
                     summary = (
-                        f"**Prefix:** `{step_data.get('prefix','')}`\n"
                         f"**Rules Channel:** <#{step_data.get('rules_channel_id','Not Set')}>\n"
                         f"**Welcome Message:** `{step_data.get('welcome_message','')}`\n"
                         f"**Moderation Roles:** {step_data.get('mod_roles','None')}\n"
@@ -219,7 +192,7 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         f"**Message Log:** <#{step_data.get('message_log_id','Not Set')}>\n"
                         f"**Leave Log:** <#{step_data.get('leave_log_id','Not Set')}>\n"
                     )
-                    await reply(ctx, f"**Step 10/{total_steps}: Review Settings**\nHere is a summary of your selections:\n{summary}\nType `confirm` to save, `back` to edit previous step, or `cancel` to abort.")
+                    await reply(ctx, f"**Step 9/{total_steps}: Review Settings**\nHere is a summary of your selections:\n{summary}\nType `confirm` to save, `back` to edit previous step, or `cancel` to abort.")
                     confirm_msg = await self._wait_for_response(ctx)
                     if not confirm_msg or confirm_msg.content.lower() == "cancel":
                         await reply(ctx, "Setup cancelled.")
@@ -231,7 +204,6 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                         # Save all settings
                         if self.bot.db:
                             # Save to Postgres
-                            await self.bot.db.set_guild_setting(guild_id, 'prefix', step_data.get('prefix'))
                             if step_data.get('rules_channel_id'):
                                 await self.bot.db.set_guild_setting(guild_id, 'rules_channel_id', step_data.get('rules_channel_id'))
                             if step_data.get('welcome_message'):
