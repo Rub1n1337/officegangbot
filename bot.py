@@ -149,7 +149,7 @@ class MyBot(commands.Bot):
             },
             "welcome-message": {
                 "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
-                "message": settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!",
+                "message": str(settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!"),
             },
             "reaction-role": {
                 "messageId": self._snowflake_or_none(settings.get("rules_message_id")),
@@ -288,6 +288,9 @@ class MyBot(commands.Bot):
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",
                 "reaction_role_id", "punishment_log_id",
+                "usage_log_id", "audit_log_id", "leave_log_id",
+                "config_role_id", "kick_role_id", "ban_role_id",
+                "mute_role_id", "warn_role_id", "clear_role_id",
             }
 
             # Map feature options to settings keys
@@ -320,8 +323,6 @@ class MyBot(commands.Bot):
                                 value = int(value)
                             except (TypeError, ValueError):
                                 return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
-                        if setting_key == "welcome_message":
-                            value = str(value) # Ensure welcome_message is always a string
                         await self.db.set_guild_setting(
                             guild_id, setting_key, value
                         )
