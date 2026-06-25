@@ -21,7 +21,7 @@ import uvicorn
 from core.logger import logger
 from config import load_config
 # from core.webserver import keep_alive
-from core.settings_manager import SettingsManager
+
 from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
@@ -32,7 +32,7 @@ from api_server import app as fastapi_app, set_bot_instance
 
 class MyBot(commands.Bot):
     """Custom Bot class to handle setup, cogs, and command tree."""
-    def __init__(self, settings_manager: SettingsManager):
+    def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -49,7 +49,6 @@ class MyBot(commands.Bot):
             owner_id=owner_id
         )
 
-        self.settings_manager = settings_manager
         self.db = None
         self.redis = None
 
@@ -398,10 +397,7 @@ class MyBot(commands.Bot):
                 await interaction.followup.send("🐞 An unexpected error occurred.", ephemeral=True)
 
 async def main():
-    # Set up settings manager (JSON-based, but being phased out for DB)
-    settings_manager = SettingsManager()
-    
-    bot = MyBot(settings_manager)
+    bot = MyBot()
     set_bot_instance(bot) # Share bot instance with FastAPI app
     
     config = load_config()

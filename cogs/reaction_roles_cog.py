@@ -3,14 +3,13 @@
 import discord
 from discord.ext import commands
 from core.logger import logger
-from core.settings_manager import SettingsManager
+
 
 class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
     """Handles granting and removing roles based on message reactions."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager: SettingsManager = bot.settings_manager
 
     async def _handle_reaction(self, payload: discord.RawReactionActionEvent, *, add_role: bool) -> None:
         """A single helper function to handle both adding and removing roles. Emoji comparison is robust for unicode/custom."""

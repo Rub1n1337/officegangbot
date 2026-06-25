@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from core.logger import logger
-from core.settings_manager import SettingsManager
+
 from cogs.utils import reply
 
 DEFAULT_RULES_TEXT = (
@@ -25,19 +25,12 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager: SettingsManager = getattr(bot, 'settings_manager', None)
         self._active_setups = set()
-
-    def _check_settings_manager(self):
-        if not self.settings_manager:
-            logger.error("SettingsManager not available in SetupCog")
-            return False
-        return True
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         logger.info(f"Joined new guild: {guild.name} ({guild.id}).")
-        prefix = self.settings_manager.get_setting(guild.id, 'prefix', '!')
+        prefix = "!" # Default prefix until configured via DB
         channel = next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
         if not channel: return
         embed = discord.Embed(title=f"👋 Hello, {guild.name}!", description="Thank you for adding me! To get started, an administrator needs to run the setup command.", color=discord.Color.blue())
@@ -252,20 +245,7 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
                             if step_data.get('leave_log_id'):
                                 await self.bot.db.set_guild_setting(guild_id, 'leave_log_id', step_data.get('leave_log_id'))
 
-                        # Save to JSON (legacy sync)
-                        await self.settings_manager.update_setting(guild_id, 'prefix', step_data.get('prefix'))
-                        if step_data.get('rules_channel_id'):
-                            await self.settings_manager.update_setting(guild_id, 'rules_channel_id', step_data.get('rules_channel_id'))
-                        if step_data.get('welcome_message'):
-                            await self.settings_manager.update_setting(guild_id, 'welcome_message', step_data.get('welcome_message'))
-                        if step_data.get('punishment_log_id'):
-                            await self.settings_manager.update_setting(guild_id, 'punishment_log_id', step_data.get('punishment_log_id'))
-                        if step_data.get('usage_log_id'):
-                            await self.settings_manager.update_setting(guild_id, 'usage_log_id', step_data.get('usage_log_id'))
-                        if step_data.get('message_log_id'):
-                            await self.settings_manager.update_setting(guild_id, 'message_log_id', step_data.get('message_log_id'))
-                        if step_data.get('leave_log_id'):
-                            await self.settings_manager.update_setting(guild_id, 'leave_log_id', step_data.get('leave_log_id'))
+
                         await reply(ctx, "✅ Setup complete! The bot is now configured for your server.")
                         break
                     else:
