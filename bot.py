@@ -161,6 +161,12 @@ class MyBot(commands.Bot):
         if not self.db:
             return {"error": "Database unavailable"}
         settings = await self.db.get_all_guild_settings(guild_id)
+        mod_roles = await self.db.get_mod_roles(guild_id)
+
+        def _first_role(perm: str):
+            ids = mod_roles.get(perm) or []
+            return str(ids[0]) if ids else None
+
         feature_data = {
             "rules": {
                 "channel": self._snowflake_or_none(settings.get("rules_channel_id")),
@@ -177,9 +183,12 @@ class MyBot(commands.Bot):
                 "roleId": self._snowflake_or_none(settings.get("reaction_role_id")),
             },
             "moderation": {
-                "modRoles": [],
-                "adminRoles": [],
-                "muteRole": None,
+                "config": _first_role("config"),
+                "kick": _first_role("kick"),
+                "ban": _first_role("ban"),
+                "mute": _first_role("mute"),
+                "warn": _first_role("warn"),
+                "clear": _first_role("clear"),
             },
             "logging": {
                 "logChannel": self._snowflake_or_none(settings.get("punishment_log_id")),
@@ -311,6 +320,24 @@ class MyBot(commands.Bot):
             options = payload.get("options", {})
             if not self.db:
                 return {"error": "Database unavailable"}
+
+            # Moderation permission roles live in the mod_roles table, not in
+            # guilds columns, so they are handled separately from the column
+            # mapping below. Each level holds one role from the dashboard;
+            # setting a role replaces that level (matches /config role).
+            if feature == "moderation":
+                for perm in ("config", "kick", "ban", "mute", "warn", "clear"):
+                    if perm not in options:
+                        continue
+                    await self.db.remove_mod_role(guild_id, perm)
+                    raw = options.get(perm)
+                    if raw:
+                        try:
+                            role_id = _validate_discord_id(raw)
+                        except ValueError:
+                            return {"error": f"Invalid role id for {perm}: {raw}"}
+                        await self.db.set_mod_role(guild_id, role_id, perm)
+                return {"success": True}
 
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
             BIGINT_SETTINGS = {

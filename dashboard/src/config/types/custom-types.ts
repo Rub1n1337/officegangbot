@@ -39,9 +39,12 @@ export type ReactionRoleFeature = {
 };
 
 export type ModerationFeature = {
-  modRoles: string[];
-  adminRoles: string[];
-  muteRole?: string | null;
+  config?: string | null;
+  kick?: string | null;
+  ban?: string | null;
+  mute?: string | null;
+  warn?: string | null;
+  clear?: string | null;
 };
 
 export type LoggingFeature = {
