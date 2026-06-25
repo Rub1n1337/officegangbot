@@ -16,11 +16,14 @@ def get_xp_for_level(level: int) -> int:
 
 
 def get_level_from_xp(xp: int) -> int:
-    """Calculates current level from total XP."""
+    """Calculates current level from total XP. Capped at 1000 levels to guard
+    against runaway loops on corrupt/huge XP values (called on every message)."""
     level = 0
     while xp >= get_xp_for_level(level):
         xp -= get_xp_for_level(level)
         level += 1
+        if level > 1000:
+            break
     return level
 
 
@@ -105,7 +108,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
         guild_id = message.guild.id
         user_id = message.author.id
-        now = datetime.datetime.utcnow().timestamp()
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         # Cooldown check via Redis (atomic, cross-process safe)
         if self.bot.redis:
@@ -234,9 +237,9 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
 
 
-    @tasks.loop(minutes=2)
+    @tasks.loop(seconds=30)
     async def flush_xp_cache(self):
-        """Flushes XP write buffer to PostgreSQL every 2 minutes."""
+        """Flushes XP write buffer to PostgreSQL every 30 seconds."""
         try:
             if not self._dirty_guilds or not self.bot.db:
                 return
@@ -292,9 +295,18 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
     def cog_unload(self):
         self.flush_xp_cache.cancel()
-        # Don't attempt DB write on unload - pool may already be closed
-        self._dirty_guilds.clear()
-        self._write_buffer.clear()
+        # Best-effort final flush on a graceful unload so buffered XP isn't lost
+        # on a normal restart. Skipped if the pool is already closing/closed.
+        pool = getattr(self.bot.db, "_pool", None) if self.bot.db else None
+        if pool and not getattr(pool, "_closing", False) and not getattr(pool, "_closed", False):
+            asyncio.create_task(self._emergency_flush())
+
+    async def _emergency_flush(self):
+        """Best-effort flush of buffered XP on unload."""
+        try:
+            await self.flush_xp_cache()
+        except Exception:
+            logger.warning("Emergency XP flush on unload failed.", exc_info=True)
 
 
 async def setup(bot: commands.Bot):
