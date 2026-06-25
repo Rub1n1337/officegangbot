@@ -114,3 +114,13 @@ BEGIN
         ALTER TABLE mod_roles ADD PRIMARY KEY (guild_id, role_id, role_type);
     END IF;
 END $$;
+
+-- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
+-- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
+-- this closes the auto-exposed Supabase/PostgREST API to the anon key.
+ALTER TABLE guilds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users_xp ENABLE ROW LEVEL SECURITY;
+ALTER TABLE warnings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE timed_punishments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE level_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mod_roles ENABLE ROW LEVEL SECURITY;
