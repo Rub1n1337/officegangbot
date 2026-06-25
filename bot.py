@@ -1,14 +1,9 @@
 # bot.py
 # This is the main application file for the Discord Bot. It's the "brain" of the operation.
 
-import sys
-import subprocess
 import os
-import importlib.metadata as metadata
-import logging
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional
 from pathlib import Path
-import time
 
 # Dependencies are managed via requirements.txt and the virtual environment.
 
@@ -25,7 +20,6 @@ from config import load_config
 from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
-from cogs.utils import reply
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -148,7 +142,7 @@ class MyBot(commands.Bot):
             synced = await self.tree.sync()
             logger.info(f"Successfully synced {len(synced)} commands on startup.")
         except Exception as e:
-            logger.error(f"Failed to sync commands on startup.", exc_info=e)
+            logger.error("Failed to sync commands on startup.", exc_info=e)
 
         logger.info('Bot is ready and listening for commands.')
         logger.warning("Manual command syncing via /sync is now the primary method.")

@@ -22,7 +22,8 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
     async def on_guild_join(self, guild: discord.Guild):
         logger.info(f"Joined new guild: {guild.name} ({guild.id}).")
         channel = next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
-        if not channel: return
+        if not channel:
+            return
         embed = discord.Embed(title=f"👋 Hello, {guild.name}!", description="Thank you for adding me! To get started, an administrator needs to run the setup command.", color=discord.Color.blue())
         embed.add_field(name="🚀 Setup Command", value="In a channel of your choice, use the slash command:\n```/setup```", inline=False)
         await channel.send(embed=embed)

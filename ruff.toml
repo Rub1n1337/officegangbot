@@ -1,0 +1,8 @@
+# Ruff configuration for OfficeGangBot.
+# CI runs: ruff check . --select E,F --ignore E501
+
+[lint.per-file-ignores]
+# api_server.py must call load_dotenv() before importing core.logger, which
+# reads BOT_LOG_LEVEL from the environment at module import time. The resulting
+# "import not at top of file" warnings are therefore intentional.
+"api_server.py" = ["E402"]

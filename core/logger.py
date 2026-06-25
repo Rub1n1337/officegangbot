@@ -17,7 +17,6 @@ import logging
 import sys
 import os
 from logging.handlers import RotatingFileHandler
-from typing import Optional
 
 # --- Configuration ---
 LOG_DIRECTORY = "data"

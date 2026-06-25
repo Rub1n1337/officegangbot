@@ -1,5 +1,4 @@
 # cogs/general_cog.py
-import discord
 from discord.ext import commands
 from .utils import reply
 

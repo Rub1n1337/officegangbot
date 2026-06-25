@@ -4,7 +4,6 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
-from core.settings_manager import SettingsManager
 from typing import Literal
 from .utils import reply
 
@@ -78,7 +77,8 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         is_rules_enabled = "rules" in enabled_features
         rules_channel = ctx.guild.get_channel(settings.get("rules_channel_id")) if settings.get("rules_channel_id") else None
         rules_text = settings.get("rules_message") or "Not Set"
-        if len(rules_text) > 100: rules_text = rules_text[:97] + "..."
+        if len(rules_text) > 100:
+            rules_text = rules_text[:97] + "..."
         embed.add_field(
             name="📜 Rules System",
             value=f"**Status:** {'✅ Enabled' if is_rules_enabled else '❌ Disabled'}\n"
@@ -91,7 +91,8 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         is_welcome_enabled = "welcome-message" in enabled_features
         welcome_channel = ctx.guild.get_channel(settings.get("welcome_channel_id")) if settings.get("welcome_channel_id") else None
         welcome_text = settings.get("welcome_message") or "Not Set"
-        if len(welcome_text) > 100: welcome_text = welcome_text[:97] + "..."
+        if len(welcome_text) > 100:
+            welcome_text = welcome_text[:97] + "..."
         embed.add_field(
             name="👋 Welcome System",
             value=f"**Status:** {'✅ Enabled' if is_welcome_enabled else '❌ Enabled (via legacy)' if settings.get('welcome_enabled') else '❌ Disabled'}\n"

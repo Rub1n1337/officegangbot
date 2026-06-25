@@ -2,14 +2,10 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from datetime import timedelta
-import time
-import uuid
 from core.logger import logger
 from core.permissions import has_permission
-from typing import Optional, Literal
+from typing import Optional
 from .utils import reply
-from discord.ui import View, Button
 
 class BanConfirmView(discord.ui.View):
     """Confirmation view for the /ban command."""

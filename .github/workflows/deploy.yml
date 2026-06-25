@@ -25,7 +25,7 @@ jobs:
           pip install ruff
 
       - name: Run Ruff linter
-        run: ruff check . --select E,F --ignore E501 || true
+        run: ruff check . --select E,F --ignore E501
 
       - name: Syntax check all Python files
         run: |

@@ -19,7 +19,6 @@ What you need to do:
 import os
 from dotenv import load_dotenv
 from core.logger import logger
-from typing import Optional
 
 def load_config() -> dict:
     """

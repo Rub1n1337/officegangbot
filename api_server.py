@@ -3,7 +3,6 @@
 
 from fastapi import FastAPI, HTTPException, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from typing import Any, Optional
 import os
 import secrets
@@ -164,7 +163,7 @@ async def health_check():
             "latency_ms": data.get("latency_ms", 0),
             "guilds": data.get("guilds", 0)
         }
-    except:
+    except Exception:
         return {"status": "starting", "bot": False}
 
 

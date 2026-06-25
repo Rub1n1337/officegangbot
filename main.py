@@ -14,7 +14,6 @@ def run_bot_process():
     max_restarts = 10
     initial_wait_time = 10
     restart_attempts = 0
-    backoff = 3
 
     logger.info("Bot Runner Script has started. Preparing to launch the bot.")
 
