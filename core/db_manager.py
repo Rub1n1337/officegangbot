@@ -11,6 +11,21 @@ from typing import Optional, List, Dict, Any
 from core.logger import logger
 
 
+# Whitelist of column names allowed as `key` in get/set_guild_setting.
+# Column names cannot be parameterized in SQL, so they are interpolated into
+# the query string. Validating against this set prevents SQL injection if a
+# `key` ever originates from an untrusted source. Must stay in sync with the
+# `guilds` table columns in scripts/init_db.sql.
+ALLOWED_GUILD_SETTINGS = frozenset({
+    'prefix', 'punishment_log_id', 'usage_log_id', 'leave_log_id',
+    'audit_log_id', 'welcome_channel_id', 'welcome_message', 'welcome_enabled',
+    'autorole_id', 'rules_channel_id', 'rules_message_id', 'rules_message',
+    'reaction_emoji', 'reaction_role_id', 'setup_complete', 'levels_enabled',
+    'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
+    'ticket_support_role_id', 'ticket_category_id', 'enabled_features',
+})
+
+
 class DatabaseManager:
     """
     Async PostgreSQL manager with connection pooling via asyncpg.
@@ -76,6 +91,8 @@ class DatabaseManager:
 
     async def get_guild_setting(self, guild_id: int, key: str, default: Any = None) -> Any:
         """Returns a single guild setting by column name."""
+        if key not in ALLOWED_GUILD_SETTINGS:
+            raise ValueError(f"Invalid guild setting key: {key}")
         await self.ensure_guild(guild_id)
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -89,6 +106,8 @@ class DatabaseManager:
 
     async def set_guild_setting(self, guild_id: int, key: str, value: Any) -> None:
         """Updates a single guild setting by column name."""
+        if key not in ALLOWED_GUILD_SETTINGS:
+            raise ValueError(f"Invalid guild setting key: {key}")
         await self.ensure_guild(guild_id)
         async with self.pool.acquire() as conn:
             await conn.execute(
