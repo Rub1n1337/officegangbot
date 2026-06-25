@@ -30,6 +30,19 @@ from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
 
+def _validate_discord_id(value) -> int:
+    """Validates and converts a value to a Discord snowflake (positive 64-bit int).
+    Raises ValueError on anything else, so callers can return a clean error
+    instead of letting a bare int() blow up the RPC handler."""
+    try:
+        id_int = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid Discord ID: {value}")
+    if id_int <= 0:
+        raise ValueError(f"Invalid Discord ID: {value}")
+    return id_int
+
+
 class MyBot(commands.Bot):
     """Custom Bot class to handle setup, cogs, and command tree."""
     def __init__(self):
@@ -64,6 +77,8 @@ class MyBot(commands.Bot):
                 except asyncio.TimeoutError:
                     self._api_task.cancel()
             logger.info("FastAPI server stopped")
+        if hasattr(self, 'health_monitor') and self.health_monitor:
+            self.health_monitor.stop()
         if hasattr(self, 'db') and self.db:
             await self.db.close()
         if hasattr(self, 'redis') and self.redis:
@@ -104,6 +119,11 @@ class MyBot(commands.Bot):
         self._uvicorn_server = uvicorn.Server(config)
         self._api_task = asyncio.create_task(self._uvicorn_server.serve())
         logger.info(f"FastAPI server starting on port {port} (embedded in bot process)")
+
+        # Start background health monitor (logs latency/guilds/memory periodically)
+        self.health_monitor = HealthMonitor(self)
+        self.health_monitor.start()
+        logger.info("Health monitor started.")
 
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
@@ -172,15 +192,30 @@ class MyBot(commands.Bot):
         """Handles RPC requests from the API server via Redis Streams."""
         action = payload.get("action")
 
+        # Validate guild_id once for every action that carries one, so a bad
+        # value yields a clean error instead of a 504 from a crashed handler.
+        guild_id = None
+        if payload.get("guild_id") is not None:
+            try:
+                guild_id = _validate_discord_id(payload.get("guild_id"))
+            except ValueError as e:
+                return {"error": str(e)}
+
+        _needs_guild = {
+            "get_guild_info", "get_guild_roles", "get_guild_channels",
+            "get_feature", "enable_feature", "disable_feature", "update_feature",
+        }
+        if action in _needs_guild and guild_id is None:
+            return {"error": "Missing or invalid guild_id"}
+
         if action == "get_guild_info":
-            guild_id = payload.get("guild_id")
-            guild = self.get_guild(int(guild_id)) if guild_id else None
+            guild = self.get_guild(guild_id) if guild_id else None
             if not guild:
                 return {"error": "Guild not found"}
             if not self.db:
                 return {"error": "Database unavailable"}
-            settings = await self.db.get_all_guild_settings(int(guild_id))
-            enabled_features = await self.db.get_enabled_features(int(guild_id))
+            settings = await self.db.get_all_guild_settings(guild_id)
+            enabled_features = await self.db.get_enabled_features(guild_id)
             return {
                 "id": str(guild.id),
                 "name": guild.name,
@@ -217,8 +252,7 @@ class MyBot(commands.Bot):
             }
 
         if action == "get_guild_roles":
-            guild_id = payload.get("guild_id")
-            guild = self.get_guild(int(guild_id)) if guild_id else None
+            guild = self.get_guild(guild_id) if guild_id else None
             if not guild:
                 return {"error": "Guild not found"}
             return [
@@ -233,8 +267,7 @@ class MyBot(commands.Bot):
             ]
 
         if action == "get_guild_channels":
-            guild_id = payload.get("guild_id")
-            guild = self.get_guild(int(guild_id)) if guild_id else None
+            guild = self.get_guild(guild_id) if guild_id else None
             if not guild:
                 return {"error": "Guild not found"}
             return [
@@ -248,7 +281,6 @@ class MyBot(commands.Bot):
             ]
 
         if action == "get_feature":
-            guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
             if not self.db:
                 return {"error": "Database unavailable"}
@@ -259,7 +291,6 @@ class MyBot(commands.Bot):
             return await self._get_feature_payload(guild_id, feature)
 
         if action == "enable_feature":
-            guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
             if not self.db:
                 return {"error": "Database unavailable"}
@@ -268,7 +299,6 @@ class MyBot(commands.Bot):
             return {"success": True, "enabled_features": enabled_features}
 
         if action == "disable_feature":
-            guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
             if not self.db:
                 return {"error": "Database unavailable"}
@@ -277,7 +307,6 @@ class MyBot(commands.Bot):
             return {"success": True, "enabled_features": enabled_features}
 
         if action == "update_feature":
-            guild_id = int(payload.get("guild_id"))
             feature = payload.get("feature")
             options = payload.get("options", {})
             if not self.db:
