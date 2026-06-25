@@ -26,7 +26,8 @@ class CloseTicketView(discord.ui.View):
             return True
 
         # Check support role
-        support_role_id = bot.settings_manager.get_setting(guild.id, 'ticket_support_role_id')
+        support_role_id = await bot.db.get_guild_setting(guild.id, 'ticket_support_role_id')
+
         if support_role_id:
             support_role = guild.get_role(int(support_role_id))
             if support_role and support_role in interaction.user.roles:
@@ -97,11 +98,11 @@ class OpenTicketView(discord.ui.View):
 
         # Get support role from settings
         bot = interaction.client
-        support_role_id = bot.settings_manager.get_setting(guild.id, 'ticket_support_role_id')
+        support_role_id = await bot.db.get_guild_setting(guild.id, 'ticket_support_role_id')
         support_role = guild.get_role(int(support_role_id)) if support_role_id else None
 
         # Get ticket category
-        category_id = bot.settings_manager.get_setting(guild.id, 'ticket_category_id')
+        category_id = await bot.db.get_guild_setting(guild.id, 'ticket_category_id')
         category = guild.get_channel(int(category_id)) if category_id else None
 
         # Set permissions
@@ -159,7 +160,7 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.settings_manager = bot.settings_manager
+
         # Register persistent views
         bot.add_view(OpenTicketView())
         bot.add_view(CloseTicketView())
@@ -181,14 +182,10 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         # Save settings
         if support_role:
             await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_support_role_id', support_role.id)
-            await self.settings_manager.update_setting(
-                ctx.guild.id, 'ticket_support_role_id', str(support_role.id)
-            )
+
         if category:
             await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_category_id', category.id)
-            await self.settings_manager.update_setting(
-                ctx.guild.id, 'ticket_category_id', str(category.id)
-            )
+
 
         embed = discord.Embed(
             title="🎫 Support Tickets",
