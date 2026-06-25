@@ -104,6 +104,7 @@ async def migrate():
                     await conn.execute("""
                         INSERT INTO warnings (guild_id, user_id, reason, moderator_id, moderator_name, created_at)
                         VALUES ($1, $2, $3, $4, $5, $6)
+                        ON CONFLICT DO NOTHING
                     """,
                         guild_id, user_id,
                         w.get('reason', 'No reason'),
