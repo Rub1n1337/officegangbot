@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 from core.logger import logger
+from core.i18n import t
 
 from cogs.utils import reply
 
@@ -18,17 +19,18 @@ SETTING_COLUMNS = {
     "leave_log_id": "leave_log_id",
 }
 
+# (internal data key, i18n label key)
 LOG_FIELDS = [
-    ("punishment_log_id", "Punishment log"),
-    ("usage_log_id", "Bot usage log"),
-    ("message_log_id", "Edited / deleted messages"),
-    ("leave_log_id", "Leave notifications"),
+    ("punishment_log_id", "setup.log_punishments"),
+    ("usage_log_id", "setup.log_usage"),
+    ("message_log_id", "setup.log_messages"),
+    ("leave_log_id", "setup.log_leaves"),
 ]
 
 
-def _channel_value(data: dict, key: str) -> str:
+def _channel_value(loc: str, data: dict, key: str) -> str:
     cid = data.get(key)
-    return f"<#{cid}>" if cid else "*not set*"
+    return f"<#{cid}>" if cid else t(loc, "setup.not_set")
 
 
 class _PickChannelSelect(discord.ui.ChannelSelect):
@@ -68,8 +70,8 @@ class _LogChannelSelect(discord.ui.ChannelSelect):
 
 
 class _BackButton(discord.ui.Button):
-    def __init__(self):
-        super().__init__(label="Back", style=discord.ButtonStyle.secondary, row=4)
+    def __init__(self, loc: str):
+        super().__init__(label=t(loc, "setup.back"), style=discord.ButtonStyle.secondary, row=4)
 
     async def callback(self, interaction: discord.Interaction):
         await self.view.panel.show_main(interaction)  # type: ignore[attr-defined]
@@ -79,8 +81,8 @@ class RulesChannelView(discord.ui.View):
     def __init__(self, panel: "SetupView"):
         super().__init__(timeout=panel.timeout)
         self.panel = panel
-        self.add_item(_PickChannelSelect("rules_channel_id", "Select the rules channel"))
-        self.add_item(_BackButton())
+        self.add_item(_PickChannelSelect("rules_channel_id", t(panel.loc, "setup.rules_placeholder")))
+        self.add_item(_BackButton(panel.loc))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return await self.panel.interaction_check(interaction)
@@ -90,36 +92,36 @@ class LogsView(discord.ui.View):
     def __init__(self, panel: "SetupView"):
         super().__init__(timeout=panel.timeout)
         self.panel = panel
-        for field, label in LOG_FIELDS:
-            self.add_item(_LogChannelSelect(field, label))
-        self.add_item(_BackButton())
+        for field, label_key in LOG_FIELDS:
+            self.add_item(_LogChannelSelect(field, t(panel.loc, label_key)))
+        self.add_item(_BackButton(panel.loc))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return await self.panel.interaction_check(interaction)
 
     def embed(self) -> discord.Embed:
-        data = self.panel.data
+        loc = self.panel.loc
         embed = discord.Embed(
-            title="🪵 Log Channels",
-            description="Pick a channel for each log type. **Back** returns to the panel.",
+            title=t(loc, "setup.logs_title"),
+            description=t(loc, "setup.logs_desc"),
             color=discord.Color.blurple(),
         )
-        for field, label in LOG_FIELDS:
-            embed.add_field(name=label, value=_channel_value(data, field), inline=False)
+        for field, label_key in LOG_FIELDS:
+            embed.add_field(name=t(loc, label_key), value=_channel_value(loc, self.panel.data, field), inline=False)
         return embed
 
 
-class WelcomeModal(discord.ui.Modal, title="Welcome Message"):
+class WelcomeModal(discord.ui.Modal):
     def __init__(self, panel: "SetupView"):
-        super().__init__()
+        super().__init__(title=t(panel.loc, "setup.welcome_modal_title"))
         self.panel = panel
         self.message = discord.ui.TextInput(
-            label="Message",
+            label=t(panel.loc, "setup.welcome_input_label"),
             style=discord.TextStyle.paragraph,
             default=panel.data.get("welcome_message") or DEFAULT_WELCOME_MESSAGE,
             max_length=1000,
             required=True,
-            placeholder="Use {user.mention} and {server.name} as placeholders.",
+            placeholder=t(panel.loc, "setup.welcome_input_placeholder"),
         )
         self.add_item(self.message)
 
@@ -131,43 +133,46 @@ class WelcomeModal(discord.ui.Modal, title="Welcome Message"):
 class SetupView(discord.ui.View):
     """The main interactive setup panel. Nothing is persisted until Save."""
 
-    def __init__(self, bot: commands.Bot, guild_id: int, author_id: int, *, timeout: float = 300):
+    def __init__(self, bot: commands.Bot, guild_id: int, author_id: int, loc: str, *, timeout: float = 300):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
         self.author_id = author_id
+        self.loc = loc
         self.data: dict = {}
         self.message: discord.Message | None = None
+        # Localize button labels (decorator labels are the fallback).
+        self.rules_button.label = t(loc, "setup.btn_rules")
+        self.welcome_button.label = t(loc, "setup.btn_welcome")
+        self.logs_button.label = t(loc, "setup.btn_logs")
+        self.save_button.label = t(loc, "setup.btn_save")
+        self.cancel_button.label = t(loc, "setup.btn_cancel")
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "This setup panel isn't yours — run `/setup` yourself.", ephemeral=True
-            )
+            await interaction.response.send_message(t(self.loc, "setup.not_yours"), ephemeral=True)
             return False
         return True
 
     def main_embed(self) -> discord.Embed:
+        loc = self.loc
         embed = discord.Embed(
-            title="🛠️ Server Setup",
-            description="Configure the options below, then click **Save**. "
-                        "Nothing is stored until you save.",
+            title=t(loc, "setup.title"),
+            description=t(loc, "setup.desc"),
             color=discord.Color.blurple(),
         )
-        embed.add_field(name="📋 Rules channel", value=_channel_value(self.data, "rules_channel_id"), inline=True)
+        embed.add_field(name=t(loc, "setup.field_rules"), value=_channel_value(loc, self.data, "rules_channel_id"), inline=True)
         welcome = self.data.get("welcome_message")
         embed.add_field(
-            name="👋 Welcome message",
-            value=(f"`{welcome[:60]}`" if welcome else "*default*"),
+            name=t(loc, "setup.field_welcome"),
+            value=(f"`{welcome[:60]}`" if welcome else t(loc, "setup.welcome_default")),
             inline=True,
         )
         embed.add_field(
-            name="🪵 Logs",
-            value=(
-                f"Punishments: {_channel_value(self.data, 'punishment_log_id')}\n"
-                f"Bot usage: {_channel_value(self.data, 'usage_log_id')}\n"
-                f"Edited/Deleted: {_channel_value(self.data, 'message_log_id')}\n"
-                f"Leaves: {_channel_value(self.data, 'leave_log_id')}"
+            name=t(loc, "setup.field_logs"),
+            value="\n".join(
+                f"{t(loc, label_key)}: {_channel_value(loc, self.data, field)}"
+                for field, label_key in LOG_FIELDS
             ),
             inline=False,
         )
@@ -180,8 +185,8 @@ class SetupView(discord.ui.View):
     async def rules_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = RulesChannelView(self)
         embed = discord.Embed(
-            title="📋 Rules Channel",
-            description="Select the channel where the rules message will live.",
+            title=t(self.loc, "setup.rules_title"),
+            description=t(self.loc, "setup.rules_desc"),
             color=discord.Color.blurple(),
         )
         await interaction.response.edit_message(embed=embed, view=view)
@@ -200,8 +205,8 @@ class SetupView(discord.ui.View):
         if not self.bot.db:
             await interaction.response.edit_message(
                 embed=discord.Embed(
-                    title="❌ Setup failed",
-                    description="The database is unavailable right now. Please try again later.",
+                    title=t(self.loc, "setup.fail_title"),
+                    description=t(self.loc, "setup.fail_db"),
                     color=discord.Color.red(),
                 ),
                 view=None,
@@ -217,8 +222,8 @@ class SetupView(discord.ui.View):
             logger.error(f"Setup save failed for guild {self.guild_id}: {e}", exc_info=True)
             await interaction.response.edit_message(
                 embed=discord.Embed(
-                    title="❌ Setup failed",
-                    description="Something went wrong while saving. Please try again.",
+                    title=t(self.loc, "setup.fail_title"),
+                    description=t(self.loc, "setup.fail_save"),
                     color=discord.Color.red(),
                 ),
                 view=None,
@@ -227,9 +232,9 @@ class SetupView(discord.ui.View):
             return
 
         summary = self.main_embed()
-        summary.title = "✅ Setup complete"
+        summary.title = t(self.loc, "setup.done_title")
         summary.color = discord.Color.green()
-        summary.description = "Your settings have been saved."
+        summary.description = t(self.loc, "setup.done_desc")
         await interaction.response.edit_message(embed=summary, view=None)
         logger.info(f"Setup completed for guild {self.guild_id} by {self.author_id}.")
         self.stop()
@@ -238,8 +243,8 @@ class SetupView(discord.ui.View):
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
             embed=discord.Embed(
-                title="Setup cancelled",
-                description="No changes were saved.",
+                title=t(self.loc, "setup.cancelled_title"),
+                description=t(self.loc, "setup.cancelled_desc"),
                 color=discord.Color.greyple(),
             ),
             view=None,
@@ -271,6 +276,7 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
         )
         if not channel:
             return
+        # Locale defaults to English at join time (nothing configured yet).
         embed = discord.Embed(
             title=f"👋 Hello, {guild.name}!",
             description="Thanks for adding me! To get started, an administrator should run "
@@ -286,9 +292,10 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
     async def setup(self, ctx: commands.Context):
         """Opens an interactive panel to configure rules, welcome and log channels."""
         if not ctx.guild:
-            return await reply(ctx, "❌ This command can only be used in a server.", ephemeral=True)
+            return await reply(ctx, t("en", "setup.guild_only"), ephemeral=True)
 
-        view = SetupView(self.bot, ctx.guild.id, ctx.author.id)
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+        view = SetupView(self.bot, ctx.guild.id, ctx.author.id, loc)
         embed = view.main_embed()
 
         # The global auto-defer has already acked the interaction ephemerally, so
@@ -302,13 +309,19 @@ class SetupCog(commands.Cog, name="🛠️ Server Setup"):
     @setup.error
     async def setup_error(self, ctx: commands.Context, error: commands.CommandError):
         """Error handler specific to the setup command."""
+        loc = "en"
+        if ctx.guild and self.bot.db:
+            try:
+                loc = await self.bot.db.get_locale(ctx.guild.id)
+            except Exception:
+                loc = "en"
         if isinstance(error, commands.CheckFailure):
-            await reply(ctx, "❌ You need the **Administrator** permission to run setup.", ephemeral=True)
+            await reply(ctx, t(loc, "setup.err_no_admin"), ephemeral=True)
         elif isinstance(error, commands.NoPrivateMessage):
             pass
         else:
             logger.error(f"Unexpected setup error for guild {getattr(ctx.guild, 'id', None)}:", exc_info=error)
-            await reply(ctx, "❌ An unexpected error occurred. Setup was cancelled.", ephemeral=True)
+            await reply(ctx, t(loc, "setup.err_unexpected"), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
