@@ -62,6 +62,33 @@ class MyBot(commands.Bot):
         # Set up the global error handler for slash commands
         self.tree.on_error = self.on_app_command_error
 
+        # Acknowledge every slash interaction early (see _auto_defer) so slow
+        # DB work in a command body can't blow Discord's 3-second ACK window.
+        self.before_invoke(self._auto_defer)
+
+    async def _auto_defer(self, ctx: commands.Context):
+        """Defer the interaction before the command body runs.
+
+        Commands do DB work (e.g. get_enabled_features) before their first
+        reply(), and reply() only defers when it is finally called — by then
+        the 3s window may have passed, surfacing "The application did not
+        respond" even though the command succeeds. Deferring here acks
+        immediately. Deferred ephemerally so the hidden "thinking" placeholder
+        never leaks content; reply() still controls each followup's visibility.
+
+        Skipped for prefix invocations and for commands that send their own
+        initial interaction response (marked extras["manages_own_response"],
+        e.g. /ban which shows a confirmation view)."""
+        interaction = ctx.interaction
+        if interaction is None or interaction.response.is_done():
+            return
+        if ctx.command and ctx.command.extras.get("manages_own_response"):
+            return
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except discord.HTTPException:
+            pass
+
     async def close(self):
         if hasattr(self, '_uvicorn_server'):
             self._uvicorn_server.should_exit = True
