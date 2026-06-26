@@ -158,7 +158,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         await self._log_action(ctx, "Member Kicked", member, reason)
         await reply(ctx, f"✅ **{member}** has been kicked.", ephemeral=True)
 
-    @commands.hybrid_command(name="ban", description="Ban a member from the server.")
+    @commands.hybrid_command(name="ban", description="Ban a member from the server.", extras={"manages_own_response": True})
     @app_commands.describe(member="Member to ban.", reason="Reason for the ban.")
     @commands.bot_has_permissions(ban_members=True)
     @commands.cooldown(3, 10, commands.BucketType.user)

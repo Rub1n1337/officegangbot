@@ -133,7 +133,6 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     @filter.command(name="add_defaults", description="Adds the default list of profanities to the filter.")
     async def filter_add_defaults(self, ctx: commands.Context):
         """Adds a predefined list of common profanities to the server's filter."""
-        await ctx.defer(ephemeral=True)  # DB read+write can exceed the 3s slash window
         # Get current words from DB
         current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
         
