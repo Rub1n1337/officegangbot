@@ -4,24 +4,29 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
+from core.i18n import t
 from typing import Optional
 from .utils import reply
 
 class BanConfirmView(discord.ui.View):
     """Confirmation view for the /ban command."""
 
-    def __init__(self, moderator: discord.Member, target: discord.Member, reason: str):
+    def __init__(self, moderator: discord.Member, target: discord.Member, reason: str, loc: str):
         super().__init__(timeout=30)
         self.moderator = moderator
         self.target = target
         self.reason = reason
+        self.loc = loc
         self.confirmed = False
+        # Localize the button labels (decorator labels are the fallback).
+        self.confirm.label = t(loc, "mod.ban_confirm_label")
+        self.cancel.label = t(loc, "mod.ban_cancel_label")
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Only the moderator who called the command can press the buttons."""
         if interaction.user.id != self.moderator.id:
             await interaction.response.send_message(
-                "❌ Only the moderator who issued this command can confirm the action.",
+                t(self.loc, "mod.ban_not_yours"),
                 ephemeral=True
             )
             return False
@@ -32,7 +37,7 @@ class BanConfirmView(discord.ui.View):
         self.confirmed = True
         self.stop()
         await interaction.response.edit_message(
-            content=f"⏳ Banning `{self.target}`...",
+            content=t(self.loc, "mod.ban_in_progress", target=self.target),
             view=None
         )
 
@@ -41,7 +46,7 @@ class BanConfirmView(discord.ui.View):
         self.confirmed = False
         self.stop()
         await interaction.response.edit_message(
-            content=f"🚫 Ban of `{self.target}` has been cancelled.",
+            content=t(self.loc, "mod.ban_view_cancelled", target=self.target),
             view=None
         )
 
@@ -50,7 +55,7 @@ class BanConfirmView(discord.ui.View):
         self.stop()
 
 class HierarchyError(commands.CheckFailure):
-    """Custom exception for hierarchy check failures."""
+    """Custom exception for hierarchy check failures. Carries an i18n key."""
     pass
 
 class Moderation(commands.Cog, name="🛡️ Moderation"):
@@ -64,42 +69,53 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         if isinstance(error, commands.CommandNotFound):
             return
 
+        loc = "en"
+        if ctx.guild and self.bot.db:
+            try:
+                loc = await self.bot.db.get_locale(ctx.guild.id)
+            except Exception:
+                loc = "en"
+
         if isinstance(error, HierarchyError):
-            await reply(ctx, f"❌ {error}", ephemeral=True)
+            # error message is an i18n key set by _check_hierarchy.
+            await reply(ctx, t(loc, str(error)), ephemeral=True)
         elif isinstance(error, commands.BotMissingPermissions):
             perms = ', '.join(error.missing_permissions)
-            await reply(ctx, f"❌ I need the following permissions to do that: `{perms}`.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.err_bot_missing_perms", perms=perms), ephemeral=True)
         elif isinstance(error, (commands.MissingPermissions, commands.CheckFailure)):
-            await reply(ctx, "❌ You don't have the required permissions for this command.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.err_no_permission"), ephemeral=True)
         elif isinstance(error, (commands.MemberNotFound, commands.UserNotFound)):
-            await reply(ctx, f"❌ I could not find a user named `{error.argument}`. Please check the name or use their ID.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.err_member_not_found", argument=error.argument), ephemeral=True)
         elif isinstance(error, commands.BadArgument):
-            await reply(ctx, "❌ Invalid argument provided. Please check the command's help for usage.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.err_bad_argument"), ephemeral=True)
         else:
             logger.error(f"An unhandled error occurred in moderation cog: {error}", exc_info=True)
-            await reply(ctx, "🐞 An unexpected error occurred. The developers have been notified.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.err_unexpected"), ephemeral=True)
 
     def _check_hierarchy(self, ctx: commands.Context, target: discord.Member):
-        """Checks if the author can perform an action on the target."""
+        """Checks if the author can perform an action on the target.
+
+        Raises HierarchyError whose message is an i18n key, translated by the
+        error handler in the guild's locale."""
         if target.id == ctx.author.id:
-            raise HierarchyError("You cannot moderate yourself.")
+            raise HierarchyError("mod.hierarchy_self")
         if target.id == self.bot.user.id:
-            raise HierarchyError("I cannot moderate myself.")
+            raise HierarchyError("mod.hierarchy_bot_self")
         if target.id == ctx.guild.owner_id:
-            raise HierarchyError("You cannot moderate the server owner.")
+            raise HierarchyError("mod.hierarchy_owner")
         # Moderators may act on members with an EQUAL top role; only a strictly
         # higher target is blocked. (Bot-side check below stays <= on purpose.)
         if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role < target.top_role:
-            raise HierarchyError("You cannot moderate a member with a higher role.")
+            raise HierarchyError("mod.hierarchy_higher")
         if ctx.guild.me.top_role <= target.top_role:
-            raise HierarchyError("I cannot moderate a member with an equal or higher role than me.")
+            raise HierarchyError("mod.hierarchy_bot_higher")
 
-    async def _notify_user(self, target: discord.Member, guild_name: str, action: str, reason: str, duration: Optional[str] = None):
-        """Sends a DM to the user about the moderation action."""
-        embed = discord.Embed(title=f"You have been {action} in {guild_name}", color=discord.Color.red())
-        embed.add_field(name="Reason", value=reason, inline=False)
+    async def _notify_user(self, target: discord.Member, guild_name: str, title_key: str, reason: str, loc: str, duration: Optional[str] = None):
+        """Sends a DM to the user about the moderation action, in the guild's locale."""
+        embed = discord.Embed(title=t(loc, title_key, guild=guild_name), color=discord.Color.red())
+        embed.add_field(name=t(loc, "field.reason"), value=reason, inline=False)
         if duration:
-            embed.add_field(name="Duration", value=duration, inline=False)
+            embed.add_field(name=t(loc, "field.duration"), value=duration, inline=False)
         try:
             await target.send(embed=embed)
             return True
@@ -143,8 +159,9 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("clear")
     async def clear(self, ctx: commands.Context, amount: commands.Range[int, 1, 100]):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         deleted = await ctx.channel.purge(limit=amount)
-        await reply(ctx, f"✅ Deleted {len(deleted)} messages.", ephemeral=True)
+        await reply(ctx, t(loc, "mod.cleared", count=len(deleted)), ephemeral=True)
 
     @commands.hybrid_command(name="kick", description="Kick a member from the server.")
     @app_commands.describe(member="The member to kick.", reason="The reason for the kick.")
@@ -152,11 +169,12 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("kick")
     async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         self._check_hierarchy(ctx, member)
-        await self._notify_user(member, ctx.guild.name, "kicked", reason)
+        await self._notify_user(member, ctx.guild.name, "mod.dm_kicked_title", reason, loc)
         await member.kick(reason=f"{reason} (Moderator: {ctx.author.id})")
         await self._log_action(ctx, "Member Kicked", member, reason)
-        await reply(ctx, f"✅ **{member}** has been kicked.", ephemeral=True)
+        await reply(ctx, t(loc, "mod.kicked", member=member), ephemeral=True)
 
     @commands.hybrid_command(name="ban", description="Ban a member from the server.", extras={"manages_own_response": True})
     @app_commands.describe(member="Member to ban.", reason="Reason for the ban.")
@@ -164,15 +182,12 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("ban")
     async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         self._check_hierarchy(ctx, member)
 
-        view = BanConfirmView(moderator=ctx.author, target=member, reason=reason)
+        view = BanConfirmView(moderator=ctx.author, target=member, reason=reason, loc=loc)
 
-        confirm_content = (
-            f"⚠️ **Ban Confirmation**\n"
-            f"Are you sure you want to ban {member.mention}?\n"
-            f"**Reason:** `{reason}`"
-        )
+        confirm_content = t(loc, "mod.ban_confirm_prompt", member=member.mention, reason=reason)
 
         if ctx.interaction:
             await ctx.interaction.response.send_message(
@@ -188,11 +203,11 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         if not view.confirmed:
             return
 
-        dm_sent = await self._notify_user(member, ctx.guild.name, "banned", reason)
+        dm_sent = await self._notify_user(member, ctx.guild.name, "mod.dm_banned_title", reason, loc)
         await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
         await self._log_action(ctx, "🔨 Ban", member, reason, dm_notified="✅" if dm_sent else "❌")
 
-        result_content = f"✅ {member.mention} has been banned. Reason: `{reason}`"
+        result_content = t(loc, "mod.banned", member=member.mention, reason=reason)
         if ctx.interaction:
             await ctx.interaction.followup.send(content=result_content, ephemeral=True)
         else:
@@ -203,30 +218,32 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
     @commands.bot_has_permissions(ban_members=True)
     @has_permission("ban")
     async def unban(self, ctx: commands.Context, user_id: str, *, reason: str = "No reason provided"):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         try:
             user = await self.bot.fetch_user(int(user_id))
         except (ValueError, discord.NotFound):
-            return await reply(ctx, "❌ Invalid user ID or user not found.", ephemeral=True)
-        
+            return await reply(ctx, t(loc, "mod.unban_invalid"), ephemeral=True)
+
         try:
             await ctx.guild.unban(user, reason=f"{reason} (Moderator: {ctx.author.id})")
             await self._log_action(ctx, "User Unbanned", user, reason)
-            await reply(ctx, f"✅ **{user}** has been unbanned.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.unbanned", user=user), ephemeral=True)
         except discord.NotFound:
-            await reply(ctx, f"❌ **{user}** is not banned from this server.", ephemeral=True)
+            await reply(ctx, t(loc, "mod.unban_not_banned", user=user), ephemeral=True)
 
     @commands.hybrid_command(name="unmute", description="Unmute a member.")
     @app_commands.describe(member="The member to unmute.", reason="The reason for unmuting.")
     @commands.bot_has_permissions(moderate_members=True)
     @has_permission("mute")
     async def unmute(self, ctx: commands.Context, member: discord.Member, *, reason: str = "Moderator decision"):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         self._check_hierarchy(ctx, member)
         if not member.is_timed_out():
-            return await reply(ctx, f"❌ {member.mention} is not currently muted.", ephemeral=True)
-        
+            return await reply(ctx, t(loc, "mod.unmute_not_muted", member=member.mention), ephemeral=True)
+
         await member.timeout(None, reason=f"{reason} (Moderator: {ctx.author.id})")
         await self._log_action(ctx, "Member Unmuted", member, reason)
-        await reply(ctx, f"✅ **{member}** has been unmuted.", ephemeral=True)
+        await reply(ctx, t(loc, "mod.unmuted", member=member), ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
