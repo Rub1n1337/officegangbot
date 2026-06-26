@@ -3,7 +3,6 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
-from core.permissions import has_permission
 from .utils import reply
 from typing import Optional
 import asyncio

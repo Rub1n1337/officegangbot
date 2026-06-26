@@ -45,7 +45,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             # Try to fetch if not in cache
             try:
                 channel = await guild.fetch_channel(int(log_channel_id))
-            except:
+            except Exception:
                 return
 
         embed = discord.Embed(
@@ -122,6 +122,13 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             # Keep only messages from the last 3 seconds
             user_log[:] = [t for t in user_log if now - t < 3]
             user_log.append(now)
+
+            # Drop empty per-user/per-guild entries so the fallback dict doesn't
+            # grow unbounded over time (only matters when Redis is unavailable).
+            for uid in [uid for uid, log in guild_log.items() if not log and uid != user_id]:
+                del guild_log[uid]
+            if not guild_log:
+                self._message_log.pop(guild_id, None)
 
             if len(user_log) >= 5:
                 user_log.clear()

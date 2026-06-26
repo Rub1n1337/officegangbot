@@ -4,7 +4,6 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from typing import List, Literal
-import traceback
 import os
 from .utils import reply
 
@@ -66,8 +65,10 @@ class OwnerCog(commands.Cog, name="👑 Owner"):
                     failed.append(ext)
 
             msg = ""
-            if reloaded: msg += f"✅ Reloaded: `{', '.join(reloaded)}`\n"
-            if failed: msg += f"❌ Failed: `{', '.join(failed)}`"
+            if reloaded:
+                msg += f"✅ Reloaded: `{', '.join(reloaded)}`\n"
+            if failed:
+                msg += f"❌ Failed: `{', '.join(failed)}`"
             await reply(ctx, msg or "No cogs found to reload.", ephemeral=True)
             logger.info(f"All cogs reloaded by {ctx.author}.")
         else:

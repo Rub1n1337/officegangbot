@@ -2,7 +2,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from core.logger import logger
 from .utils import reply
 from typing import Optional
 

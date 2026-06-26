@@ -25,7 +25,7 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         if member.bot:
             return await reply(ctx, "❌ You cannot warn bots.", ephemeral=True)
 
-        warning_id = await self.bot.db.add_warning(
+        await self.bot.db.add_warning(
             ctx.guild.id, member.id, reason, ctx.author.id, str(ctx.author)
         )
         warnings = await self.bot.db.get_warnings(ctx.guild.id, member.id)

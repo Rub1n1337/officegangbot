@@ -24,7 +24,14 @@ class AuditLogCog(commands.Cog):
         if not log_channel_id:
             return None
             
-        return self.bot.get_channel(int(log_channel_id))
+        channel = self.bot.get_channel(int(log_channel_id))
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(int(log_channel_id))
+            except (discord.NotFound, discord.Forbidden):
+                logger.warning(f"Audit log channel {log_channel_id} not found or inaccessible.")
+                return None
+        return channel
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):

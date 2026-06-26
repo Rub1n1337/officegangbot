@@ -82,15 +82,45 @@ CREATE TABLE IF NOT EXISTS level_roles (
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
 
--- Moderation roles (mod/admin)
+-- Permission roles. role_type is a permission level ('config', 'kick', 'ban',
+-- 'mute', 'warn', 'clear'). One role may hold several permission levels, so the
+-- primary key includes role_type.
 CREATE TABLE IF NOT EXISTS mod_roles (
     guild_id BIGINT NOT NULL,
     role_id BIGINT NOT NULL,
-    role_type VARCHAR(10) NOT NULL CHECK (role_type IN ('mod', 'admin')),
-    PRIMARY KEY (guild_id, role_id),
+    role_type VARCHAR(20) NOT NULL,
+    PRIMARY KEY (guild_id, role_id, role_type),
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
 
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
+
+-- Migration: relax mod_roles to store permission-level role_types and allow a
+-- role to hold multiple permissions (older schema used CHECK ('mod','admin')
+-- and PK (guild_id, role_id), which rejected /config role assignments).
+DO $$
+BEGIN
+    ALTER TABLE mod_roles DROP CONSTRAINT IF EXISTS mod_roles_role_type_check;
+    ALTER TABLE mod_roles ALTER COLUMN role_type TYPE VARCHAR(20);
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'mod_roles_pkey'
+          AND conrelid = 'mod_roles'::regclass
+          AND array_length(conkey, 1) = 2
+    ) THEN
+        ALTER TABLE mod_roles DROP CONSTRAINT mod_roles_pkey;
+        ALTER TABLE mod_roles ADD PRIMARY KEY (guild_id, role_id, role_type);
+    END IF;
+END $$;
+
+-- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
+-- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
+-- this closes the auto-exposed Supabase/PostgREST API to the anon key.
+ALTER TABLE guilds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users_xp ENABLE ROW LEVEL SECURITY;
+ALTER TABLE warnings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE timed_punishments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE level_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mod_roles ENABLE ROW LEVEL SECURITY;

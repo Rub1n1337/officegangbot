@@ -96,7 +96,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                         if not channel:
                             try:
                                 channel = await guild.fetch_channel(int(log_channel_id))
-                            except:
+                            except Exception:
                                 pass
                         
                         if channel:

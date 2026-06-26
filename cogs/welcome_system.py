@@ -32,7 +32,6 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        guild = member.guild
         await self._send_welcome_message(member)
         await self._assign_auto_role(member)
 
@@ -66,7 +65,7 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             await self.bot.db.set_feature_enabled(guild.id, "welcome-message", False)
         except (KeyError, AttributeError) as e:
             logger.error(f"Invalid placeholder in welcome message for {guild.name}: {e}")
-            await channel.send(f"⚠️ **Welcome Message Error:** An invalid placeholder was used. Please ask an admin to fix it with `/welcome message`.")
+            await channel.send("⚠️ **Welcome Message Error:** An invalid placeholder was used. Please ask an admin to fix it with `/welcome message`.")
         except Exception as e:
             logger.error(f"Failed to send welcome message in {guild.name}: {e}", exc_info=True)
 
@@ -172,7 +171,7 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             return await reply(ctx, f"❌ Invalid placeholder in message: {e}")
 
         await self.bot.db.set_guild_setting(ctx.guild.id, "welcome_message", message)
-        await reply(ctx, f"✅ Welcome message updated! Use `/welcome test` to see a preview.")
+        await reply(ctx, "✅ Welcome message updated! Use `/welcome test` to see a preview.")
 
     @welcome.command(name="autorole")
     @has_permission("config")

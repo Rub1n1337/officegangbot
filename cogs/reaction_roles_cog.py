@@ -45,11 +45,14 @@ class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
                 return str(payload_emoji.id) == str(config_emoji) or str(payload_emoji) == str(config_emoji)
             return str(payload_emoji) == str(config_emoji)
 
-        if not (rules_message_id and reaction_emoji and role_id): return
-        if payload.message_id != rules_message_id or not emoji_match(payload.emoji, reaction_emoji): return
+        if not (rules_message_id and reaction_emoji and role_id):
+            return
+        if payload.message_id != rules_message_id or not emoji_match(payload.emoji, reaction_emoji):
+            return
 
         guild = self.bot.get_guild(payload.guild_id)
-        if not guild: return
+        if not guild:
+            return
 
         role_to_manage = guild.get_role(role_id)
         if not role_to_manage:
@@ -61,7 +64,8 @@ class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
         except discord.NotFound:
             return # Member left the server
 
-        if not member: return
+        if not member:
+            return
 
         try:
             if add_role:

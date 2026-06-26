@@ -61,7 +61,8 @@ class HealthMonitor:
                     latency_ms = getattr(self.bot, 'latency', 0) * 1000
                     guild_count = len(getattr(self.bot, 'guilds', []))
                     try:
-                        import psutil, os
+                        import psutil
+                        import os
                         mem_mb = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
                     except Exception as psu:
                         logger.warning(f"psutil error in health monitor: {psu}", exc_info=True)

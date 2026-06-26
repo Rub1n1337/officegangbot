@@ -25,8 +25,12 @@ class UsageLogCog(commands.Cog):
             return
 
         log_channel = self.bot.get_channel(int(log_channel_id))
-        if not log_channel:
-            return
+        if log_channel is None:
+            try:
+                log_channel = await self.bot.fetch_channel(int(log_channel_id))
+            except (discord.NotFound, discord.Forbidden):
+                logger.warning(f"Usage log channel {log_channel_id} not found or inaccessible.")
+                return
 
         # Truncate fields for Discord embed limits
         command_name = f"`{ctx.command.qualified_name}`"[:256]

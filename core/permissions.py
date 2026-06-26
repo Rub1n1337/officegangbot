@@ -22,6 +22,12 @@ def has_permission(permission_level: str) -> Callable:
             logger.warning(f"Permission check for '{permission_level}' failed: command used in DM by {ctx.author}.")
             raise NoPrivateMessage("This command cannot be used in private messages.")
 
+        # Server administrators always pass. Without this, no one but the bot
+        # owner could bootstrap permissions, since assigning the first mod_role
+        # via /config role is itself gated by has_permission("config").
+        if ctx.author.guild_permissions.administrator:
+            return True
+
         # 1. Try Postgres (mod_roles table)
         if hasattr(ctx.bot, 'db') and ctx.bot.db:
             mod_roles = await ctx.bot.db.get_mod_roles(ctx.guild.id)
