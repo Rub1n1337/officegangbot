@@ -12,9 +12,10 @@ import { ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useGuildStatsQuery } from '@/api/hooks';
+import { useGuildInfoQuery, useGuildStatsQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { LoadingPanel } from '@/components/panel/LoadingPanel';
+import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
 import type { GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 
 function StatCard({
@@ -125,7 +126,14 @@ function Overview({ stats }: { stats: GuildStats }) {
 
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
-  const query = useGuildStatsQuery(guild);
+  const infoQuery = useGuildInfoQuery(guild);
+  const statsQuery = useGuildStatsQuery(guild);
+
+  // Bot isn't a member of this guild — show a friendly invite prompt instead of
+  // a raw stats error.
+  if (infoQuery.isSuccess && infoQuery.data == null) {
+    return <NotJoinedPanel guild={guild} />;
+  }
 
   return (
     <Flex direction="column" gap={5}>
@@ -133,14 +141,14 @@ const GuildOverviewPage: NextPageWithLayout = () => {
         <Heading fontSize="2xl" fontWeight="600">
           Overview
         </Heading>
-        {query.data?.online && (
+        {statsQuery.data?.online && (
           <Badge colorScheme="green" rounded="md" px={2}>
             Bot online
           </Badge>
         )}
       </Flex>
-      <QueryStatus query={query} loading={<LoadingPanel />} error="Failed to load guild stats.">
-        {query.data && <Overview stats={query.data} />}
+      <QueryStatus query={statsQuery} loading={<LoadingPanel />} error="Failed to load guild stats.">
+        {statsQuery.data && <Overview stats={statsQuery.data} />}
       </QueryStatus>
     </Flex>
   );
