@@ -1,4 +1,4 @@
-import { CustomFeatures, CustomGuildInfo } from '@/config/types/custom-types';
+import { CustomFeatures, CustomGuildInfo, GuildStats } from '@/config/types/custom-types';
 import { AccessToken } from '@/utils/auth/server';
 import { callDefault, callReturn } from '@/utils/fetch/core';
 import { botRequest } from '@/utils/fetch/requests';
@@ -43,6 +43,21 @@ export async function fetchGuildInfo(
       },
       allowed: {
         404: () => null,
+      },
+    })
+  );
+}
+
+/**
+ * Live overview stats for a guild (member/channel/role counts, latency, top XP).
+ * @param guild Guild ID
+ */
+export async function fetchGuildStats(session: AccessToken, guild: string): Promise<GuildStats> {
+  return await callReturn<GuildStats>(
+    `/api/guild/${guild}/stats`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
       },
     })
   );

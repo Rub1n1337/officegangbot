@@ -7,6 +7,7 @@ import {
   fetchGuildChannels,
   fetchGuildInfo,
   fetchGuildRoles,
+  fetchGuildStats,
   getFeature,
   updateFeature,
 } from '@/api/bot';
@@ -33,6 +34,7 @@ export const Keys = {
   features: (guild: string, feature: string) => ['feature', guild, feature],
   guildRoles: (guild: string) => ['gulid_roles', guild],
   guildChannels: (guild: string) => ['gulid_channel', guild],
+  guildStats: (guild: string) => ['guild_stats', guild],
 };
 
 export const Mutations = {
@@ -179,6 +181,18 @@ export function useUpdateFeatureMutation() {
       },
     }
   );
+}
+
+export function useGuildStatsQuery(guild: string) {
+  const { status, session } = useSession();
+
+  return useQuery(Keys.guildStats(guild), () => fetchGuildStats(session!!, guild), {
+    enabled: status === 'authenticated',
+    refetchOnWindowFocus: true,
+    // Stats are live-ish; let them go stale quickly so a revisit refetches.
+    staleTime: 15_000,
+    retry: false,
+  });
 }
 
 export function useGuildRolesQuery(guild: string) {

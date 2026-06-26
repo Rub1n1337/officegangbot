@@ -1,4 +1,4 @@
-import { FiSettings as SettingsIcon } from 'react-icons/fi';
+import { FiBarChart2 as OverviewIcon } from 'react-icons/fi';
 import { Flex, Heading, Text } from '@chakra-ui/layout';
 import { Button, ButtonGroup } from '@chakra-ui/react';
 import { guild as view } from '@/config/translations/guild';
@@ -26,7 +26,7 @@ export function Banner() {
       <Text color="whiteAlpha.800">{t.banner.description}</Text>
       <ButtonGroup mt={3}>
         <Button
-          leftIcon={<SettingsIcon />}
+          leftIcon={<OverviewIcon />}
           color="white"
           bg="whiteAlpha.200"
           _hover={{
