@@ -11,7 +11,6 @@ import {
 } from '@chakra-ui/react';
 import { config } from '@/config/common';
 import { useGuilds } from '@/api/hooks';
-import HomeView from '@/config/example/HomeView';
 import { NextPageWithLayout } from '@/pages/_app';
 import AppLayout from '@/components/layout/app';
 import { iconUrl } from '@/api/discord';

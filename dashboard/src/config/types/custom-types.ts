@@ -19,6 +19,7 @@ export type CustomFeatures = {
   'reaction-role': ReactionRoleFeature;
   'moderation': ModerationFeature;
   'logging': LoggingFeature;
+  'filter': FilterFeature;
 };
 
 export type WelcomeMessageFeature = {
@@ -49,7 +50,13 @@ export type ModerationFeature = {
 
 export type LoggingFeature = {
   logChannel?: string | null;
-  events: string[];
+  usageChannel?: string | null;
+  messagesChannel?: string | null;
+  leaveChannel?: string | null;
+};
+
+export type FilterFeature = {
+  words: string[];
 };
 
 export const rulesFeatureSchema = z.object({
