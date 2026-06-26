@@ -30,13 +30,20 @@ export type WelcomeMessageFeature = {
 export type RulesFeature = {
   channel?: string | null;
   message: string;
+  reactionEnabled?: boolean;
+  reactionEmoji?: string;
+  reactionRole?: string | null;
+};
+
+export type ReactionRoleItem = {
+  channelId?: string | null;
+  messageId?: string | null;
+  emoji: string;
+  roleId?: string | null;
 };
 
 export type ReactionRoleFeature = {
-  messageId?: string | null;
-  channelId?: string | null;
-  emoji: string;
-  roleId?: string | null;
+  items: ReactionRoleItem[];
 };
 
 export type ModerationFeature = {
