@@ -25,16 +25,18 @@ function buildTargetUrl(req: NextApiRequest) {
   return target.toString();
 }
 
-function buildHeaders(req: NextApiRequest, apiKey: string) {
+function buildHeaders(req: NextApiRequest, apiKey: string, hasBody: boolean) {
+  // Forward only a minimal, safe header set to the bot API. Forwarding the raw
+  // browser headers (origin, cookie, sec-fetch-*, transfer-encoding, …) made
+  // undici's fetch reject body-less POST/DELETE requests, so enable/disable
+  // failed with "Bot API proxy failed".
   const headers = new Headers();
-  const blocked = new Set(['host', 'connection', 'content-length', 'accept-encoding']);
-
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value == null || blocked.has(key.toLowerCase())) continue;
-    headers.set(key, Array.isArray(value) ? value.join(', ') : value);
-  }
-
   headers.set('X-API-Key', apiKey);
+  headers.set('Accept', 'application/json');
+  if (hasBody) {
+    const ct = req.headers['content-type'];
+    headers.set('Content-Type', (Array.isArray(ct) ? ct[0] : ct) ?? 'application/json');
+  }
   return headers;
 }
 
@@ -59,10 +61,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const method = req.method ?? 'GET';
     const rawBody = method === 'GET' || method === 'HEAD' ? undefined : await readRawBody(req);
+    const body = rawBody && rawBody.length > 0 ? rawBody : undefined;
     const upstream = await fetch(buildTargetUrl(req), {
       method,
-      headers: buildHeaders(req, apiKey),
-      body: rawBody && rawBody.length > 0 ? (rawBody as any) : undefined,
+      headers: buildHeaders(req, apiKey, body != null),
+      body: body as any,
     });
 
     const contentType = upstream.headers.get('content-type');
@@ -73,6 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (responseBody.length === 0) return res.end();
     return res.send(responseBody);
   } catch (error) {
-    return res.status(502).json({ detail: 'Bot API proxy failed' });
+    console.error('Bot API proxy error:', error);
+    return res.status(502).json({
+      detail: 'Bot API proxy failed',
+      error: String((error as { cause?: unknown })?.cause ?? error),
+    });
   }
 }
