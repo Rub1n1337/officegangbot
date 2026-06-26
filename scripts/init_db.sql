@@ -114,6 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_reaction_roles_lookup ON reaction_roles(guild_id,
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS locale VARCHAR(5) DEFAULT 'en';
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')

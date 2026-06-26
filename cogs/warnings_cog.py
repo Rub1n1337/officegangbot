@@ -4,6 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
+from core.i18n import t
 from .utils import reply, send_paginated
 import datetime
 
@@ -14,16 +15,16 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-
     @commands.hybrid_command(name="warn", description="Issue a warning to a server member.")
     @app_commands.describe(member="Member to warn.", reason="Reason for the warning.")
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("warn")
     async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         if member.id == ctx.author.id:
-            return await reply(ctx, "❌ You cannot warn yourself.", ephemeral=True)
+            return await reply(ctx, t(loc, "warn.cannot_self"), ephemeral=True)
         if member.bot:
-            return await reply(ctx, "❌ You cannot warn bots.", ephemeral=True)
+            return await reply(ctx, t(loc, "warn.cannot_bot"), ephemeral=True)
 
         await self.bot.db.add_warning(
             ctx.guild.id, member.id, reason, ctx.author.id, str(ctx.author)
@@ -33,21 +34,21 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         # Attempt to DM the user
         try:
             dm_embed = discord.Embed(
-                title=f"⚠️ You have received a warning in {ctx.guild.name}",
+                title=t(loc, "warn.dm_title", guild=ctx.guild.name),
                 color=discord.Color.yellow()
             )
-            dm_embed.add_field(name="Reason", value=reason, inline=False)
-            dm_embed.add_field(name="Moderator", value=str(ctx.author), inline=False)
-            dm_embed.add_field(name="Total Warnings", value=str(len(warnings)), inline=False)
+            dm_embed.add_field(name=t(loc, "field.reason"), value=reason, inline=False)
+            dm_embed.add_field(name=t(loc, "field.moderator"), value=str(ctx.author), inline=False)
+            dm_embed.add_field(name=t(loc, "field.total_warnings"), value=str(len(warnings)), inline=False)
             await member.send(embed=dm_embed)
         except discord.Forbidden:
             pass
 
-        embed = discord.Embed(title="⚠️ Warning Issued", color=discord.Color.yellow())
-        embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
-        embed.add_field(name="Reason", value=reason, inline=False)
-        embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
-        embed.add_field(name="Total Warnings", value=f"**{len(warnings)}**", inline=False)
+        embed = discord.Embed(title=t(loc, "warn.issued_title"), color=discord.Color.yellow())
+        embed.add_field(name=t(loc, "field.user"), value=f"{member.mention} (`{member.id}`)", inline=False)
+        embed.add_field(name=t(loc, "field.reason"), value=reason, inline=False)
+        embed.add_field(name=t(loc, "field.moderator"), value=ctx.author.mention, inline=False)
+        embed.add_field(name=t(loc, "field.total_warnings"), value=f"**{len(warnings)}**", inline=False)
 
         await reply(ctx, embed=embed)
         logger.info(f"Warning issued to {member} in {ctx.guild.name} by {ctx.author}. Reason: {reason}")
@@ -56,12 +57,13 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
     @app_commands.describe(member="Member whose warnings to view.")
     @has_permission("warn")
     async def warnings(self, ctx: commands.Context, member: discord.Member):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         warnings = await self.bot.db.get_warnings(ctx.guild.id, member.id)
 
         if not warnings:
             embed = discord.Embed(
-                title=f"⚠️ Warnings: {member.display_name}",
-                description="✅ This member has no warnings.",
+                title=t(loc, "warnings.title", member=member.display_name),
+                description=t(loc, "warnings.none"),
                 color=discord.Color.orange(),
             )
             embed.set_thumbnail(url=member.display_avatar.url)
@@ -74,8 +76,8 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         for page in range(total_pages):
             chunk = warnings[page * per_page:(page + 1) * per_page]
             embed = discord.Embed(
-                title=f"⚠️ Warnings: {member.display_name}",
-                description=f"Total warnings: **{len(warnings)}**",
+                title=t(loc, "warnings.title", member=member.display_name),
+                description=t(loc, "warnings.total", count=len(warnings)),
                 color=discord.Color.orange(),
             )
             embed.set_thumbnail(url=member.display_avatar.url)
@@ -87,11 +89,11 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
                 else:
                     timestamp_str = str(timestamp)
                 embed.add_field(
-                    name=f"#{number} — {timestamp_str} UTC",
-                    value=f"**Reason:** {w['reason']}\n**Moderator:** {w['moderator_name']}",
-                    inline=False
+                    name=t(loc, "warnings.entry_name", number=number, time=timestamp_str),
+                    value=t(loc, "warnings.entry_value", reason=w['reason'], moderator=w['moderator_name']),
+                    inline=False,
                 )
-            embed.set_footer(text=f"Page {page + 1}/{total_pages}")
+            embed.set_footer(text=t(loc, "page.indicator", current=page + 1, total=total_pages))
             pages.append(embed)
 
         await send_paginated(ctx, pages, ephemeral=True)
@@ -100,8 +102,9 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
     @app_commands.describe(member="Member whose warnings to clear.")
     @has_permission("warn")
     async def clearwarnings(self, ctx: commands.Context, member: discord.Member):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         count = await self.bot.db.clear_warnings(ctx.guild.id, member.id)
-        await reply(ctx, f"✅ Cleared **{count}** warning(s) for {member.mention}.", ephemeral=True)
+        await reply(ctx, t(loc, "warnings.cleared", count=count, member=member.mention), ephemeral=True)
         logger.info(f"Cleared {count} warnings for {member} in {ctx.guild.name} by {ctx.author}.")
 
 
