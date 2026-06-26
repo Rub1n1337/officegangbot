@@ -1,10 +1,10 @@
 import { RiErrorWarningFill as WarningIcon } from 'react-icons/ri';
 import { Box, Flex, Heading, Spacer, Text } from '@chakra-ui/layout';
-import { ButtonGroup, Button, Icon } from '@chakra-ui/react';
+import { ButtonGroup, Button, Icon, Switch } from '@chakra-ui/react';
 import { SlideFade } from '@chakra-ui/react';
 import { FeatureConfig, UseFormRenderResult, CustomFeatures } from '@/config/types';
 import { IoSave } from 'react-icons/io5';
-import { useEnableFeatureMutation, useUpdateFeatureMutation } from '@/api/hooks';
+import { useEnableFeatureMutation, useGuildInfoQuery, useUpdateFeatureMutation } from '@/api/hooks';
 import { Params } from '@/pages/guilds/[guild]/features/[feature]';
 import { feature as view } from '@/config/translations/feature';
 import { useRouter } from 'next/router';
@@ -19,6 +19,9 @@ export function UpdateFeaturePanel({
   const { guild, feature: featureId } = useRouter().query as Params;
   const mutation = useUpdateFeatureMutation();
   const enableMutation = useEnableFeatureMutation();
+  const guildQuery = useGuildInfoQuery(guild);
+  const enabled = guildQuery.data?.enabledFeatures?.includes(featureId) ?? false;
+
   const result = config.useRender(feature, (data) => {
     return mutation.mutateAsync({
       guild,
@@ -27,28 +30,44 @@ export function UpdateFeaturePanel({
     });
   });
 
-  const onDisable = () => {
-    enableMutation.mutate({ enabled: false, guild, feature: featureId });
+  const onToggle = (next: boolean) => {
+    enableMutation.mutate({ enabled: next, guild, feature: featureId });
   };
 
   return (
     <Flex as="form" direction="column" gap={5} w="full" h="full">
-      <Flex direction={{ base: 'column', md: 'row' }} mx={{ '3sm': 5 }} justify="space-between">
+      <Flex direction={{ base: 'column', md: 'row' }} mx={{ '3sm': 5 }} justify="space-between" gap={3}>
         <Box>
           <Heading fontSize="2xl" fontWeight="600">
             {config.name}
           </Heading>
           <Text color="TextSecondary">{config.description}</Text>
         </Box>
-        <ButtonGroup mt={3}>
-          <Button variant="danger" isLoading={enableMutation.isLoading} onClick={onDisable}>
-            <view.T text={(e) => e.bn.disable} />
-          </Button>
-        </ButtonGroup>
+        <Flex align="center" gap={3} mt={{ base: 2, md: 0 }}>
+          <Text fontWeight="600" color={enabled ? 'green.400' : 'TextSecondary'}>
+            {enabled ? 'Enabled' : 'Disabled'}
+          </Text>
+          <Switch
+            variant="main"
+            size="lg"
+            isChecked={enabled}
+            isDisabled={enableMutation.isLoading || guildQuery.isLoading}
+            onChange={(e) => onToggle(e.target.checked)}
+          />
+        </Flex>
       </Flex>
 
-      {result.component}
-      <Savebar isLoading={mutation.isLoading} result={result} />
+      <Box
+        opacity={enabled ? 1 : 0.4}
+        pointerEvents={enabled ? 'auto' : 'none'}
+        filter={enabled ? 'none' : 'grayscale(1)'}
+        transition="opacity 0.2s ease, filter 0.2s ease"
+        aria-disabled={!enabled}
+      >
+        {result.component}
+      </Box>
+
+      {enabled && <Savebar isLoading={mutation.isLoading} result={result} />}
     </Flex>
   );
 }
