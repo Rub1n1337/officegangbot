@@ -47,6 +47,9 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
-        run: railway redeploy --service officegangbot --yes
+        # `up` uploads and builds the freshly checked-out commit, so the bot
+        # always deploys the latest main. `redeploy` only re-ran the previous
+        # deployment, which could leave the bot on stale code.
+        run: railway up --service officegangbot --ci
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
