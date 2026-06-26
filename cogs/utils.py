@@ -5,17 +5,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-async def reply(ctx: commands.Context, content: str = None, embed: discord.Embed = None, ephemeral: bool = False):
+async def reply(
+    ctx: commands.Context,
+    content: str = None,
+    embed: discord.Embed = None,
+    ephemeral: bool = False,
+    view: discord.ui.View = None,
+):
     """
     A robust reply function that handles both prefix and slash commands,
     and deals with interaction deferrals and errors.
     This function is the single source of truth for all bot replies.
     """
+    # discord.py rejects view=None; only pass the kwarg when a view exists.
+    extra = {"view": view} if view is not None else {}
+
     # For prefix commands, just send a normal message to the channel.
     # The 'ephemeral' flag is ignored as it's not supported.
     if ctx.prefix:
         try:
-            await ctx.channel.send(content=content, embed=embed)
+            await ctx.channel.send(content=content, embed=embed, **extra)
         except discord.errors.HTTPException as e:
             logger.error(f"Failed to send prefix command reply: {e}")
         return
@@ -35,7 +44,7 @@ async def reply(ctx: commands.Context, content: str = None, embed: discord.Embed
 
         # Now that we are certain the interaction is acknowledged (deferred),
         # we can safely send a followup message.
-        await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+        await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral, **extra)
 
     except discord.errors.HTTPException as e:
         # This typically happens if the interaction token expires (e.g., > 15 mins have passed)

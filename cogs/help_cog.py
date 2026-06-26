@@ -1,7 +1,114 @@
 # cogs/help_cog.py
 import discord
 from discord.ext import commands
+from discord import app_commands
 from .utils import reply
+
+
+def _visible_cogs(bot: commands.Bot):
+    """Cogs that expose at least one non-hidden command, sorted by name."""
+    cogs = [
+        cog
+        for cog in bot.cogs.values()
+        if any(not cmd.hidden for cmd in cog.get_commands())
+    ]
+    return sorted(cogs, key=lambda c: c.qualified_name)
+
+
+def build_main_embed(bot: commands.Bot) -> discord.Embed:
+    """The overview page listing every command category."""
+    embed = discord.Embed(
+        title="Bot Help Desk",
+        description="All commands are available as **Slash Commands** (`/`).\n"
+                    "Pick a category from the menu below, or use `/help <command>` "
+                    "for details on a single command.",
+        color=discord.Color.blue()
+    )
+    for cog in _visible_cogs(bot):
+        commands_list = sorted(cmd.name for cmd in cog.get_commands() if not cmd.hidden)
+        if commands_list:
+            embed.add_field(
+                name=cog.qualified_name,
+                value=f"`{'`, `'.join(commands_list)}`",
+                inline=False
+            )
+    return embed
+
+
+def build_cog_embed(cog: commands.Cog) -> discord.Embed:
+    """The detail page for a single category."""
+    embed = discord.Embed(
+        title=f"{cog.qualified_name} Help",
+        description=cog.description or "No description available for this category.",
+        color=discord.Color.green()
+    )
+    visible_commands = sorted(
+        (cmd for cmd in cog.get_commands() if not cmd.hidden),
+        key=lambda c: c.name,
+    )
+    for cmd in visible_commands:
+        # All user-facing commands are slash commands.
+        signature = f"/{cmd.name} {cmd.signature}".strip()
+        embed.add_field(name=f"`{signature}`", value=cmd.short_doc or "No description.", inline=False)
+    return embed
+
+
+class HelpView(discord.ui.View):
+    """A category dropdown that swaps the help embed in place. Only the member
+    who invoked /help can drive it; it self-disables after a short timeout."""
+
+    def __init__(self, bot: commands.Bot, author_id: int, *, timeout: float = 180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.author_id = author_id
+        self._message: discord.Message | None = None
+
+        select = discord.ui.Select(placeholder="📚 Choose a category…", min_values=1, max_values=1)
+        select.add_option(
+            label="Overview",
+            value="__overview__",
+            description="Back to the full category list.",
+            emoji="🏠",
+        )
+        for cog in _visible_cogs(bot):
+            # qualified_name is like "🛡️ Moderation" — keep it as the label so the
+            # category emoji shows without us having to parse it out.
+            label = cog.qualified_name[:100]
+            select.add_option(
+                label=label,
+                value=cog.qualified_name,
+                description=(cog.description or "")[:100] or None,
+            )
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "This help menu belongs to someone else — run `/help` yourself.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _on_select(self, interaction: discord.Interaction):
+        value = interaction.data["values"][0]
+        if value == "__overview__":
+            embed = build_main_embed(self.bot)
+        else:
+            cog = self.bot.get_cog(value)
+            embed = build_cog_embed(cog) if cog else build_main_embed(self.bot)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self._message is not None:
+            try:
+                await self._message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
 
 class HelpCog(commands.Cog, name="❓ Help"):
     """Provides a detailed and organized help command focusing on Slash Commands."""
@@ -9,7 +116,27 @@ class HelpCog(commands.Cog, name="❓ Help"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    async def _help_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        """Suggests category names and command names for /help <query>."""
+        current = current.lower()
+        choices: list[app_commands.Choice[str]] = []
+        for cog in _visible_cogs(self.bot):
+            if current in cog.qualified_name.lower():
+                choices.append(app_commands.Choice(name=cog.qualified_name, value=cog.qualified_name))
+            for cmd in cog.get_commands():
+                if cmd.hidden:
+                    continue
+                if current in cmd.qualified_name.lower():
+                    choices.append(
+                        app_commands.Choice(name=f"/{cmd.qualified_name}", value=cmd.qualified_name)
+                    )
+        return choices[:25]
+
     @commands.hybrid_command(name="help", description="Shows information about commands and categories.")
+    @app_commands.describe(query="A category or command to get details on. Leave empty for the menu.")
+    @app_commands.autocomplete(query=_help_autocomplete)
     async def help(self, ctx: commands.Context, *, query: str = None):
         """Shows a list of command categories, or details for a specific category/command."""
         if not query:
@@ -18,25 +145,16 @@ class HelpCog(commands.Cog, name="❓ Help"):
             await self.send_specific_help(ctx, query)
 
     async def send_main_help(self, ctx: commands.Context):
-        """Sends the main help page with all command categories."""
-        embed = discord.Embed(
-            title="Bot Help Desk",
-            description="All commands are available as **Slash Commands** (`/`).\n"
-                        "Use `/help <category>` or `/help <command>` for more details.",
-            color=discord.Color.blue()
-        )
-
-        cogs_with_commands = [cog for cog in self.bot.cogs.values() if [cmd for cmd in cog.get_commands() if not cmd.hidden]]
-
-        for cog in sorted(cogs_with_commands, key=lambda c: c.qualified_name):
-            commands_list = sorted([cmd.name for cmd in cog.get_commands() if not cmd.hidden])
-            if commands_list:
-                embed.add_field(
-                    name=cog.qualified_name,
-                    value=f"`{'`, `'.join(commands_list)}`",
-                    inline=False
-                )
-        await reply(ctx, embed=embed, ephemeral=True)
+        """Sends the interactive main help page with a category dropdown."""
+        embed = build_main_embed(self.bot)
+        view = HelpView(self.bot, ctx.author.id)
+        await reply(ctx, embed=embed, ephemeral=True, view=view)
+        # Capture the sent message so the view can disable itself on timeout.
+        if ctx.interaction is not None:
+            try:
+                view._message = await ctx.interaction.original_response()
+            except discord.HTTPException:
+                pass
 
     async def send_specific_help(self, ctx: commands.Context, query: str):
         """Sends help for a specific command or cog."""
@@ -58,16 +176,7 @@ class HelpCog(commands.Cog, name="❓ Help"):
 
     async def send_cog_help(self, ctx: commands.Context, cog: commands.Cog):
         """Sends help for a specific cog (category)."""
-        embed = discord.Embed(
-            title=f"{cog.qualified_name} Help",
-            description=cog.description or "No description available for this category.",
-            color=discord.Color.green()
-        )
-        visible_commands = sorted([cmd for cmd in cog.get_commands() if not cmd.hidden], key=lambda c: c.name)
-        for cmd in visible_commands:
-            # All user-facing commands are slash commands.
-            signature = f"/{cmd.name} {cmd.signature}".strip()
-            embed.add_field(name=f"`{signature}`", value=cmd.short_doc or "No description.", inline=False)
+        embed = build_cog_embed(cog)
         await reply(ctx, embed=embed, ephemeral=True)
 
     async def send_command_help(self, ctx: commands.Context, command: commands.Command):
