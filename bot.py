@@ -365,6 +365,19 @@ class MyBot(commands.Bot):
                         await self.db.set_mod_role(guild_id, role_id, perm)
                 return {"success": True}
 
+            # Filter word list is a TEXT[] column and feeds a cached compiled
+            # regex, so it is handled separately: normalise the list and
+            # invalidate the filter cog's pattern cache so changes apply at once.
+            if feature == "filter":
+                words = options.get("words")
+                if isinstance(words, list):
+                    cleaned = sorted({str(w).strip().lower() for w in words if str(w).strip()})
+                    await self.db.set_guild_setting(guild_id, "filter_words", cleaned)
+                    filter_cog = self.get_cog("🚫 Filter")
+                    if filter_cog:
+                        await filter_cog._invalidate_pattern(guild_id)
+                return {"success": True}
+
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",

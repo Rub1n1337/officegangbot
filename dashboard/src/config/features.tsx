@@ -1,11 +1,12 @@
 import { Icon } from '@chakra-ui/react';
-import { MdMessage, MdSecurity, MdHistory, MdAddReaction, MdPeople } from 'react-icons/md';
+import { MdMessage, MdSecurity, MdHistory, MdAddReaction, MdPeople, MdBlock } from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './example/WelcomeMessageFeature';
 import { useRulesFeature } from './example/RulesFeature';
 import { useReactionRoleFeature } from './example/ReactionRoleFeature';
 import { useLoggingFeature } from './example/LoggingFeature';
 import { useModerationFeature } from './example/ModerationFeature';
+import { useFilterFeature } from './example/FilterFeature';
 
 export const features: FeaturesConfig = {
   'rules': {
@@ -37,5 +38,11 @@ export const features: FeaturesConfig = {
     description: 'Configure logging channels for moderation events',
     icon: <Icon as={MdHistory} />,
     useRender: useLoggingFeature,
+  },
+  'filter': {
+    name: 'Word Filter',
+    description: 'Automatically delete messages containing banned words',
+    icon: <Icon as={MdBlock} />,
+    useRender: useFilterFeature,
   },
 };
