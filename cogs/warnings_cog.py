@@ -4,7 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
-from .utils import reply
+from .utils import reply, send_paginated
 import datetime
 
 
@@ -58,29 +58,43 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
     async def warnings(self, ctx: commands.Context, member: discord.Member):
         warnings = await self.bot.db.get_warnings(ctx.guild.id, member.id)
 
-        embed = discord.Embed(
-            title=f"⚠️ Warnings: {member.display_name}",
-            color=discord.Color.orange()
-        )
-        embed.set_thumbnail(url=member.display_avatar.url)
-
         if not warnings:
-            embed.description = "✅ This member has no warnings."
-        else:
-            embed.description = f"Total warnings: **{len(warnings)}**"
-            for i, w in enumerate(warnings, 1):
+            embed = discord.Embed(
+                title=f"⚠️ Warnings: {member.display_name}",
+                description="✅ This member has no warnings.",
+                color=discord.Color.orange(),
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            return await reply(ctx, embed=embed, ephemeral=True)
+
+        per_page = 5
+        total_pages = (len(warnings) + per_page - 1) // per_page
+        pages = []
+
+        for page in range(total_pages):
+            chunk = warnings[page * per_page:(page + 1) * per_page]
+            embed = discord.Embed(
+                title=f"⚠️ Warnings: {member.display_name}",
+                description=f"Total warnings: **{len(warnings)}**",
+                color=discord.Color.orange(),
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            for offset, w in enumerate(chunk):
+                number = page * per_page + offset + 1
                 timestamp = w['created_at']
                 if isinstance(timestamp, datetime.datetime):
                     timestamp_str = timestamp.strftime('%d.%m.%Y %H:%M')
                 else:
                     timestamp_str = str(timestamp)
                 embed.add_field(
-                    name=f"#{i} — {timestamp_str} UTC",
+                    name=f"#{number} — {timestamp_str} UTC",
                     value=f"**Reason:** {w['reason']}\n**Moderator:** {w['moderator_name']}",
                     inline=False
                 )
+            embed.set_footer(text=f"Page {page + 1}/{total_pages}")
+            pages.append(embed)
 
-        await reply(ctx, embed=embed, ephemeral=True)
+        await send_paginated(ctx, pages, ephemeral=True)
 
     @commands.hybrid_command(name="clearwarnings", description="Clears all warnings for a member.")
     @app_commands.describe(member="Member whose warnings to clear.")

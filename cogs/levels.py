@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
-from .utils import reply
+from .utils import reply, send_paginated
 from typing import Optional
 import random
 import datetime
@@ -226,25 +226,38 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         )
         await reply(ctx, embed=embed)
 
-    @commands.hybrid_command(name="leaderboard", description="Shows the top 10 members by XP.")
+    @commands.hybrid_command(name="leaderboard", description="Shows the server XP leaderboard.")
     async def leaderboard(self, ctx: commands.Context):
-        rows = await self.bot.db.get_leaderboard(ctx.guild.id, limit=10)
+        rows = await self.bot.db.get_leaderboard(ctx.guild.id, limit=100)
         if not rows:
             return await reply(ctx, "❌ No XP data found for this server.", ephemeral=True)
 
-        embed = discord.Embed(title="🏆 XP Leaderboard", color=discord.Color.gold())
         medals = ["🥇", "🥈", "🥉"]
-        description = ""
+        per_page = 10
+        total_pages = (len(rows) + per_page - 1) // per_page
+        pages = []
 
-        for i, row in enumerate(rows):
-            member = ctx.guild.get_member(row['user_id'])
-            name = member.display_name if member else (row.get('display_name') or f"User {row['user_id']}")
-            medal = medals[i] if i < 3 else f"`#{i+1}`"
-            description += f"{medal} **{name}** — Level {row['level']} | {row['xp']} XP\n"
+        for page in range(total_pages):
+            chunk = rows[page * per_page:(page + 1) * per_page]
+            description = ""
+            for offset, row in enumerate(chunk):
+                rank = page * per_page + offset
+                member = ctx.guild.get_member(row['user_id'])
+                name = member.display_name if member else (row.get('display_name') or f"User {row['user_id']}")
+                medal = medals[rank] if rank < 3 else f"`#{rank + 1}`"
+                description += f"{medal} **{name}** — Level {row['level']} | {row['xp']} XP\n"
+            embed = discord.Embed(
+                title="🏆 XP Leaderboard",
+                description=description,
+                color=discord.Color.gold(),
+            )
+            embed.set_footer(
+                text=f"Page {page + 1}/{total_pages} • Requested by {ctx.author}",
+                icon_url=ctx.author.display_avatar.url,
+            )
+            pages.append(embed)
 
-        embed.description = description
-        embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
-        await reply(ctx, embed=embed)
+        await send_paginated(ctx, pages)
 
 
 

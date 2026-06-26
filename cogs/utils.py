@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 import logging
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -56,3 +57,95 @@ async def reply(
             await ctx.channel.send(content=content, embed=embed)
         except Exception as final_e:
             logger.critical(f"FATAL: The fallback channel message in reply() also failed: {final_e}")
+
+
+class Paginator(discord.ui.View):
+    """A reusable embed paginator with first/prev/next/last buttons.
+
+    Restricted to the member who ran the command; self-disables on timeout.
+    Buttons edit the message in place via the component interaction, so it
+    works on both ephemeral and public messages.
+    """
+
+    def __init__(self, pages: List[discord.Embed], author_id: int, *, timeout: float = 180):
+        super().__init__(timeout=timeout)
+        self.pages = pages
+        self.author_id = author_id
+        self.index = 0
+        self.message: Optional[discord.Message] = None
+        self._sync()
+
+    def _sync(self) -> None:
+        last = len(self.pages) - 1
+        self.first_page.disabled = self.prev_page.disabled = self.index <= 0
+        self.next_page.disabled = self.last_page.disabled = self.index >= last
+        self.indicator.label = f"{self.index + 1}/{len(self.pages)}"
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "This menu isn't yours — run the command yourself.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def _show(self, interaction: discord.Interaction) -> None:
+        self._sync()
+        await interaction.response.edit_message(embed=self.pages[self.index], view=self)
+
+    @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.secondary)
+    async def first_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = 0
+        await self._show(interaction)
+
+    @discord.ui.button(emoji="◀️", style=discord.ButtonStyle.primary)
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = max(0, self.index - 1)
+        await self._show(interaction)
+
+    @discord.ui.button(label="1/1", style=discord.ButtonStyle.secondary, disabled=True)
+    async def indicator(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
+
+    @discord.ui.button(emoji="▶️", style=discord.ButtonStyle.primary)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = min(len(self.pages) - 1, self.index + 1)
+        await self._show(interaction)
+
+    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.secondary)
+    async def last_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = len(self.pages) - 1
+        await self._show(interaction)
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message is not None:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
+
+async def send_paginated(
+    ctx: commands.Context, pages: List[discord.Embed], *, ephemeral: bool = False
+):
+    """Sends a single embed if there's one page, otherwise an interactive
+    Paginator. Relies on the global auto-defer having acked the interaction."""
+    if not pages:
+        return
+    if len(pages) == 1:
+        return await reply(ctx, embed=pages[0], ephemeral=ephemeral)
+
+    view = Paginator(pages, ctx.author.id)
+
+    # Prefix invocation: plain channel message.
+    if ctx.interaction is None:
+        view.message = await ctx.channel.send(embed=pages[0], view=view)
+        return view.message
+
+    interaction = ctx.interaction
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=ephemeral)
+    view.message = await interaction.followup.send(embed=pages[0], view=view, ephemeral=ephemeral)
+    return view.message
