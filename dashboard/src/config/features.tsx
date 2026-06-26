@@ -1,12 +1,12 @@
 import { Icon } from '@chakra-ui/react';
 import { MdMessage, MdSecurity, MdHistory, MdAddReaction, MdPeople, MdBlock } from 'react-icons/md';
 import { FeaturesConfig } from './types';
-import { useWelcomeMessageFeature } from './example/WelcomeMessageFeature';
-import { useRulesFeature } from './example/RulesFeature';
-import { useReactionRoleFeature } from './example/ReactionRoleFeature';
-import { useLoggingFeature } from './example/LoggingFeature';
-import { useModerationFeature } from './example/ModerationFeature';
-import { useFilterFeature } from './example/FilterFeature';
+import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
+import { useRulesFeature } from './feature-forms/RulesFeature';
+import { useReactionRoleFeature } from './feature-forms/ReactionRoleFeature';
+import { useLoggingFeature } from './feature-forms/LoggingFeature';
+import { useModerationFeature } from './feature-forms/ModerationFeature';
+import { useFilterFeature } from './feature-forms/FilterFeature';
 
 export const features: FeaturesConfig = {
   'rules': {
