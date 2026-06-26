@@ -260,7 +260,7 @@ class MyBot(commands.Bot):
                 return {"error": str(e)}
 
         _needs_guild = {
-            "get_guild_info", "get_guild_roles", "get_guild_channels",
+            "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_feature", "enable_feature", "disable_feature", "update_feature",
         }
         if action in _needs_guild and guild_id is None:
@@ -282,6 +282,48 @@ class MyBot(commands.Bot):
                 "owner_id": str(guild.owner_id),
                 "settings": settings,
                 "enabledFeatures": enabled_features,
+            }
+
+        if action == "get_guild_stats":
+            guild = self.get_guild(guild_id) if guild_id else None
+            if not guild:
+                return {"error": "Guild not found"}
+
+            # Channel and role counts come straight from the cached guild object
+            # (always available). member_count is reliable; per-member iteration
+            # is avoided since the members intent/cache may be incomplete.
+            text_channels = sum(1 for ch in guild.channels if isinstance(ch, discord.TextChannel))
+            voice_channels = sum(1 for ch in guild.channels if isinstance(ch, discord.VoiceChannel))
+
+            enabled_features = []
+            top_xp = []
+            if self.db:
+                enabled_features = await self.db.get_enabled_features(guild_id)
+                try:
+                    rows = await self.db.get_leaderboard(guild_id, limit=5)
+                    for row in rows:
+                        member = guild.get_member(row["user_id"])
+                        name = (
+                            member.display_name if member
+                            else (row.get("display_name") or f"User {row['user_id']}")
+                        )
+                        top_xp.append({"name": name, "level": row["level"], "xp": row["xp"]})
+                except Exception as e:
+                    logger.warning(f"get_guild_stats leaderboard failed for {guild_id}: {e}")
+
+            return {
+                "id": str(guild.id),
+                "name": guild.name,
+                "icon": str(guild.icon) if guild.icon else None,
+                "online": True,
+                "member_count": guild.member_count,
+                "channel_count": len(guild.channels),
+                "text_channels": text_channels,
+                "voice_channels": voice_channels,
+                "role_count": len(guild.roles),
+                "latency_ms": round(self.latency * 1000, 2),
+                "enabled_feature_count": len(enabled_features),
+                "top_xp": top_xp,
             }
 
         if action == "get_stats":

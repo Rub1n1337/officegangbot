@@ -13,6 +13,27 @@ export type CustomGuildInfo = GuildInfo & {
   member_count: number;
 };
 
+export type GuildStatsTopXp = {
+  name: string;
+  level: number;
+  xp: number;
+};
+
+export type GuildStats = {
+  id: string;
+  name: string;
+  icon?: string | null;
+  online: boolean;
+  member_count: number;
+  channel_count: number;
+  text_channels: number;
+  voice_channels: number;
+  role_count: number;
+  latency_ms: number;
+  enabled_feature_count: number;
+  top_xp: GuildStatsTopXp[];
+};
+
 export type CustomFeatures = {
   'rules': RulesFeature;
   'welcome-message': WelcomeMessageFeature;

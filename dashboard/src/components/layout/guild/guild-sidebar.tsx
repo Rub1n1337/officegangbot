@@ -3,7 +3,7 @@ import { Flex, HStack, Text, VStack } from '@chakra-ui/layout';
 import { Icon, IconButton } from '@chakra-ui/react';
 import { HSeparator } from '@/components/layout/Separator';
 import { getFeatures } from '@/utils/common';
-import { IoSettings } from 'react-icons/io5';
+import { IoStatsChart } from 'react-icons/io5';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
 import { guild as view } from '@/config/translations/guild';
@@ -35,7 +35,7 @@ export function InGuildSidebar() {
         <SidebarItem
           href={`/guilds/${guildId}/settings`}
           active={router.route === `/guilds/[guild]/settings`}
-          icon={<Icon as={IoSettings} />}
+          icon={<Icon as={IoStatsChart} />}
           name={t.bn.settings}
         />
         <HSeparator>Features</HSeparator>
