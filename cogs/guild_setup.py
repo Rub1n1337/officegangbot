@@ -1,5 +1,4 @@
 # cogs/guild_setup.py
-import asyncio
 import discord
 from discord.ext import commands
 from core.logger import logger
@@ -8,259 +7,309 @@ from cogs.utils import reply
 
 DEFAULT_WELCOME_MESSAGE = "Welcome {user.mention} to **{server.name}**! We're glad to have you."
 
-class SetupCog(commands.Cog, name="🛠️ Server Setup"):
-    """Interactive server setup for admins. Guides through rules, welcome and log channel configuration. Uses centralized reply function for all responses and ensures thread safety for concurrent setups."""
+# Internal data key -> guilds column. The "edited/deleted messages" log is
+# stored in the audit_log_id column (kept identical to the old text wizard).
+SETTING_COLUMNS = {
+    "rules_channel_id": "rules_channel_id",
+    "welcome_message": "welcome_message",
+    "punishment_log_id": "punishment_log_id",
+    "usage_log_id": "usage_log_id",
+    "message_log_id": "audit_log_id",
+    "leave_log_id": "leave_log_id",
+}
 
-    _active_setups = set()
-    _setup_lock = asyncio.Lock()
+LOG_FIELDS = [
+    ("punishment_log_id", "Punishment log"),
+    ("usage_log_id", "Bot usage log"),
+    ("message_log_id", "Edited / deleted messages"),
+    ("leave_log_id", "Leave notifications"),
+]
+
+
+def _channel_value(data: dict, key: str) -> str:
+    cid = data.get(key)
+    return f"<#{cid}>" if cid else "*not set*"
+
+
+class _PickChannelSelect(discord.ui.ChannelSelect):
+    """Single text-channel picker that writes one field then returns to the panel."""
+
+    def __init__(self, field: str, placeholder: str):
+        super().__init__(
+            channel_types=[discord.ChannelType.text],
+            placeholder=placeholder,
+            min_values=1,
+            max_values=1,
+        )
+        self.field = field
+
+    async def callback(self, interaction: discord.Interaction):
+        panel: "SetupView" = self.view.panel  # type: ignore[attr-defined]
+        panel.data[self.field] = self.values[0].id
+        await panel.show_main(interaction)
+
+
+class _LogChannelSelect(discord.ui.ChannelSelect):
+    """One log-channel picker; stays on the logs sub-panel so several can be set."""
+
+    def __init__(self, field: str, label: str):
+        super().__init__(
+            channel_types=[discord.ChannelType.text],
+            placeholder=label,
+            min_values=1,
+            max_values=1,
+        )
+        self.field = field
+
+    async def callback(self, interaction: discord.Interaction):
+        sub: "LogsView" = self.view  # type: ignore[assignment]
+        sub.panel.data[self.field] = self.values[0].id
+        await interaction.response.edit_message(embed=sub.embed(), view=sub)
+
+
+class _BackButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Back", style=discord.ButtonStyle.secondary, row=4)
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.view.panel.show_main(interaction)  # type: ignore[attr-defined]
+
+
+class RulesChannelView(discord.ui.View):
+    def __init__(self, panel: "SetupView"):
+        super().__init__(timeout=panel.timeout)
+        self.panel = panel
+        self.add_item(_PickChannelSelect("rules_channel_id", "Select the rules channel"))
+        self.add_item(_BackButton())
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return await self.panel.interaction_check(interaction)
+
+
+class LogsView(discord.ui.View):
+    def __init__(self, panel: "SetupView"):
+        super().__init__(timeout=panel.timeout)
+        self.panel = panel
+        for field, label in LOG_FIELDS:
+            self.add_item(_LogChannelSelect(field, label))
+        self.add_item(_BackButton())
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return await self.panel.interaction_check(interaction)
+
+    def embed(self) -> discord.Embed:
+        data = self.panel.data
+        embed = discord.Embed(
+            title="🪵 Log Channels",
+            description="Pick a channel for each log type. **Back** returns to the panel.",
+            color=discord.Color.blurple(),
+        )
+        for field, label in LOG_FIELDS:
+            embed.add_field(name=label, value=_channel_value(data, field), inline=False)
+        return embed
+
+
+class WelcomeModal(discord.ui.Modal, title="Welcome Message"):
+    def __init__(self, panel: "SetupView"):
+        super().__init__()
+        self.panel = panel
+        self.message = discord.ui.TextInput(
+            label="Message",
+            style=discord.TextStyle.paragraph,
+            default=panel.data.get("welcome_message") or DEFAULT_WELCOME_MESSAGE,
+            max_length=1000,
+            required=True,
+            placeholder="Use {user.mention} and {server.name} as placeholders.",
+        )
+        self.add_item(self.message)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        self.panel.data["welcome_message"] = self.message.value.strip()
+        await self.panel.show_main(interaction)
+
+
+class SetupView(discord.ui.View):
+    """The main interactive setup panel. Nothing is persisted until Save."""
+
+    def __init__(self, bot: commands.Bot, guild_id: int, author_id: int, *, timeout: float = 300):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.author_id = author_id
+        self.data: dict = {}
+        self.message: discord.Message | None = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "This setup panel isn't yours — run `/setup` yourself.", ephemeral=True
+            )
+            return False
+        return True
+
+    def main_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="🛠️ Server Setup",
+            description="Configure the options below, then click **Save**. "
+                        "Nothing is stored until you save.",
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(name="📋 Rules channel", value=_channel_value(self.data, "rules_channel_id"), inline=True)
+        welcome = self.data.get("welcome_message")
+        embed.add_field(
+            name="👋 Welcome message",
+            value=(f"`{welcome[:60]}`" if welcome else "*default*"),
+            inline=True,
+        )
+        embed.add_field(
+            name="🪵 Logs",
+            value=(
+                f"Punishments: {_channel_value(self.data, 'punishment_log_id')}\n"
+                f"Bot usage: {_channel_value(self.data, 'usage_log_id')}\n"
+                f"Edited/Deleted: {_channel_value(self.data, 'message_log_id')}\n"
+                f"Leaves: {_channel_value(self.data, 'leave_log_id')}"
+            ),
+            inline=False,
+        )
+        return embed
+
+    async def show_main(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(embed=self.main_embed(), view=self)
+
+    @discord.ui.button(label="Rules Channel", emoji="📋", style=discord.ButtonStyle.secondary, row=0)
+    async def rules_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = RulesChannelView(self)
+        embed = discord.Embed(
+            title="📋 Rules Channel",
+            description="Select the channel where the rules message will live.",
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Welcome Message", emoji="👋", style=discord.ButtonStyle.secondary, row=0)
+    async def welcome_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(WelcomeModal(self))
+
+    @discord.ui.button(label="Log Channels", emoji="🪵", style=discord.ButtonStyle.secondary, row=0)
+    async def logs_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = LogsView(self)
+        await interaction.response.edit_message(embed=view.embed(), view=view)
+
+    @discord.ui.button(label="Save", emoji="💾", style=discord.ButtonStyle.success, row=1)
+    async def save_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.bot.db:
+            await interaction.response.edit_message(
+                embed=discord.Embed(
+                    title="❌ Setup failed",
+                    description="The database is unavailable right now. Please try again later.",
+                    color=discord.Color.red(),
+                ),
+                view=None,
+            )
+            self.stop()
+            return
+        try:
+            for key, column in SETTING_COLUMNS.items():
+                value = self.data.get(key)
+                if value is not None:
+                    await self.bot.db.set_guild_setting(self.guild_id, column, value)
+        except Exception as e:
+            logger.error(f"Setup save failed for guild {self.guild_id}: {e}", exc_info=True)
+            await interaction.response.edit_message(
+                embed=discord.Embed(
+                    title="❌ Setup failed",
+                    description="Something went wrong while saving. Please try again.",
+                    color=discord.Color.red(),
+                ),
+                view=None,
+            )
+            self.stop()
+            return
+
+        summary = self.main_embed()
+        summary.title = "✅ Setup complete"
+        summary.color = discord.Color.green()
+        summary.description = "Your settings have been saved."
+        await interaction.response.edit_message(embed=summary, view=None)
+        logger.info(f"Setup completed for guild {self.guild_id} by {self.author_id}.")
+        self.stop()
+
+    @discord.ui.button(label="Cancel", emoji="✖️", style=discord.ButtonStyle.danger, row=1)
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Setup cancelled",
+                description="No changes were saved.",
+                color=discord.Color.greyple(),
+            ),
+            view=None,
+        )
+        self.stop()
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message is not None:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
+
+class SetupCog(commands.Cog, name="🛠️ Server Setup"):
+    """Interactive, button-driven server setup for admins (rules, welcome, logs)."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._active_setups = set()
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         logger.info(f"Joined new guild: {guild.name} ({guild.id}).")
-        channel = next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
+        channel = next(
+            (ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages),
+            None,
+        )
         if not channel:
             return
-        embed = discord.Embed(title=f"👋 Hello, {guild.name}!", description="Thank you for adding me! To get started, an administrator needs to run the setup command.", color=discord.Color.blue())
-        embed.add_field(name="🚀 Setup Command", value="In a channel of your choice, use the slash command:\n```/setup```", inline=False)
+        embed = discord.Embed(
+            title=f"👋 Hello, {guild.name}!",
+            description="Thanks for adding me! To get started, an administrator should run "
+                        "the setup command.",
+            color=discord.Color.blue(),
+        )
+        embed.add_field(name="🚀 Setup Command", value="```/setup```", inline=False)
         await channel.send(embed=embed)
 
     @commands.hybrid_command(name="setup", description="Interactive server setup.")
     @commands.has_guild_permissions(administrator=True)
     @commands.guild_only()
     async def setup(self, ctx: commands.Context):
-        """Guides the admin through a multi-stage interactive server setup wizard."""
+        """Opens an interactive panel to configure rules, welcome and log channels."""
         if not ctx.guild:
             return await reply(ctx, "❌ This command can only be used in a server.", ephemeral=True)
-            
-        guild_id = ctx.guild.id
-        async with self._setup_lock:
-            if guild_id in self._active_setups:
-                await reply(ctx, "❌ A setup is already in progress for this server. Please wait for it to finish or cancel it.", ephemeral=True)
-                return
-            self._active_setups.add(guild_id)
-        try:
-            await reply(ctx, "Welcome to the setup wizard! Type `cancel` at any time to exit.\nYou can also type `back` to return to the previous step.")
 
-            step_data = {}
-            step = 1
-            total_steps = 9
-            while step <= total_steps:
-                if step == 1:
-                    await reply(ctx,
-                        f"**Step 1/{total_steps}: Rules Channel**\n"
-                        "> Please mention the channel for posting server rules (e.g., #rules).\n"
-                        "> Type `skip` to skip this step or `cancel` to exit."
-                    )
-                    rules_channel_msg = await self._wait_for_response(ctx)
-                    if not rules_channel_msg or rules_channel_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if rules_channel_msg.content.lower() == "back":
-                        await reply(ctx, "You are at the first step.")
-                        continue
-                    if rules_channel_msg.content.lower() != "skip":
-                        rules_channel = await self._extract_channel(ctx, rules_channel_msg.content)
-                        if not rules_channel:
-                            await reply(ctx, "> Invalid channel. Please mention a valid text channel.")
-                            continue
-                        step_data['rules_channel_id'] = rules_channel.id
-                    step += 1
+        view = SetupView(self.bot, ctx.guild.id, ctx.author.id)
+        embed = view.main_embed()
 
-                elif step == 2:
-                    await reply(ctx, f"**Step 2/{total_steps}: Welcome Message**\nPlease enter the welcome message template.\nYou can use placeholders like `{{user.mention}}` and `{{server.name}}`.\nType `skip` to use the default message or `back` to return.")
-                    welcome_msg = await self._wait_for_response(ctx)
-                    if not welcome_msg or welcome_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if welcome_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    if welcome_msg.content.lower() != "skip":
-                        step_data['welcome_message'] = welcome_msg.content.strip()
-                    else:
-                        step_data['welcome_message'] = DEFAULT_WELCOME_MESSAGE
-                    # Show preview
-                    preview = step_data['welcome_message'].replace('{user.mention}', ctx.author.mention).replace('{server.name}', ctx.guild.name)
-                    await reply(ctx, f"Preview: {preview}")
-                    step += 1
-
-                elif step == 3:
-                    admin_roles = [role for role in ctx.guild.roles if role.permissions.administrator]
-                    mod_roles = [role for role in ctx.guild.roles if (role.permissions.manage_guild or role.permissions.kick_members or role.permissions.ban_members) and not role.permissions.administrator]
-                    admin_roles_str = ", ".join([role.mention for role in admin_roles]) or "None"
-                    mod_roles_str = ", ".join([role.mention for role in mod_roles]) or "None"
-                    await reply(ctx, f"**Step 3/{total_steps}: Moderation Roles Overview**\nRoles with moderation permissions (manage_guild, kick, ban): {mod_roles_str}\nType `back` to return.")
-                    # Save for summary
-                    step_data['mod_roles'] = mod_roles_str
-                    mod_roles_msg = await self._wait_for_response(ctx)
-                    if mod_roles_msg and mod_roles_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    step += 1
-
-                elif step == 4:
-                    admin_roles = [role for role in ctx.guild.roles if role.permissions.administrator]
-                    admin_roles_str = ", ".join([role.mention for role in admin_roles]) or "None"
-                    await reply(ctx, f"**Step 4/{total_steps}: Admin Roles Overview**\nRoles with ADMINISTRATOR permission: {admin_roles_str}\nType `back` to return.")
-                    step_data['admin_roles'] = admin_roles_str
-                    admin_roles_msg = await self._wait_for_response(ctx)
-                    if admin_roles_msg and admin_roles_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    step += 1
-
-                elif step == 5:
-                    await reply(ctx, f"**Step 5/{total_steps}: Punishments Log Channel**\nPlease mention the channel for punishment logs (e.g., #punishments). Type `skip` to skip or `back` to return.")
-                    punish_log_msg = await self._wait_for_response(ctx)
-                    if not punish_log_msg or punish_log_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if punish_log_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    if punish_log_msg.content.lower() != "skip":
-                        punish_log_channel = await self._extract_channel(ctx, punish_log_msg.content)
-                        if not punish_log_channel:
-                            await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                            continue
-                        step_data['punishment_log_id'] = punish_log_channel.id
-                    step += 1
-
-                elif step == 6:
-                    await reply(ctx, f"**Step 6/{total_steps}: Bot Usage Log Channel**\nPlease mention the channel for bot usage logs (e.g., #bot-usage). Type `skip` to skip or `back` to return.")
-                    usage_log_msg = await self._wait_for_response(ctx)
-                    if not usage_log_msg or usage_log_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if usage_log_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    if usage_log_msg.content.lower() != "skip":
-                        usage_log_channel = await self._extract_channel(ctx, usage_log_msg.content)
-                        if not usage_log_channel:
-                            await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                            continue
-                        step_data['usage_log_id'] = usage_log_channel.id
-                    step += 1
-
-                elif step == 7:
-                    await reply(ctx, f"**Step 7/{total_steps}: Edited/Deleted Messages Log Channel**\nPlease mention the channel for edited/deleted messages logs (e.g., #message-logs). Type `skip` to skip or `back` to return.")
-                    msg_log_msg = await self._wait_for_response(ctx)
-                    if not msg_log_msg or msg_log_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if msg_log_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    if msg_log_msg.content.lower() != "skip":
-                        msg_log_channel = await self._extract_channel(ctx, msg_log_msg.content)
-                        if not msg_log_channel:
-                            await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                            continue
-                        step_data['message_log_id'] = msg_log_channel.id
-                    step += 1
-
-                elif step == 8:
-                    await reply(ctx, f"**Step 8/{total_steps}: Leave Notifications Channel**\nPlease mention the channel for leave notifications (e.g., #leaves). Type `skip` to skip or `back` to return.")
-                    leave_log_msg = await self._wait_for_response(ctx)
-                    if not leave_log_msg or leave_log_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if leave_log_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    if leave_log_msg.content.lower() != "skip":
-                        leave_log_channel = await self._extract_channel(ctx, leave_log_msg.content)
-                        if not leave_log_channel:
-                            await reply(ctx, "Invalid channel. Please mention a valid text channel.")
-                            continue
-                        step_data['leave_log_id'] = leave_log_channel.id
-                    step += 1
-
-                elif step == 9:
-                    # Summary and confirmation
-                    summary = (
-                        f"**Rules Channel:** <#{step_data.get('rules_channel_id','Not Set')}>\n"
-                        f"**Welcome Message:** `{step_data.get('welcome_message','')}`\n"
-                        f"**Moderation Roles:** {step_data.get('mod_roles','None')}\n"
-                        f"**Admin Roles:** {step_data.get('admin_roles','None')}\n"
-                        f"**Punishment Log:** <#{step_data.get('punishment_log_id','Not Set')}>\n"
-                        f"**Usage Log:** <#{step_data.get('usage_log_id','Not Set')}>\n"
-                        f"**Message Log:** <#{step_data.get('message_log_id','Not Set')}>\n"
-                        f"**Leave Log:** <#{step_data.get('leave_log_id','Not Set')}>\n"
-                    )
-                    await reply(ctx, f"**Step 9/{total_steps}: Review Settings**\nHere is a summary of your selections:\n{summary}\nType `confirm` to save, `back` to edit previous step, or `cancel` to abort.")
-                    confirm_msg = await self._wait_for_response(ctx)
-                    if not confirm_msg or confirm_msg.content.lower() == "cancel":
-                        await reply(ctx, "Setup cancelled.")
-                        return
-                    if confirm_msg.content.lower() == "back":
-                        step -= 1
-                        continue
-                    if confirm_msg.content.lower() == "confirm":
-                        # Save all settings
-                        if self.bot.db:
-                            # Save to Postgres
-                            if step_data.get('rules_channel_id'):
-                                await self.bot.db.set_guild_setting(guild_id, 'rules_channel_id', step_data.get('rules_channel_id'))
-                            if step_data.get('welcome_message'):
-                                await self.bot.db.set_guild_setting(guild_id, 'welcome_message', step_data.get('welcome_message'))
-                            if step_data.get('punishment_log_id'):
-                                await self.bot.db.set_guild_setting(guild_id, 'punishment_log_id', step_data.get('punishment_log_id'))
-                            if step_data.get('usage_log_id'):
-                                await self.bot.db.set_guild_setting(guild_id, 'usage_log_id', step_data.get('usage_log_id'))
-                            if step_data.get('message_log_id'):
-                                await self.bot.db.set_guild_setting(guild_id, 'audit_log_id', step_data.get('message_log_id'))
-                            if step_data.get('leave_log_id'):
-                                await self.bot.db.set_guild_setting(guild_id, 'leave_log_id', step_data.get('leave_log_id'))
-
-
-                        await reply(ctx, "✅ Setup complete! The bot is now configured for your server.")
-                        break
-                    else:
-                        await reply(ctx, "Invalid response. Type `confirm`, `back`, or `cancel`.")
-
-        except Exception as e:
-            await reply(ctx, f"An error occurred during setup: {e}")
-            logger.error(f"Setup error for guild {guild_id}: {e}", exc_info=True)
-        finally:
-            self._active_setups.discard(guild_id)
-
-    async def _extract_channel(self, ctx, content):
-        """Преобразует ввод пользователя в объект текстового канала Discord."""
-        try:
-            channel = await commands.TextChannelConverter().convert(ctx, content)
-            return channel
-        except commands.ChannelNotFound:
-            return None
-
-    async def _wait_for_response(self, ctx):
-        def check(m):
-            return m.author == ctx.author and m.channel == ctx.channel
-        try:
-            msg = await self.bot.wait_for('message', timeout=120.0, check=check)
-            return msg
-        except asyncio.TimeoutError:
-            await reply(ctx, "⏰ Время ожидания истекло. Попробуйте снова.")
-            return None
+        # The global auto-defer has already acked the interaction ephemerally, so
+        # the panel is sent as an ephemeral followup (admin-only). Falls back to a
+        # channel message for the rare prefix invocation.
+        if ctx.interaction is not None:
+            view.message = await ctx.interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        else:
+            view.message = await ctx.channel.send(embed=embed, view=view)
 
     @setup.error
-    async def setup_error(self, ctx, error):
+    async def setup_error(self, ctx: commands.Context, error: commands.CommandError):
         """Error handler specific to the setup command."""
-        self._active_setups.discard(ctx.guild.id)
         if isinstance(error, commands.CheckFailure):
-            await ctx.send("You do not have the required permissions to run this command.")
+            await reply(ctx, "❌ You need the **Administrator** permission to run setup.", ephemeral=True)
         elif isinstance(error, commands.NoPrivateMessage):
             pass
-        elif isinstance(error, (asyncio.TimeoutError, asyncio.CancelledError)):
-            pass  # The command itself handles this.
         else:
-            logger.error(f"An unexpected error occurred during setup for guild {ctx.guild.id}:", exc_info=error)
-            await ctx.send("An unexpected error occurred. The setup has been cancelled.")
+            logger.error(f"Unexpected setup error for guild {getattr(ctx.guild, 'id', None)}:", exc_info=error)
+            await reply(ctx, "❌ An unexpected error occurred. Setup was cancelled.", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     """This function is required by discord.py to load the cog."""
