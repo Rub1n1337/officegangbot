@@ -5,6 +5,7 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
+from core.i18n import t
 
 from .utils import reply
 
@@ -85,7 +86,8 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         if pattern and pattern.search(message.content):
             try:
                 await message.delete()
-                await message.channel.send(f"{message.author.mention}, your message contained inappropriate language and was deleted.", delete_after=10)
+                loc = await self.bot.db.get_locale(message.guild.id)
+                await message.channel.send(t(loc, "filter.deleted", mention=message.author.mention), delete_after=10)
                 logger.info(f"Deleted a message from {message.author} in {message.guild.name} due to profanity.")
                 
                 log_channel_id = await self.bot.db.get_guild_setting(message.guild.id, 'punishment_log_id')
@@ -124,43 +126,46 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         new_status = not is_enabled
         
         await self.bot.db.set_feature_enabled(ctx.guild.id, "filter", new_status)
-        
-        await reply(ctx, f"✅ The profanity filter has been **{'enabled' if new_status else 'disabled'}**.")
+
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+        await reply(ctx, t(loc, "filter.toggle_on" if new_status else "filter.toggle_off"))
 
     @filter.command(name="add", description="Adds a word to the filter.")
     @app_commands.describe(word="The word to add to the filter.")
     @has_permission("config")
     async def filter_add(self, ctx: commands.Context, word: str):
         word = word.lower()
-        
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+
         # Save to DB
         current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
         if word in current_words:
-            await reply(ctx, f"The word `{word}` is already in the filter.")
+            await reply(ctx, t(loc, "filter.add_exists", word=word))
             return
         current_words.append(word)
         await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
-        
+
         await self._invalidate_pattern(ctx.guild.id)
-        await reply(ctx, f"✅ The word `{word}` has been added to the filter.")
+        await reply(ctx, t(loc, "filter.added", word=word))
 
     @filter.command(name="add_defaults", description="Adds the default list of profanities to the filter.")
     async def filter_add_defaults(self, ctx: commands.Context):
         """Adds a predefined list of common profanities to the server's filter."""
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         # Get current words from DB
         current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
-        
+
         new_words = [word for word in DEFAULT_BANNED_WORDS if word not in current_words]
         added_count = len(new_words)
-        
+
         if added_count == 0:
-            await reply(ctx, "✅ All default profanities are already in your filter list.")
+            await reply(ctx, t(loc, "filter.defaults_all"))
             return
-        
+
         current_words.extend(new_words)
         await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
         await self._invalidate_pattern(ctx.guild.id)
-        await reply(ctx, f"✅ Added **{added_count}** new words from the default profanity list to your filter.")
+        await reply(ctx, t(loc, "filter.defaults_added", count=added_count))
 
     @filter.command(name="remove", description="Removes a word from the filter.")
     @app_commands.describe(word="The word to remove from the filter.")
@@ -168,32 +173,34 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     @has_permission("config")
     async def filter_remove(self, ctx: commands.Context, word: str):
         word = word.lower()
-        
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+
         # Get current words from DB
         current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
-        
+
         if word not in current_words:
-            await reply(ctx, f"The word `{word}` is not in the filter.")
+            await reply(ctx, t(loc, "filter.not_found", word=word))
             return
-            
+
         current_words.remove(word)
         await self.bot.db.set_guild_setting(ctx.guild.id, 'filter_words', current_words)
         await self._invalidate_pattern(ctx.guild.id)
-        await reply(ctx, f"✅ The word `{word}` has been removed from the filter.")
+        await reply(ctx, t(loc, "filter.removed", word=word))
 
     @filter.command(name="list", description="Lists all words in the filter.")
     @has_permission("config")
     async def filter_list(self, ctx: commands.Context):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         # Get words from DB
         banned_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
-        
+
         if not banned_words:
-            await reply(ctx, "There are no words in the filter.")
+            await reply(ctx, t(loc, "filter.list_empty"))
             return
         description = ", ".join(f"`{word}`" for word in sorted(banned_words))
         if len(description) > 4000:
             description = description[:4000] + "..."
-        embed = discord.Embed(title="🚫 Filtered Words", description=description, color=discord.Color.red())
+        embed = discord.Embed(title=t(loc, "filter.list_title"), description=description, color=discord.Color.red())
         await reply(ctx, embed=embed)
 
 async def setup(bot: commands.Bot):
