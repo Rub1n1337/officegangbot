@@ -8,7 +8,7 @@ from typing import Callable
 def has_permission(permission_level: str) -> Callable:
     """
     Custom check decorator that verifies if the user has the required permission level.
-    Uses the bot's singleton SettingsManager. Logs missing roles and raises NoPrivateMessage in DMs.
+    Reads mod roles from PostgreSQL (mod_roles). Logs missing roles and raises NoPrivateMessage in DMs.
     Args:
         permission_level (str): Permission level to check (e.g., 'config').
     Returns:

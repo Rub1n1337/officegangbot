@@ -192,10 +192,12 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
             if role.is_default() or role.is_bot_managed() or role.is_premium_subscriber() or role.is_integration():
                 return await reply(ctx, f"❌ The role `{role.name}` cannot be used for permissions.", ephemeral=True)
             
-            # Save to Postgres
+            # One role per permission level: clear any existing role(s) for this
+            # level first, then assign the new one (matches the dashboard form).
             if self.bot.db:
+                await self.bot.db.remove_mod_role(ctx.guild.id, permission)
                 await self.bot.db.set_mod_role(ctx.guild.id, role.id, permission)
-            
+
             await reply(ctx, f"✅ The `{permission}` permission has been assigned to {role.mention}.", ephemeral=True)
         else:
             # Remove from Postgres

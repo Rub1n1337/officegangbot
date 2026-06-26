@@ -9,7 +9,7 @@ import datetime
 
 
 class WarningsCog(commands.Cog, name="⚠️ Warnings"):
-    """Warning system with persistent storage via SettingsManager."""
+    """Warning system with persistent storage in PostgreSQL."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
