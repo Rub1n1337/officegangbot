@@ -1,4 +1,4 @@
-import { Box, Flex, Heading, SimpleGrid, Text } from '@chakra-ui/layout';
+import { Box, Flex, Heading, SimpleGrid } from '@chakra-ui/layout';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
@@ -6,32 +6,28 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SwitchFieldForm } from '@/components/forms/SwitchField';
-import { InputForm } from '@/components/forms/InputForm';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 
 const schema = z.object({
   beta: z.boolean(),
   role: z.string().optional(),
-  prefix: z.string().min(1).max(1),
   channel: z.string().optional(),
 });
 
 type ExampleSettings = z.infer<typeof schema>;
 
 /**
- * Exmaple for using react-hook-form with built-in components
+ * Example for using react-hook-form with built-in components
  */
 const GuildSettingsPage: NextPageWithLayout = () => {
-  const { watch, register, control, formState, handleSubmit } = useForm<ExampleSettings>({
+  const { control } = useForm<ExampleSettings>({
     resolver: zodResolver(schema),
     defaultValues: {
       beta: true,
-      prefix: '/',
       role: undefined,
       channel: undefined,
     },
   });
-  const errors = formState.errors;
 
   return (
     <Flex direction="column">
@@ -54,15 +50,6 @@ const GuildSettingsPage: NextPageWithLayout = () => {
             description: 'Roles that able to configure the discord bot',
           }}
           controller={{ control, name: 'role' }}
-        />
-        <InputForm
-          control={{
-            label: 'Command prefix',
-            description: 'Change the default command prefix',
-            error: errors.prefix?.message,
-          }}
-          placeholder="/"
-          {...register('prefix')}
         />
         <ChannelSelectForm
           control={{

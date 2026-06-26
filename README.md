@@ -73,8 +73,7 @@ python bot.py
 ### ⚙️ Setup & Config
 | Command | Description |
 |---------|-------------|
-| `!setup` | Interactive server setup wizard |
-| `/config prefix <prefix>` | Change the bot prefix |
+| `/setup` | Interactive server setup wizard |
 | `/config logs <type> <channel>` | Set logging channels |
 | `/settings` | View current server settings |
 
