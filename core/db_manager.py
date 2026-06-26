@@ -23,6 +23,7 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'reaction_emoji', 'reaction_role_id', 'setup_complete', 'levels_enabled',
     'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
     'ticket_support_role_id', 'ticket_category_id', 'enabled_features',
+    'locale',
 })
 
 
@@ -34,6 +35,8 @@ class DatabaseManager:
 
     def __init__(self):
         self._pool: Optional[asyncpg.Pool] = None
+        # Per-guild locale cache (locale changes rarely; invalidated on set_locale).
+        self._locale_cache: Dict[int, str] = {}
 
     async def connect(self) -> None:
         """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""
@@ -114,6 +117,20 @@ class DatabaseManager:
                 f"UPDATE guilds SET {key} = $1, updated_at = NOW() WHERE guild_id = $2",
                 value, guild_id
             )
+
+    async def get_locale(self, guild_id: int) -> str:
+        """Returns the guild's locale ('en'/'ru'), cached. Defaults to 'en'."""
+        cached = self._locale_cache.get(guild_id)
+        if cached is not None:
+            return cached
+        value = await self.get_guild_setting(guild_id, 'locale') or 'en'
+        self._locale_cache[guild_id] = value
+        return value
+
+    async def set_locale(self, guild_id: int, locale: str) -> None:
+        """Sets the guild's locale and updates the cache."""
+        await self.set_guild_setting(guild_id, 'locale', locale)
+        self._locale_cache[guild_id] = locale
 
     async def get_all_guild_settings(self, guild_id: int) -> Dict[str, Any]:
         """Returns all settings for a guild as a dict (excludes internal timestamp columns)."""
