@@ -24,6 +24,17 @@ from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
 
+DEFAULT_RULES_TEXT = (
+    "> 1. **Be respectful** - You must respect all users, regardless of your liking towards them. Treat others the way you want to be treated.\n"
+    "> 2. **No Inappropriate Language** - The use of profanity should be kept to a minimum. However, any derogatory language towards any user is prohibited.\n"
+    "> 3. **No Spamming** - Do not send a lot of small messages right after each other. Do not disrupt chat by spamming.\n"
+    "> 4. **No NSFW Material** - This is a community server and not meant to share pornographic/adult/other NSFW material.\n"
+    "> 5. **No Advertisements** - We do not tolerate any kind of advertisements, whether it be for other communities or streams.\n"
+    "> 6. **Follow the Discord Community Guidelines** - You can find them here: https://discordapp.com/guidelines\n\n"
+    "> **Your presence in this server implies accepting these rules, including all further changes.**"
+)
+
+
 def _validate_discord_id(value) -> int:
     """Validates and converts a value to a Discord snowflake (positive 64-bit int).
     Raises ValueError on anything else, so callers can return a clean error
@@ -191,7 +202,7 @@ class MyBot(commands.Bot):
         feature_data = {
             "rules": {
                 "channel": self._snowflake_or_none(settings.get("rules_channel_id")),
-                "message": settings.get("rules_message") or "Please follow the server rules.",
+                "message": settings.get("rules_message") or DEFAULT_RULES_TEXT,
             },
             "welcome-message": {
                 "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
@@ -319,10 +330,9 @@ class MyBot(commands.Bot):
             feature = payload.get("feature")
             if not self.db:
                 return {"error": "Database unavailable"}
-            # Check if feature is enabled first
-            enabled_features = await self.db.get_enabled_features(guild_id)
-            if feature not in enabled_features:
-                return {"error": "Feature not enabled"}
+            # Return the settings regardless of enabled state — the dashboard
+            # shows the config form (greyed out) for disabled features and reads
+            # the enabled flag from the guild info query, not from here.
             return await self._get_feature_payload(guild_id, feature)
 
         if action == "enable_feature":

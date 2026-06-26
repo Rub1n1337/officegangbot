@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { SimpleGrid } from '@chakra-ui/react';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
-import { InputForm } from '@/components/forms/InputForm';
+import { TextAreaForm } from '@/components/forms/TextAreaForm';
 import type { RulesFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -26,7 +26,7 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
 
   return {
     component: (
-      <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
+      <SimpleGrid columns={1} gap={3}>
         <ChannelSelectForm
           control={{
             label: 'Rules Channel',
@@ -34,13 +34,16 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
           }}
           controller={{ control, name: 'channel' }}
         />
-        <InputForm
+        <TextAreaForm
           control={{
             label: 'Rules Message',
-            description: 'Enter the server rules',
+            description: 'Enter the server rules. A scrollbar appears when the text is longer than the box.',
             error: formState.errors.message?.message,
           }}
           placeholder="Be respectful..."
+          h="260px"
+          resize="vertical"
+          overflowY="auto"
           {...register('message')}
         />
       </SimpleGrid>
