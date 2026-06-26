@@ -57,6 +57,20 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         if guild_id in self._pattern_cache:
             del self._pattern_cache[guild_id]
 
+    async def _filter_word_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        """Suggests words already in this guild's filter for /filter remove."""
+        if interaction.guild_id is None:
+            return []
+        words = await self.bot.db.get_guild_setting(interaction.guild_id, 'filter_words') or []
+        current = current.lower()
+        return [
+            app_commands.Choice(name=word, value=word)
+            for word in sorted(words)
+            if current in word
+        ][:25]
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.guild or message.author.bot or message.author.guild_permissions.administrator:
@@ -150,6 +164,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
 
     @filter.command(name="remove", description="Removes a word from the filter.")
     @app_commands.describe(word="The word to remove from the filter.")
+    @app_commands.autocomplete(word=_filter_word_autocomplete)
     @has_permission("config")
     async def filter_remove(self, ctx: commands.Context, word: str):
         word = word.lower()
