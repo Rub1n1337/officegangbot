@@ -11,20 +11,33 @@ import asyncio
 
 
 def get_xp_for_level(level: int) -> int:
-    """Returns total XP required to reach a given level."""
+    """Returns the XP needed to advance from `level` to `level + 1`."""
     return 5 * (level ** 2) + 50 * level + 100
 
 
+def _cumulative_xp(level: int) -> int:
+    """Total XP required to reach `level` = sum(get_xp_for_level(0..level-1)),
+    in closed form (sum of a quadratic) so it is O(1)."""
+    n = level
+    return 5 * (n - 1) * n * (2 * n - 1) // 6 + 50 * (n - 1) * n // 2 + 100 * n
+
+
+_MAX_LEVEL = 1000
+
+
 def get_level_from_xp(xp: int) -> int:
-    """Calculates current level from total XP. Capped at 1000 levels to guard
-    against runaway loops on corrupt/huge XP values (called on every message)."""
-    level = 0
-    while xp >= get_xp_for_level(level):
-        xp -= get_xp_for_level(level)
-        level += 1
-        if level > 1000:
-            break
-    return level
+    """Current level for a total XP, in O(log n) via binary search over the
+    closed-form cumulative curve. Called on every message. Capped at 1000."""
+    if xp < _cumulative_xp(1):
+        return 0
+    lo, hi = 0, _MAX_LEVEL
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _cumulative_xp(mid) <= xp:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
 
 
 def build_progress_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
@@ -172,10 +185,8 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         total_xp = user_data['xp']
         level = user_data['level']
 
-        # Calculate XP within current level
-        xp_so_far = total_xp
-        for lvl in range(level):
-            xp_so_far -= get_xp_for_level(lvl)
+        # XP earned within the current level (closed-form, O(1))
+        xp_so_far = total_xp - _cumulative_xp(level)
         xp_needed = get_xp_for_level(level)
         progress_bar = build_progress_bar(xp_so_far, xp_needed)
 
