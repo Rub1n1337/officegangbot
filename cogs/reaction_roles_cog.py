@@ -4,91 +4,80 @@ import discord
 from discord.ext import commands
 from core.logger import logger
 
+# Which feature flag gates each reaction-role source.
+SOURCE_FEATURE = {
+    "reaction-role": "reaction-role",
+    "rules": "rules",
+}
+
+
+def _emoji_match(payload_emoji, stored: str) -> bool:
+    """Matches a reaction payload emoji against a stored emoji string.
+    Handles unicode emoji and custom emoji (by full string, name, or id)."""
+    stored = str(stored)
+    if getattr(payload_emoji, "id", None):
+        return stored in (str(payload_emoji), str(payload_emoji.id), str(payload_emoji.name))
+    return str(payload_emoji) == stored
+
 
 class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
-    """Handles granting and removing roles based on message reactions."""
+    """Grants/removes roles based on reactions, using the reaction_roles table.
+    Supports many mappings per guild on arbitrary messages, plus the one tied
+    to the rules message."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     async def _handle_reaction(self, payload: discord.RawReactionActionEvent, *, add_role: bool) -> None:
-        """A single helper function to handle both adding and removing roles. Emoji comparison is robust for unicode/custom."""
-        if payload.user_id == self.bot.user.id or not payload.guild_id:
+        if payload.user_id == self.bot.user.id or not payload.guild_id or not self.bot.db:
             return
 
-        # Check if reaction-role feature is enabled
+        mappings = await self.bot.db.get_message_reaction_roles(payload.guild_id, payload.message_id)
+        if not mappings:
+            return
+
+        match = next((m for m in mappings if _emoji_match(payload.emoji, m["emoji"])), None)
+        if not match:
+            return
+
+        # Gate by the feature that owns this mapping.
         enabled_features = await self.bot.db.get_enabled_features(payload.guild_id)
-        if "reaction-role" not in enabled_features:
-            return
-
-        # Fetch settings from Postgres
-        rules_message_id = await self.bot.db.get_guild_setting(payload.guild_id, 'rules_message_id')
-        reaction_emoji = await self.bot.db.get_guild_setting(payload.guild_id, 'reaction_emoji')
-        role_id = await self.bot.db.get_guild_setting(payload.guild_id, 'reaction_role_id')
-        
-        # Ensure rules_message_id and role_id are integers
-        if rules_message_id:
-            try:
-                rules_message_id = int(rules_message_id)
-            except (ValueError, TypeError):
-                rules_message_id = None
-                
-        if role_id:
-            try:
-                role_id = int(role_id)
-            except (ValueError, TypeError):
-                role_id = None
-
-        def emoji_match(payload_emoji, config_emoji):
-            # Match unicode or custom emoji by id or string
-            if hasattr(payload_emoji, 'id') and payload_emoji.id:
-                return str(payload_emoji.id) == str(config_emoji) or str(payload_emoji) == str(config_emoji)
-            return str(payload_emoji) == str(config_emoji)
-
-        if not (rules_message_id and reaction_emoji and role_id):
-            return
-        if payload.message_id != rules_message_id or not emoji_match(payload.emoji, reaction_emoji):
+        if SOURCE_FEATURE.get(match["source"], "reaction-role") not in enabled_features:
             return
 
         guild = self.bot.get_guild(payload.guild_id)
         if not guild:
             return
-
-        role_to_manage = guild.get_role(role_id)
-        if not role_to_manage:
-            logger.warning(f"Reaction role ID {role_id} not found in guild {guild.name}.")
+        role = guild.get_role(int(match["role_id"]))
+        if not role:
+            logger.warning(f"Reaction role {match['role_id']} not found in guild {guild.name}.")
             return
 
         try:
             member = await guild.fetch_member(payload.user_id)
         except discord.NotFound:
-            return # Member left the server
-
+            return
         if not member:
             return
 
         try:
-            if add_role:
-                if role_to_manage not in member.roles:
-                    await member.add_roles(role_to_manage, reason="Accepted server rules via reaction.")
-                    logger.info(f"Assigned role '{role_to_manage.name}' to {member.name} in {guild.name}.")
-            else: # Remove role
-                if role_to_manage in member.roles:
-                    await member.remove_roles(role_to_manage, reason="Un-accepted server rules via reaction.")
-                    logger.info(f"Removed role '{role_to_manage.name}' from {member.name} in {guild.name}.")
+            if add_role and role not in member.roles:
+                await member.add_roles(role, reason="Reaction role granted.")
+                logger.info(f"Assigned role '{role.name}' to {member.name} in {guild.name}.")
+            elif not add_role and role in member.roles:
+                await member.remove_roles(role, reason="Reaction role removed.")
+                logger.info(f"Removed role '{role.name}' from {member.name} in {guild.name}.")
         except discord.Forbidden:
-            logger.error(f"Failed to manage reaction role in {guild.name}. Missing 'Manage Roles' permission or role is above mine.")
+            logger.error(f"Cannot manage reaction role in {guild.name}: missing 'Manage Roles' or role too high.")
         except Exception as e:
-            logger.error(f"An unexpected error in reaction role management: {e}", exc_info=True)
+            logger.error(f"Unexpected error in reaction role management: {e}", exc_info=True)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        """Called when a user ADDS a reaction. Grants the role."""
         await self._handle_reaction(payload, add_role=True)
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
-        """Called when a user REMOVES a reaction. Removes the role."""
         await self._handle_reaction(payload, add_role=False)
 
 

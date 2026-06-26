@@ -194,25 +194,37 @@ class MyBot(commands.Bot):
             return {"error": "Database unavailable"}
         settings = await self.db.get_all_guild_settings(guild_id)
         mod_roles = await self.db.get_mod_roles(guild_id)
+        reaction_roles = await self.db.get_reaction_roles(guild_id)
 
         def _first_role(perm: str):
             ids = mod_roles.get(perm) or []
             return str(ids[0]) if ids else None
 
+        standalone_rr = [
+            {
+                "channelId": str(r["channel_id"]),
+                "messageId": str(r["message_id"]),
+                "emoji": r["emoji"],
+                "roleId": str(r["role_id"]),
+            }
+            for r in reaction_roles if r["source"] == "reaction-role"
+        ]
+        rules_rr = next((r for r in reaction_roles if r["source"] == "rules"), None)
+
         feature_data = {
             "rules": {
                 "channel": self._snowflake_or_none(settings.get("rules_channel_id")),
                 "message": settings.get("rules_message") or DEFAULT_RULES_TEXT,
+                "reactionEnabled": rules_rr is not None,
+                "reactionEmoji": rules_rr["emoji"] if rules_rr else "✅",
+                "reactionRole": str(rules_rr["role_id"]) if rules_rr else None,
             },
             "welcome-message": {
                 "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
                 "message": str(settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!"),
             },
             "reaction-role": {
-                "messageId": self._snowflake_or_none(settings.get("rules_message_id")),
-                "channelId": self._snowflake_or_none(settings.get("rules_channel_id")),
-                "emoji": settings.get("reaction_emoji") or "✅",
-                "roleId": self._snowflake_or_none(settings.get("reaction_role_id")),
+                "items": standalone_rr,
             },
             "moderation": {
                 "config": _first_role("config"),
@@ -388,6 +400,32 @@ class MyBot(commands.Bot):
                         await filter_cog._invalidate_pattern(guild_id)
                 return {"success": True}
 
+            # Reaction roles live in the reaction_roles table (many per guild).
+            # Replace the standalone set and best-effort add each reaction to its
+            # message so members can click it.
+            if feature == "reaction-role":
+                items = options.get("items")
+                if isinstance(items, list):
+                    rows = []
+                    for it in items:
+                        ch, msg = it.get("channelId"), it.get("messageId")
+                        emoji = (it.get("emoji") or "").strip()
+                        role = it.get("roleId")
+                        if not (ch and msg and emoji and role):
+                            continue
+                        try:
+                            rows.append({
+                                "channel_id": _validate_discord_id(ch),
+                                "message_id": _validate_discord_id(msg),
+                                "emoji": emoji,
+                                "role_id": _validate_discord_id(role),
+                            })
+                        except ValueError:
+                            return {"error": "Invalid reaction-role entry (ids must be numeric)"}
+                    await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
+                    await self._sync_reactions(guild_id, rows)
+                return {"success": True}
+
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",
@@ -406,12 +444,6 @@ class MyBot(commands.Bot):
                 "welcome-message": {
                     "channel": "welcome_channel_id",
                     "message": "welcome_message",
-                },
-                "reaction-role": {
-                    "messageId": "rules_message_id",
-                    "channelId": "rules_channel_id",
-                    "emoji": "reaction_emoji",
-                    "roleId": "reaction_role_id",
                 },
                 "logging": {
                     "logChannel": "punishment_log_id",
@@ -484,9 +516,41 @@ class MyBot(commands.Bot):
                                 logger.error(f"Error during Rules E2E sync: {e}", exc_info=True)
                                 return {"error": f"Failed to sync with Discord: {str(e)}"}
 
+                        # Rules reaction-role (one mapping on the rules message)
+                        rules_msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
+                        rules_ch_id = await self.db.get_guild_setting(guild_id, "rules_channel_id")
+                        if options.get("reactionEnabled") and options.get("reactionRole") and rules_msg_id and rules_ch_id:
+                            try:
+                                rr = {
+                                    "channel_id": int(rules_ch_id),
+                                    "message_id": int(rules_msg_id),
+                                    "emoji": (options.get("reactionEmoji") or "✅").strip(),
+                                    "role_id": _validate_discord_id(options.get("reactionRole")),
+                                }
+                            except ValueError:
+                                return {"error": "Invalid rules reaction role id"}
+                            await self.db.replace_reaction_roles(guild_id, "rules", [rr])
+                            await self._sync_reactions(guild_id, [rr])
+                        else:
+                            await self.db.replace_reaction_roles(guild_id, "rules", [])
+
                 return {"success": True}
 
         return {"error": "Unknown action"}
+
+    async def _sync_reactions(self, guild_id: int, rows: list) -> None:
+        """Best-effort: add each mapping's emoji reaction to its message so
+        members can click it. A bad emoji or missing message just logs."""
+        guild = self.get_guild(guild_id)
+        if not guild:
+            return
+        for r in rows:
+            try:
+                channel = guild.get_channel(int(r["channel_id"])) or await guild.fetch_channel(int(r["channel_id"]))
+                msg = await channel.fetch_message(int(r["message_id"]))
+                await msg.add_reaction(r["emoji"])
+            except Exception as e:
+                logger.warning(f"Could not add reaction {r['emoji']} to message {r['message_id']}: {e}")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         """Global error handler for slash commands."""

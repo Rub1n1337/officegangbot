@@ -409,3 +409,59 @@ class DatabaseManager:
                     result[rtype] = []
                 result[rtype].append(r['role_id'])
             return result
+
+    # -------------------------
+    # Reaction roles
+    # -------------------------
+
+    async def get_reaction_roles(self, guild_id: int, source: str = None) -> List[Dict[str, Any]]:
+        """Returns reaction-role mappings for a guild, optionally filtered by source."""
+        async with self.pool.acquire() as conn:
+            if source is None:
+                rows = await conn.fetch(
+                    "SELECT channel_id, message_id, emoji, role_id, source "
+                    "FROM reaction_roles WHERE guild_id = $1 ORDER BY id",
+                    guild_id
+                )
+            else:
+                rows = await conn.fetch(
+                    "SELECT channel_id, message_id, emoji, role_id, source "
+                    "FROM reaction_roles WHERE guild_id = $1 AND source = $2 ORDER BY id",
+                    guild_id, source
+                )
+            return [dict(r) for r in rows]
+
+    async def get_message_reaction_roles(self, guild_id: int, message_id: int) -> List[Dict[str, Any]]:
+        """Returns reaction-role mappings on a specific message (emoji matched in Python)."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT emoji, role_id, source FROM reaction_roles "
+                "WHERE guild_id = $1 AND message_id = $2",
+                guild_id, message_id
+            )
+            return [dict(r) for r in rows]
+
+    async def replace_reaction_roles(self, guild_id: int, source: str, rows: List[Dict[str, Any]]) -> None:
+        """Replaces all reaction roles of a given source for a guild with `rows`.
+        Each row needs channel_id, message_id, emoji, role_id."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM reaction_roles WHERE guild_id = $1 AND source = $2",
+                    guild_id, source
+                )
+                for r in rows:
+                    await conn.execute(
+                        """
+                        INSERT INTO reaction_roles
+                            (guild_id, channel_id, message_id, emoji, role_id, source)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        ON CONFLICT (guild_id, message_id, emoji) DO UPDATE
+                            SET role_id = EXCLUDED.role_id,
+                                channel_id = EXCLUDED.channel_id,
+                                source = EXCLUDED.source
+                        """,
+                        guild_id, int(r["channel_id"]), int(r["message_id"]),
+                        str(r["emoji"]), int(r["role_id"]), source
+                    )

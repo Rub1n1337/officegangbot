@@ -93,6 +93,24 @@ CREATE TABLE IF NOT EXISTS mod_roles (
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
 
+-- Reaction roles. Each row maps an emoji on a specific message to a role.
+-- `source` distinguishes standalone reaction roles ('reaction-role') from the
+-- one tied to the rules message ('rules'), so the cog can gate each by the
+-- right feature flag.
+CREATE TABLE IF NOT EXISTS reaction_roles (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    channel_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    emoji VARCHAR(100) NOT NULL,
+    role_id BIGINT NOT NULL,
+    source VARCHAR(20) NOT NULL DEFAULT 'reaction-role',
+    UNIQUE (guild_id, message_id, emoji),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_reaction_roles_lookup ON reaction_roles(guild_id, message_id);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -124,3 +142,4 @@ ALTER TABLE warnings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timed_punishments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE level_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mod_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reaction_roles ENABLE ROW LEVEL SECURITY;
