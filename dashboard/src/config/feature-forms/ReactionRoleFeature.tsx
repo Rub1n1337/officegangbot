@@ -6,6 +6,7 @@ import { MdAdd, MdDelete } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
+import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
 import type { ReactionRoleFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -75,14 +76,13 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
                 placeholder="123456789012345678"
                 {...register(`items.${index}.messageId`)}
               />
-              <InputForm
+              <EmojiPickerInput
                 control={{
                   label: 'Emoji',
                   description: 'Emoji members react with',
-                  error: formState.errors.items?.[index]?.emoji?.message,
                 }}
+                controller={{ control, name: `items.${index}.emoji` }}
                 placeholder="✅"
-                {...register(`items.${index}.emoji`)}
               />
               <RoleSelectForm
                 control={{ label: 'Role', description: 'Role to grant on reaction' }}
