@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
+import { getServerSession } from '@/utils/auth/server';
 
 export const config = {
   api: {
@@ -98,11 +98,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // reaches it. Require a logged-in user here, and for guild-scoped paths verify
   // the user is an administrator of that guild — otherwise anyone could call the
   // proxy to manage any guild the bot is in.
-  const token = await getToken({ req });
-  const accessToken = (token as { accessToken?: string } | null)?.accessToken;
-  if (!accessToken) {
+  const session = getServerSession(req);
+  if (!session.success) {
     return res.status(401).json({ detail: 'Not authenticated' });
   }
+  const accessToken = session.data.access_token;
 
   const rawPath = req.query.path;
   const segments = (Array.isArray(rawPath) ? rawPath : [rawPath ?? '']) as string[];
