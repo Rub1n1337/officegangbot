@@ -4,6 +4,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
 from .utils import reply, send_paginated
+from core.i18n import t
 from typing import Optional
 import random
 import datetime
@@ -162,9 +163,10 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                 else message.channel
             )
             if channel:
+                loc = await self.bot.db.get_locale(guild_id)
                 embed = discord.Embed(
-                    title="⭐ Level Up!",
-                    description=f"🎉 {message.author.mention} reached **Level {new_level}**!",
+                    title=t(loc, "levelup.title"),
+                    description=t(loc, "levelup.desc", mention=message.author.mention, level=new_level),
                     color=discord.Color.gold()
                 )
                 embed.set_thumbnail(url=message.author.display_avatar.url)
@@ -180,6 +182,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     @app_commands.describe(member="Member to check. Defaults to yourself.")
     async def rank(self, ctx: commands.Context, member: Optional[discord.Member] = None):
         member = member or ctx.author
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         user_data = await self._get_user_data(ctx.guild.id, member.id)
 
         total_xp = user_data['xp']
@@ -191,19 +194,19 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         progress_bar = build_progress_bar(xp_so_far, xp_needed)
 
         embed = discord.Embed(
-            title=f"⭐ {member.display_name}'s Rank",
+            title=t(loc, "rank.title", member=member.display_name),
             color=discord.Color.gold()
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="Level", value=f"**{level}**", inline=True)
-        embed.add_field(name="Total XP", value=f"**{total_xp}** XP", inline=True)
+        embed.add_field(name=t(loc, "rank.level"), value=f"**{level}**", inline=True)
+        embed.add_field(name=t(loc, "rank.total_xp"), value=f"**{total_xp}** XP", inline=True)
         embed.add_field(
-            name="Progress to Next Level",
+            name=t(loc, "rank.progress"),
             value=f"{progress_bar}\n`{xp_so_far} / {xp_needed} XP`",
             inline=False
         )
         embed.set_footer(
-            text=f"Requested by {ctx.author}",
+            text=t(loc, "rank.requested_by", user=ctx.author),
             icon_url=ctx.author.display_avatar.url
         )
         await reply(ctx, embed=embed)
@@ -212,25 +215,26 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     @app_commands.describe(level="Level required.", role="Role to assign.")
     @commands.has_permissions(manage_roles=True)
     async def setlevelrole(self, ctx: commands.Context, level: int, role: discord.Role):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         if level < 1:
-            return await reply(ctx, "❌ Level must be at least 1.", ephemeral=True)
+            return await reply(ctx, t(loc, "setlevelrole.invalid"), ephemeral=True)
 
         # Save to DB - method name fix: add_level_role -> set_level_role
         await self.bot.db.set_level_role(ctx.guild.id, level, role.id)
-        
 
         embed = discord.Embed(
-            title="✅ Level Role Set",
-            description=f"Members who reach **Level {level}** will receive {role.mention}.",
+            title=t(loc, "setlevelrole.set_title"),
+            description=t(loc, "setlevelrole.set_desc", level=level, role=role.mention),
             color=discord.Color.green()
         )
         await reply(ctx, embed=embed)
 
     @commands.hybrid_command(name="leaderboard", description="Shows the server XP leaderboard.")
     async def leaderboard(self, ctx: commands.Context):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         rows = await self.bot.db.get_leaderboard(ctx.guild.id, limit=100)
         if not rows:
-            return await reply(ctx, "❌ No XP data found for this server.", ephemeral=True)
+            return await reply(ctx, t(loc, "leaderboard.empty"), ephemeral=True)
 
         medals = ["🥇", "🥈", "🥉"]
         per_page = 10
@@ -245,14 +249,17 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                 member = ctx.guild.get_member(row['user_id'])
                 name = member.display_name if member else (row.get('display_name') or f"User {row['user_id']}")
                 medal = medals[rank] if rank < 3 else f"`#{rank + 1}`"
-                description += f"{medal} **{name}** — Level {row['level']} | {row['xp']} XP\n"
+                description += t(
+                    loc, "leaderboard.row",
+                    medal=medal, name=name, level=row['level'], xp=row['xp'],
+                ) + "\n"
             embed = discord.Embed(
-                title="🏆 XP Leaderboard",
+                title=t(loc, "leaderboard.title"),
                 description=description,
                 color=discord.Color.gold(),
             )
             embed.set_footer(
-                text=f"Page {page + 1}/{total_pages} • Requested by {ctx.author}",
+                text=t(loc, "leaderboard.footer", current=page + 1, total=total_pages, user=ctx.author),
                 icon_url=ctx.author.display_avatar.url,
             )
             pages.append(embed)
