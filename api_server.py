@@ -129,7 +129,12 @@ async def _rpc(action: str, **kwargs) -> Any:
     if envelope is None:
         raise HTTPException(status_code=504, detail="Bot RPC timeout — bot may be offline")
     if isinstance(envelope, dict) and "error" in envelope and "data" not in envelope:
-        raise HTTPException(status_code=502, detail=envelope["error"])
+        # Logical errors from the bot handler (e.g. "Guild not found") arrive as a
+        # bare {"error": ...} envelope. Map "not found" to 404 so the dashboard can
+        # tell "bot isn't in this guild" apart from a real gateway failure (502).
+        err = envelope["error"]
+        status = 404 if isinstance(err, str) and "not found" in err.lower() else 502
+        raise HTTPException(status_code=status, detail=err)
 
     result = envelope.get("data", envelope) if isinstance(envelope, dict) else envelope
     if isinstance(result, dict) and "error" in result:
