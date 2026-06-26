@@ -49,7 +49,9 @@ export type ModerationFeature = {
 
 export type LoggingFeature = {
   logChannel?: string | null;
-  events: string[];
+  usageChannel?: string | null;
+  messagesChannel?: string | null;
+  leaveChannel?: string | null;
 };
 
 export const rulesFeatureSchema = z.object({

@@ -213,7 +213,12 @@ class MyBot(commands.Bot):
             },
             "logging": {
                 "logChannel": self._snowflake_or_none(settings.get("punishment_log_id")),
-                "events": ["ban", "kick", "mute", "warn"],
+                "usageChannel": self._snowflake_or_none(settings.get("usage_log_id")),
+                "messagesChannel": self._snowflake_or_none(settings.get("audit_log_id")),
+                "leaveChannel": self._snowflake_or_none(settings.get("leave_log_id")),
+            },
+            "filter": {
+                "words": settings.get("filter_words") or [],
             },
         }
         return feature_data.get(feature, {})
@@ -387,6 +392,9 @@ class MyBot(commands.Bot):
                 },
                 "logging": {
                     "logChannel": "punishment_log_id",
+                    "usageChannel": "usage_log_id",
+                    "messagesChannel": "audit_log_id",
+                    "leaveChannel": "leave_log_id",
                 },
             }
 

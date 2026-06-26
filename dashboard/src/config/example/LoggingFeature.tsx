@@ -8,6 +8,9 @@ import type { UseFormRender } from '@/config/types/types';
 
 const schema = z.object({
   logChannel: z.string().optional(),
+  usageChannel: z.string().optional(),
+  messagesChannel: z.string().optional(),
+  leaveChannel: z.string().optional(),
 });
 
 type Input = z.infer<typeof schema>;
@@ -18,6 +21,9 @@ export const useLoggingFeature: UseFormRender<LoggingFeature> = (data: LoggingFe
     shouldUnregister: false,
     defaultValues: {
       logChannel: data.logChannel ?? undefined,
+      usageChannel: data.usageChannel ?? undefined,
+      messagesChannel: data.messagesChannel ?? undefined,
+      leaveChannel: data.leaveChannel ?? undefined,
     },
   });
 
@@ -27,9 +33,30 @@ export const useLoggingFeature: UseFormRender<LoggingFeature> = (data: LoggingFe
         <ChannelSelectForm
           control={{
             label: 'Punishment Log Channel',
-            description: 'Select the channel for moderation and punishment logs',
+            description: 'Bans, kicks, mutes, warns and filtered messages',
           }}
           controller={{ control, name: 'logChannel' }}
+        />
+        <ChannelSelectForm
+          control={{
+            label: 'Command Usage Log Channel',
+            description: 'Logs every bot command that is run',
+          }}
+          controller={{ control, name: 'usageChannel' }}
+        />
+        <ChannelSelectForm
+          control={{
+            label: 'Message Log Channel',
+            description: 'Edited and deleted messages',
+          }}
+          controller={{ control, name: 'messagesChannel' }}
+        />
+        <ChannelSelectForm
+          control={{
+            label: 'Leave Log Channel',
+            description: 'Notifications when a member leaves',
+          }}
+          controller={{ control, name: 'leaveChannel' }}
         />
       </SimpleGrid>
     ),
@@ -37,6 +64,9 @@ export const useLoggingFeature: UseFormRender<LoggingFeature> = (data: LoggingFe
       const result = await onSubmit(
         JSON.stringify({
           logChannel: e.logChannel,
+          usageChannel: e.usageChannel,
+          messagesChannel: e.messagesChannel,
+          leaveChannel: e.leaveChannel,
         })
       );
       reset(result);
