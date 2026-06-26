@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Divider, SimpleGrid } from '@chakra-ui/react';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { TextAreaForm } from '@/components/forms/TextAreaForm';
-import { InputForm } from '@/components/forms/InputForm';
+import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { SwitchFieldForm } from '@/components/forms/SwitchField';
 import { RulesPreview } from '@/components/feature/RulesPreview';
@@ -70,14 +70,13 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
         />
         {reactionEnabled && (
           <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
-            <InputForm
+            <EmojiPickerInput
               control={{
                 label: 'Reaction Emoji',
                 description: 'Emoji members react with to accept the rules',
-                error: formState.errors.reactionEmoji?.message,
               }}
+              controller={{ control, name: 'reactionEmoji' }}
               placeholder="✅"
-              {...register('reactionEmoji')}
             />
             <RoleSelectForm
               control={{
