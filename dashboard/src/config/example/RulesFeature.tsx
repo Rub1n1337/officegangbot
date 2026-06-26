@@ -7,6 +7,7 @@ import { TextAreaForm } from '@/components/forms/TextAreaForm';
 import { InputForm } from '@/components/forms/InputForm';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { SwitchFieldForm } from '@/components/forms/SwitchField';
+import { RulesPreview } from '@/components/feature/RulesPreview';
 import type { RulesFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -34,6 +35,8 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
   });
 
   const reactionEnabled = watch('reactionEnabled');
+  const message = watch('message');
+  const reactionEmoji = watch('reactionEmoji');
 
   return {
     component: (
@@ -85,6 +88,12 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
             />
           </SimpleGrid>
         )}
+        <Divider my={1} />
+        <RulesPreview
+          message={message ?? ''}
+          reactionEnabled={reactionEnabled}
+          reactionEmoji={reactionEmoji}
+        />
       </SimpleGrid>
     ),
     onSubmit: handleSubmit(async (e) => {
