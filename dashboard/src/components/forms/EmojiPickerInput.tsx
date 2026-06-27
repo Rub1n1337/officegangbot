@@ -50,7 +50,13 @@ export const EmojiInput = forwardRef<HTMLInputElement, EmojiInputProps>(
                 😀
               </Button>
             </PopoverTrigger>
-            <PopoverContent w="auto" bg="transparent" border="none" boxShadow="none">
+            <PopoverContent
+              w={{ base: 'calc(100vw - 1.5rem)', sm: '352px' }}
+              maxW="calc(100vw - 1.5rem)"
+              bg="transparent"
+              border="none"
+              boxShadow="none"
+            >
               <PopoverArrow />
               <PopoverBody p={0}>
                 <EmojiMartPicker
