@@ -195,6 +195,24 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "welcome.runtime_invalid_placeholder": "⚠️ **Welcome Message Error:** An invalid placeholder was used. Please ask an admin to fix it with `/welcome message`.",
         "welcome.autorole_too_high_channel": "❌ Cannot assign auto-role `{role}`: role is higher than my top role.",
         "welcome.autorole_no_perms_channel": "❌ I lack permissions to assign the auto-role `{role}`. Please check my role settings.",
+        # --- automod (member-facing notices) ---
+        "automod.mention_spam": "⚠️ {mention} Your message was removed for containing too many mentions.",
+        "automod.spam_timeout": "⚠️ {mention} You are sending messages too fast. You have been timed out for **10 minutes**.",
+        # --- help ---
+        "help.title": "Bot Help Desk",
+        "help.desc": "All commands are available as **Slash Commands** (`/`).\nPick a category from the menu below, or use `/help <command>` for details on a single command.",
+        "help.no_cat_desc": "No description available for this category.",
+        "help.cog_title": "{cog} Help",
+        "help.no_desc": "No description.",
+        "help.select_placeholder": "📚 Choose a category…",
+        "help.overview_label": "Overview",
+        "help.overview_desc": "Back to the full category list.",
+        "help.not_yours": "This help menu belongs to someone else — run `/help` yourself.",
+        "help.not_found": "Sorry, I couldn't find a category or command named `{query}`.",
+        "help.cmd_title": "Help: `/{command}`",
+        "help.no_desc_available": "No description available.",
+        "help.usage": "Usage",
+        "help.subcommands": "Subcommands",
     },
     "ru": {
         # --- language command ---
@@ -376,6 +394,24 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "welcome.runtime_invalid_placeholder": "⚠️ **Ошибка приветствия:** использован неверный плейсхолдер. Попросите админа исправить через `/welcome message`.",
         "welcome.autorole_too_high_channel": "❌ Не могу выдать авто-роль `{role}`: она выше моей высшей роли.",
         "welcome.autorole_no_perms_channel": "❌ Мне не хватает прав, чтобы выдать авто-роль `{role}`. Проверьте настройки моих ролей.",
+        # --- automod (member-facing notices) ---
+        "automod.mention_spam": "⚠️ {mention} Твоё сообщение удалено: слишком много упоминаний.",
+        "automod.spam_timeout": "⚠️ {mention} Ты пишешь слишком часто. Тебе выдан таймаут на **10 минут**.",
+        # --- help ---
+        "help.title": "Справочник команд",
+        "help.desc": "Все команды доступны как **слэш-команды** (`/`).\nВыберите категорию в меню ниже или используйте `/help <команда>` для подробностей по конкретной команде.",
+        "help.no_cat_desc": "Описание для этой категории отсутствует.",
+        "help.cog_title": "{cog} — справка",
+        "help.no_desc": "Нет описания.",
+        "help.select_placeholder": "📚 Выберите категорию…",
+        "help.overview_label": "Обзор",
+        "help.overview_desc": "Назад к списку категорий.",
+        "help.not_yours": "Это меню справки принадлежит другому — запустите `/help` сами.",
+        "help.not_found": "Не удалось найти категорию или команду с именем `{query}`.",
+        "help.cmd_title": "Справка: `/{command}`",
+        "help.no_desc_available": "Описание недоступно.",
+        "help.usage": "Использование",
+        "help.subcommands": "Подкоманды",
     },
 }
 

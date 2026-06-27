@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 from core.logger import logger
+from core.i18n import t
 import datetime
 
 class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
@@ -76,6 +77,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         guild_id = message.guild.id
         user_id = message.author.id
         now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        loc = await self.bot.db.get_locale(guild_id)
 
         # --- Anti-mention spam ---
         total_mentions = len(message.mentions) + len(message.role_mentions)
@@ -83,7 +85,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             try:
                 await message.delete()
                 await message.channel.send(
-                    f"⚠️ {message.author.mention} Your message was removed for containing too many mentions.",
+                    t(loc, "automod.mention_spam", mention=message.author.mention),
                     delete_after=5
                 )
                 await self._log_automod(
@@ -102,8 +104,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self.bot.redis.clear_message_log(guild_id, user_id)
                 try:
                     await message.channel.send(
-                        f"⚠️ {message.author.mention} You are sending messages too fast. "
-                        f"You have been timed out for **10 minutes**.",
+                        t(loc, "automod.spam_timeout", mention=message.author.mention),
                         delete_after=10
                     )
                 except discord.Forbidden:
@@ -134,8 +135,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 user_log.clear()
                 try:
                     await message.channel.send(
-                        f"⚠️ {message.author.mention} You are sending messages too fast. "
-                        f"You have been timed out for **10 minutes**.",
+                        t(loc, "automod.spam_timeout", mention=message.author.mention),
                         delete_after=10
                     )
                 except discord.Forbidden:
