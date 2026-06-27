@@ -191,8 +191,11 @@ export function useGuildStatsQuery(guild: string) {
   return useQuery(Keys.guildStats(guild), () => fetchGuildStats(session!!, guild), {
     enabled: status === 'authenticated',
     refetchOnWindowFocus: true,
-    // Stats are live-ish; let them go stale quickly so a revisit refetches.
-    staleTime: 15_000,
+    // Live dashboard: re-fetch on an interval so the Overview updates on its own
+    // (only while the tab is focused, to stay gentle on the rate limit).
+    staleTime: 0,
+    refetchInterval: 8_000,
+    refetchIntervalInBackground: false,
     retry: false,
   });
 }

@@ -1,4 +1,5 @@
 import { Badge, Box, Flex, Heading, Icon, SimpleGrid, Text } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react';
 import {
   MdPeople,
   MdTag,
@@ -8,7 +9,7 @@ import {
   MdToggleOn,
 } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
@@ -124,6 +125,34 @@ function Overview({ stats }: { stats: GuildStats }) {
   );
 }
 
+const pulse = keyframes`
+  0% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
+  70% { box-shadow: 0 0 0 7px rgba(72, 187, 120, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
+`;
+
+// Live indicator: a pulsing dot + a ticking "updated Ns ago", driven by the
+// stats query's auto-refetch (every 8s).
+function LiveIndicator({ updatedAt }: { updatedAt: number }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const secs = updatedAt ? Math.max(0, Math.round((Date.now() - updatedAt) / 1000)) : 0;
+  return (
+    <Flex align="center" gap={2}>
+      <Box w="9px" h="9px" rounded="full" bg="green.400" animation={`${pulse} 2s infinite`} />
+      <Text fontSize="sm" fontWeight="700" color="green.400" letterSpacing="wide">
+        LIVE
+      </Text>
+      <Text fontSize="xs" color="TextSecondary">
+        updated {secs}s ago
+      </Text>
+    </Flex>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -141,11 +170,13 @@ const GuildOverviewPage: NextPageWithLayout = () => {
         <Heading fontSize="2xl" fontWeight="600">
           Overview
         </Heading>
-        {statsQuery.data?.online && (
-          <Badge colorScheme="green" rounded="md" px={2}>
-            Bot online
+        {statsQuery.data?.online ? (
+          <LiveIndicator updatedAt={statsQuery.dataUpdatedAt} />
+        ) : statsQuery.data ? (
+          <Badge colorScheme="red" rounded="md" px={2}>
+            Bot offline
           </Badge>
-        )}
+        ) : null}
       </Flex>
       <QueryStatus query={statsQuery} loading={<LoadingPanel />} error="Failed to load guild stats.">
         {statsQuery.data && <Overview stats={statsQuery.data} />}
