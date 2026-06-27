@@ -63,6 +63,32 @@ export async function fetchGuildStats(session: AccessToken, guild: string): Prom
   );
 }
 
+export type GuildEmoji = {
+  id: string;
+  name: string;
+  animated: boolean;
+  url: string;
+};
+
+/**
+ * The guild's custom emojis, for the dashboard emoji picker. Returns [] if the
+ * bot can't reach the guild (older bot build, not joined, etc.) so the picker
+ * still works with the standard emoji set.
+ */
+export async function fetchGuildEmojis(session: AccessToken, guild: string): Promise<GuildEmoji[]> {
+  return await callReturn<GuildEmoji[]>(
+    `/api/guild/${guild}/emojis`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+      allowed: {
+        404: () => [],
+      },
+    })
+  );
+}
+
 export async function enableFeature(session: AccessToken, guild: string, feature: string) {
   return await callDefault(
     `/guilds/${guild}/features/${feature}`,
