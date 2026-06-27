@@ -19,6 +19,7 @@ import discord
 from discord.ext import commands
 from core.logger import logger
 from core.permissions import has_permission
+from core.i18n import t
 from typing import Optional
 from .utils import reply
 
@@ -65,7 +66,8 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             await self.bot.db.set_feature_enabled(guild.id, "welcome-message", False)
         except (KeyError, AttributeError) as e:
             logger.error(f"Invalid placeholder in welcome message for {guild.name}: {e}")
-            await channel.send("⚠️ **Welcome Message Error:** An invalid placeholder was used. Please ask an admin to fix it with `/welcome message`.")
+            loc = await self.bot.db.get_locale(guild.id)
+            await channel.send(t(loc, "welcome.runtime_invalid_placeholder"))
         except Exception as e:
             logger.error(f"Failed to send welcome message in {guild.name}: {e}", exc_info=True)
 
@@ -88,7 +90,8 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             logger.error(f"Cannot assign auto-role '{role.name}' in {guild.name} as it is higher or equal to my top role.")
             channel = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
             if channel:
-                await channel.send(f"❌ Cannot assign auto-role `{role.name}`: role is higher than my top role.")
+                loc = await self.bot.db.get_locale(guild.id)
+                await channel.send(t(loc, "welcome.autorole_too_high_channel", role=role.name))
             return
 
         try:
@@ -98,7 +101,8 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             logger.error(f"Missing permissions to assign auto-role in {guild.name}.")
             channel = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
             if channel:
-                await channel.send(f"❌ I lack permissions to assign the auto-role `{role.name}`. Please check my role settings.")
+                loc = await self.bot.db.get_locale(guild.id)
+                await channel.send(t(loc, "welcome.autorole_no_perms_channel", role=role.name))
         except Exception as e:
             logger.error(f"Failed to assign auto-role in {guild.name}: {e}", exc_info=True)
 
@@ -107,7 +111,8 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
     async def welcome(self, ctx: commands.Context):
         """Displays the current welcome system and auto-role settings."""
         if not self.bot.db:
-            return await reply(ctx, "❌ Database unavailable.")
+            return await reply(ctx, t("en", "common.db_unavailable"))
+        loc = await self.bot.db.get_locale(ctx.guild.id)
 
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
         is_enabled = "welcome-message" in enabled_features
@@ -115,19 +120,27 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
         message = await self.bot.db.get_guild_setting(ctx.guild.id, "welcome_message", DEFAULT_WELCOME_MESSAGE)
         auto_role_id = await self.bot.db.get_guild_setting(ctx.guild.id, "autorole_id")
 
-        embed = discord.Embed(title="Welcome System Status", color=discord.Color.blue())
-        
+        embed = discord.Embed(title=t(loc, "welcome.status_title"), color=discord.Color.blue())
+
         # Welcome Message Info
-        status = "✅ Enabled" if is_enabled else "❌ Disabled"
+        status = t(loc, "common.enabled") if is_enabled else t(loc, "common.disabled")
         channel = ctx.guild.get_channel(channel_id) if channel_id else None
-        channel_status = channel.mention if channel else "Not Set"
-        embed.add_field(name="Welcome Messages", value=f"**Status:** {status}\n**Channel:** {channel_status}", inline=False)
-        embed.add_field(name="Message Template", value=f"```{message}```", inline=False)
+        channel_status = channel.mention if channel else t(loc, "common.not_set")
+        embed.add_field(
+            name=t(loc, "welcome.field_messages"),
+            value=t(loc, "welcome.field_messages_value", status=status, channel=channel_status),
+            inline=False,
+        )
+        embed.add_field(name=t(loc, "welcome.field_template"), value=f"```{message}```", inline=False)
 
         # Auto-Role Info
         auto_role = ctx.guild.get_role(auto_role_id) if auto_role_id else None
-        role_status = auto_role.mention if auto_role else "Not Set"
-        embed.add_field(name="Auto-Role", value=f"**Role:** {role_status}", inline=False)
+        role_status = auto_role.mention if auto_role else t(loc, "common.not_set")
+        embed.add_field(
+            name=t(loc, "welcome.field_autorole"),
+            value=t(loc, "welcome.field_autorole_value", role=role_status),
+            inline=False,
+        )
 
         await reply(ctx, embed=embed)
 
@@ -136,90 +149,96 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
     async def welcome_toggle(self, ctx: commands.Context):
         """Enables or disables the welcome message system."""
         if not self.bot.db:
-            return await reply(ctx, "❌ Database unavailable.")
+            return await reply(ctx, t("en", "common.db_unavailable"))
+        loc = await self.bot.db.get_locale(ctx.guild.id)
 
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
         is_enabled = "welcome-message" in enabled_features
         new_status = not is_enabled
         await self.bot.db.set_feature_enabled(ctx.guild.id, "welcome-message", new_status)
-        await reply(ctx, f"✅ Welcome system has been **{'enabled' if new_status else 'disabled'}**.")
+        await reply(ctx, t(loc, "welcome.toggled_on" if new_status else "welcome.toggled_off"))
 
     @welcome.command(name="channel")
     @has_permission("config")
     async def welcome_channel(self, ctx: commands.Context, channel: discord.TextChannel):
         """Sets the channel for welcome messages."""
         if not self.bot.db:
-            return await reply(ctx, "❌ Database unavailable.")
+            return await reply(ctx, t("en", "common.db_unavailable"))
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         if not channel.permissions_for(ctx.guild.me).send_messages:
-            return await reply(ctx, f"❌ I can't send messages in {channel.mention}. Please check my permissions.")
-        
+            return await reply(ctx, t(loc, "welcome.no_send_perms", channel=channel.mention))
+
         await self.bot.db.set_guild_setting(ctx.guild.id, "welcome_channel_id", channel.id)
-        await reply(ctx, f"✅ Welcome messages will now be sent to {channel.mention}.")
+        await reply(ctx, t(loc, "welcome.channel_set", channel=channel.mention))
 
     @welcome.command(name="message", description="Set the welcome message template for new members.")
     @has_permission("config")
     async def welcome_message(self, ctx: commands.Context, *, message: str):
         """Sets the custom welcome message. Use placeholders for dynamic content. Pre-validates placeholders and sanitizes input."""
         if not self.bot.db:
-            return await reply(ctx, "❌ Database unavailable.")
+            return await reply(ctx, t("en", "common.db_unavailable"))
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         if len(message) > 1500:
-            return await reply(ctx, "❌ Welcome message cannot exceed 1500 characters.")
+            return await reply(ctx, t(loc, "welcome.msg_too_long"))
         # Pre-validate placeholders
         try:
             _ = message.format(user=ctx.author, server=ctx.guild)
         except Exception as e:
-            return await reply(ctx, f"❌ Invalid placeholder in message: {e}")
+            return await reply(ctx, t(loc, "welcome.msg_invalid_placeholder", error=e))
 
         await self.bot.db.set_guild_setting(ctx.guild.id, "welcome_message", message)
-        await reply(ctx, "✅ Welcome message updated! Use `/welcome test` to see a preview.")
+        await reply(ctx, t(loc, "welcome.msg_updated"))
 
     @welcome.command(name="autorole")
     @has_permission("config")
     async def welcome_autorole(self, ctx: commands.Context, role: Optional[discord.Role] = None):
         """Sets or removes the role automatically assigned to new members."""
         if not self.bot.db:
-            return await reply(ctx, "❌ Database unavailable.")
+            return await reply(ctx, t("en", "common.db_unavailable"))
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         if role:
             if role >= ctx.guild.me.top_role:
-                return await reply(ctx, f"❌ I cannot assign the '{role.name}' role as it is higher or equal to my top role.")
+                return await reply(ctx, t(loc, "welcome.role_too_high", role=role.name))
             if role.is_default() or role.is_bot_managed() or role.is_premium_subscriber() or role.is_integration():
-                return await reply(ctx, f"❌ The role `{role.name}` cannot be used as an auto-role.")
+                return await reply(ctx, t(loc, "welcome.role_invalid", role=role.name))
             await self.bot.db.set_guild_setting(ctx.guild.id, "autorole_id", role.id)
-            await reply(ctx, f"✅ New members will now automatically receive the {role.mention} role.")
+            await reply(ctx, t(loc, "welcome.autorole_set", role=role.mention))
         else:
             await self.bot.db.set_guild_setting(ctx.guild.id, "autorole_id", None)
-            await reply(ctx, "✅ Auto-role has been disabled. New members will not receive a role.")
+            await reply(ctx, t(loc, "welcome.autorole_disabled"))
 
     @welcome.command(name="test")
     @has_permission("config")
     async def welcome_test(self, ctx: commands.Context):
         """Sends a test welcome message to the configured channel."""
         if not self.bot.db:
-            return await reply(ctx, "❌ Database unavailable.")
+            return await reply(ctx, t("en", "common.db_unavailable"))
+        loc = await self.bot.db.get_locale(ctx.guild.id)
 
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
         if "welcome-message" not in enabled_features:
-            return await reply(ctx, "❌ The welcome system is disabled. Enable it first with `/welcome toggle`.")
+            return await reply(ctx, t(loc, "welcome.test_disabled"))
 
         channel_id = await self.bot.db.get_guild_setting(ctx.guild.id, "welcome_channel_id")
         if not channel_id:
-            return await reply(ctx, "❌ No welcome channel is set. Set it first with `/welcome channel #channel`.")
+            return await reply(ctx, t(loc, "welcome.test_no_channel"))
 
         channel = ctx.guild.get_channel(channel_id)
         if not channel:
-            return await reply(ctx, "❌ The configured welcome channel could not be found. Please set it again.")
+            return await reply(ctx, t(loc, "welcome.test_channel_missing"))
 
         await self._send_welcome_message(ctx.author)
-        await reply(ctx, f"✅ A test welcome message has been sent to {channel.mention}.")
+        await reply(ctx, t(loc, "welcome.test_sent", channel=channel.mention))
 
     @welcome.command(name="placeholders")
     @has_permission("config")
     async def welcome_placeholders(self, ctx: commands.Context):
         """Shows available placeholders for the welcome message."""
-        embed = discord.Embed(title="Welcome Message Placeholders", color=discord.Color.teal())
-        embed.description = "Use these placeholders in your welcome message to include dynamic information."
-        embed.add_field(name="Member", value="`{user.mention}` - Mentions the user\n`{user.name}` - The user's name\n`{user.id}` - The user's ID", inline=False)
-        embed.add_field(name="Server", value="`{server.name}` - The server's name\n`{server.member_count}` - The server's member count", inline=False)
+        loc = await self.bot.db.get_locale(ctx.guild.id) if self.bot.db else "en"
+        embed = discord.Embed(title=t(loc, "welcome.ph_title"), color=discord.Color.teal())
+        embed.description = t(loc, "welcome.ph_desc")
+        embed.add_field(name=t(loc, "welcome.ph_member"), value=t(loc, "welcome.ph_member_value"), inline=False)
+        embed.add_field(name=t(loc, "welcome.ph_server"), value=t(loc, "welcome.ph_server_value"), inline=False)
         await reply(ctx, embed=embed)
 
     # Local error handler removed. The global handler in bot.py will now manage errors.
