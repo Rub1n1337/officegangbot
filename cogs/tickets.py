@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
+from core.i18n import t
 from .utils import reply
 from typing import Optional
 import asyncio
@@ -12,8 +13,13 @@ import re
 class CloseTicketView(discord.ui.View):
     """View with a close button inside a ticket channel."""
 
-    def __init__(self):
+    def __init__(self, loc: Optional[str] = None):
         super().__init__(timeout=None)
+        # Persistent view registered at startup has no locale (labels there are
+        # only used to re-bind handlers by custom_id). When a ticket is opened we
+        # post a fresh view with the guild's locale so the label is translated.
+        if loc:
+            self.close_ticket.label = t(loc, "tickets.close_button")
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Only ticket owner, support role, or admins can close the ticket."""
@@ -41,8 +47,9 @@ class CloseTicketView(discord.ui.View):
         if is_owner:
             return True
 
+        loc = await bot.db.get_locale(guild.id)
         await interaction.response.send_message(
-            "❌ You don't have permission to close this ticket.",
+            t(loc, "tickets.close_no_perm"),
             ephemeral=True
         )
         return False
@@ -53,8 +60,9 @@ class CloseTicketView(discord.ui.View):
         custom_id="close_ticket"
     )
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        loc = await interaction.client.db.get_locale(interaction.guild.id)
         await interaction.response.send_message(
-            "🔒 Ticket will be closed in **5 seconds**...",
+            t(loc, "tickets.closing"),
             ephemeral=False
         )
         await asyncio.sleep(5)
@@ -62,7 +70,7 @@ class CloseTicketView(discord.ui.View):
             await interaction.channel.delete(reason=f"Ticket closed by {interaction.user}")
             logger.info(f"Ticket channel {interaction.channel.name} closed by {interaction.user}")
         except discord.Forbidden:
-            await interaction.channel.send("❌ I don't have permission to delete this channel.")
+            await interaction.channel.send(t(loc, "tickets.close_no_delete_perm"))
         except discord.NotFound:
             pass
 
@@ -70,8 +78,10 @@ class CloseTicketView(discord.ui.View):
 class OpenTicketView(discord.ui.View):
     """Persistent view with an open ticket button."""
 
-    def __init__(self):
+    def __init__(self, loc: Optional[str] = None):
         super().__init__(timeout=None)
+        if loc:
+            self.open_ticket.label = t(loc, "tickets.open_button")
 
     @discord.ui.button(
         label="📩 Open Ticket",
@@ -81,6 +91,8 @@ class OpenTicketView(discord.ui.View):
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         member = interaction.user
+        bot = interaction.client
+        loc = await bot.db.get_locale(guild.id)
 
         # Sanitize channel name for Unicode safety
         clean_name = re.sub(r'[^a-z0-9-]', '', member.name.lower()) or str(member.id)
@@ -90,13 +102,12 @@ class OpenTicketView(discord.ui.View):
         existing = discord.utils.get(guild.text_channels, name=channel_name)
         if existing:
             await interaction.response.send_message(
-                f"❌ You already have an open ticket: {existing.mention}",
+                t(loc, "tickets.already_open", channel=existing.mention),
                 ephemeral=True
             )
             return
 
         # Get support role from settings
-        bot = interaction.client
         support_role_id = await bot.db.get_guild_setting(guild.id, 'ticket_support_role_id')
         support_role = guild.get_role(int(support_role_id)) if support_role_id else None
 
@@ -124,31 +135,27 @@ class OpenTicketView(discord.ui.View):
             )
         except discord.Forbidden:
             await interaction.response.send_message(
-                "❌ I don't have permission to create channels.",
+                t(loc, "tickets.no_create_perm"),
                 ephemeral=True
             )
             return
 
         # Send ticket message
         embed = discord.Embed(
-            title="🎫 Support Ticket",
-            description=(
-                f"Welcome {member.mention}! Support staff will be with you shortly.\n\n"
-                f"Please describe your issue and wait for a response.\n"
-                f"Click the button below when your issue is resolved."
-            ),
+            title=t(loc, "tickets.channel_title"),
+            description=t(loc, "tickets.channel_desc", member=member.mention),
             color=discord.Color.blurple()
         )
-        embed.set_footer(text=f"Ticket opened by {member}", icon_url=member.display_avatar.url)
+        embed.set_footer(text=t(loc, "tickets.channel_footer", member=member), icon_url=member.display_avatar.url)
 
         await channel.send(
             content=f"{member.mention}" + (f" | {support_role.mention}" if support_role else ""),
             embed=embed,
-            view=CloseTicketView()
+            view=CloseTicketView(loc)
         )
 
         await interaction.response.send_message(
-            f"✅ Your ticket has been created: {channel.mention}",
+            t(loc, "tickets.created", channel=channel.mention),
             ephemeral=True
         )
         logger.info(f"Ticket opened by {member} in {guild.name}: #{channel.name}")
@@ -160,7 +167,8 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        # Register persistent views
+        # Register persistent views (default labels; only used to re-bind handlers
+        # by custom_id after a restart — displayed labels come from posted views).
         bot.add_view(OpenTicketView())
         bot.add_view(CloseTicketView())
 
@@ -178,6 +186,7 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         support_role: Optional[discord.Role] = None,
         category: Optional[discord.CategoryChannel] = None
     ):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
         # Save settings
         if support_role:
             await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_support_role_id', support_role.id)
@@ -185,23 +194,19 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         if category:
             await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_category_id', category.id)
 
-
         embed = discord.Embed(
-            title="🎫 Support Tickets",
-            description=(
-                "Need help? Click the button below to open a private support ticket.\n\n"
-                "Our staff will assist you as soon as possible."
-            ),
+            title=t(loc, "tickets.panel_title"),
+            description=t(loc, "tickets.panel_desc"),
             color=discord.Color.blurple()
         )
         embed.set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
 
         try:
-            await channel.send(embed=embed, view=OpenTicketView())
-            await reply(ctx, f"✅ Ticket panel sent to {channel.mention}.", ephemeral=True)
+            await channel.send(embed=embed, view=OpenTicketView(loc))
+            await reply(ctx, t(loc, "tickets.setup_sent", channel=channel.mention), ephemeral=True)
             logger.info(f"Ticket panel set up in #{channel.name} by {ctx.author} in {ctx.guild.name}")
         except discord.Forbidden:
-            await reply(ctx, "❌ I don't have permission to send messages in that channel.", ephemeral=True)
+            await reply(ctx, t(loc, "tickets.setup_no_perm"), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

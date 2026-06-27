@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import datetime
 from core.logger import logger
+from core.i18n import t
 
 class UsageLogCog(commands.Cog):
     """Handles logging for command usage."""
@@ -32,6 +33,8 @@ class UsageLogCog(commands.Cog):
                 logger.warning(f"Usage log channel {log_channel_id} not found or inaccessible.")
                 return
 
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+
         # Truncate fields for Discord embed limits
         command_name = f"`{ctx.command.qualified_name}`"[:256]
         channel_mention = ctx.channel.mention[:256]
@@ -52,15 +55,15 @@ class UsageLogCog(commands.Cog):
         full_command = f"```\n{full_command_text[:900]}\n```"
 
         embed = discord.Embed(
-            title="Command Used",
+            title=t(loc, "usagelog.title"),
             color=discord.Color.light_grey(),
             timestamp=ctx.message.created_at if ctx.message else datetime.datetime.now(datetime.timezone.utc)
         )
         embed.set_author(name=f"{ctx.author.name} ({ctx.author.id})", icon_url=ctx.author.display_avatar.url)
-        embed.add_field(name="Command", value=command_name)
-        embed.add_field(name="Channel", value=channel_mention)
-        embed.add_field(name="Type", value="Slash `/`" if ctx.interaction else "Prefix `!`", inline=True)
-        embed.add_field(name="Full Command", value=full_command, inline=False)
+        embed.add_field(name=t(loc, "usagelog.field_command"), value=command_name)
+        embed.add_field(name=t(loc, "usagelog.field_channel"), value=channel_mention)
+        embed.add_field(name=t(loc, "usagelog.field_type"), value=t(loc, "usagelog.type_slash") if ctx.interaction else t(loc, "usagelog.type_prefix"), inline=True)
+        embed.add_field(name=t(loc, "usagelog.field_full"), value=full_command, inline=False)
 
         try:
             await log_channel.send(embed=embed)

@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import datetime
 from core.logger import logger
+from core.i18n import t
 
 class AuditLogCog(commands.Cog):
     """Handles logging for message edits and deletions."""
@@ -42,14 +43,15 @@ class AuditLogCog(commands.Cog):
         if not log_channel:
             return
 
+        loc = await self.bot.db.get_locale(message.guild.id)
         embed = discord.Embed(
-            description=f"**Message sent by {message.author.mention} deleted in {message.channel.mention}**",
+            description=t(loc, "auditlog.deleted_desc", author=message.author.mention, channel=message.channel.mention),
             color=discord.Color.red(),
             timestamp=datetime.datetime.now(datetime.timezone.utc)
         )
-        embed.add_field(name="Content", value=f"```{message.content[:1020]}```" if message.content else "No message content (e.g., an embed).", inline=False)
+        embed.add_field(name=t(loc, "auditlog.field_content"), value=f"```{message.content[:1020]}```" if message.content else t(loc, "auditlog.no_content"), inline=False)
         embed.set_author(name=f"{message.author.name} ({message.author.id})", icon_url=message.author.display_avatar.url)
-        embed.set_footer(text=f"Message ID: {message.id}")
+        embed.set_footer(text=t(loc, "auditlog.msg_id", id=message.id))
 
         try:
             await log_channel.send(embed=embed)
@@ -67,15 +69,16 @@ class AuditLogCog(commands.Cog):
         if not log_channel:
             return
 
+        loc = await self.bot.db.get_locale(after.guild.id)
         embed = discord.Embed(
-            description=f"**Message edited in {after.channel.mention}** [Jump to Message]({after.jump_url})",
+            description=t(loc, "auditlog.edited_desc", channel=after.channel.mention, url=after.jump_url),
             color=discord.Color.blue(),
             timestamp=datetime.datetime.now(datetime.timezone.utc)
         )
         embed.set_author(name=f"{after.author.name} ({after.author.id})", icon_url=after.author.display_avatar.url)
-        embed.add_field(name="Before", value=f"```{before.content[:1020]}```", inline=False)
-        embed.add_field(name="After", value=f"```{after.content[:1020]}```", inline=False)
-        embed.set_footer(text=f"Message ID: {after.id}")
+        embed.add_field(name=t(loc, "auditlog.field_before"), value=f"```{before.content[:1020]}```", inline=False)
+        embed.add_field(name=t(loc, "auditlog.field_after"), value=f"```{after.content[:1020]}```", inline=False)
+        embed.set_footer(text=t(loc, "auditlog.msg_id", id=after.id))
 
         try:
             await log_channel.send(embed=embed)
