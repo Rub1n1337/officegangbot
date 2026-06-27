@@ -5,6 +5,7 @@ import {
   disableFeature,
   enableFeature,
   fetchGuildChannels,
+  fetchGuildEmojis,
   fetchGuildInfo,
   fetchGuildRoles,
   fetchGuildStats,
@@ -35,6 +36,7 @@ export const Keys = {
   guildRoles: (guild: string) => ['gulid_roles', guild],
   guildChannels: (guild: string) => ['gulid_channel', guild],
   guildStats: (guild: string) => ['guild_stats', guild],
+  guildEmojis: (guild: string) => ['guild_emojis', guild],
 };
 
 export const Mutations = {
@@ -191,6 +193,16 @@ export function useGuildStatsQuery(guild: string) {
     refetchOnWindowFocus: true,
     // Stats are live-ish; let them go stale quickly so a revisit refetches.
     staleTime: 15_000,
+    retry: false,
+  });
+}
+
+export function useGuildEmojisQuery(guild: string) {
+  const { status, session } = useSession();
+
+  return useQuery(Keys.guildEmojis(guild), () => fetchGuildEmojis(session!!, guild), {
+    enabled: status === 'authenticated',
+    staleTime: 5 * 60 * 1000,
     retry: false,
   });
 }

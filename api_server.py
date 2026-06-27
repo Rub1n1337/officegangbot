@@ -231,6 +231,13 @@ async def get_guild_stats(request: Request, guild_id: int):
     data = await _rpc("get_guild_stats", guild_id=guild_id)
     return data
 
+@app.get("/api/guild/{guild_id}/emojis", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_guild_emojis(request: Request, guild_id: int):
+    """Returns the guild's custom emojis (for the dashboard emoji picker)."""
+    data = await _rpc("get_guild_emojis", guild_id=guild_id)
+    return data
+
 # --- Endpoints required for fuma-nama/discord-bot-dashboard ---
 
 @app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])

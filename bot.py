@@ -261,7 +261,7 @@ class MyBot(commands.Bot):
 
         _needs_guild = {
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
-            "get_feature", "enable_feature", "disable_feature", "update_feature",
+            "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -378,6 +378,20 @@ class MyBot(commands.Bot):
                     "category": str(ch.category_id) if ch.category_id else None,
                 }
                 for ch in guild.channels
+            ]
+
+        if action == "get_guild_emojis":
+            guild = self.get_guild(guild_id) if guild_id else None
+            if not guild:
+                return {"error": "Guild not found"}
+            return [
+                {
+                    "id": str(e.id),
+                    "name": e.name,
+                    "animated": e.animated,
+                    "url": str(e.url),
+                }
+                for e in guild.emojis
             ]
 
         if action == "get_feature":
