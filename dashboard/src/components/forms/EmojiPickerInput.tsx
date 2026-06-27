@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   Input,
   InputGroup,
@@ -9,24 +8,13 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-  SimpleGrid,
-  Text,
   useDisclosure,
 } from '@chakra-ui/react';
 import { forwardRef } from 'react';
 import { useController } from 'react-hook-form';
 import { ControlledInput } from './types';
 import { FormCard } from './Form';
-
-// A small, curated set of unicode emojis covering the common reaction-role /
-// rules use cases. Dependency-free on purpose — the field stays a plain text
-// input, so pasting a custom server emoji (e.g. <:name:id>) still works.
-const EMOJI_GROUPS: { label: string; emojis: string[] }[] = [
-  { label: 'Common', emojis: ['✅', '❌', '👍', '👎', '⭐', '🎉', '🔥', '💯', '❤️', '🙏', '👀', '🚀'] },
-  { label: 'Roles', emojis: ['🛡️', '⚔️', '👑', '🎮', '🎨', '🎵', '💻', '📚', '🏆', '🥇', '🔔', '📌'] },
-  { label: 'Faces', emojis: ['😀', '😎', '🥳', '😇', '🤖', '👻', '🤝', '🫡', '😴', '🤔', '🙌', '🫶'] },
-  { label: 'Symbols', emojis: ['🟢', '🔴', '🟡', '🔵', '🟣', '⚪', '⚫', '♻️', '⚠️', '🆗', '🔒', '🔓'] },
-];
+import { EmojiMartPicker } from './EmojiMartPicker';
 
 export type EmojiInputProps = {
   value?: string;
@@ -48,6 +36,8 @@ export const EmojiInput = forwardRef<HTMLInputElement, EmojiInputProps>(
           pr="3rem"
         />
         <InputRightElement width="3rem">
+          {/* Full searchable emoji-mart picker. The field stays a plain input,
+              so pasting a custom server emoji (<:name:id>) still works. */}
           <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end" isLazy>
             <PopoverTrigger>
               <Button
@@ -60,33 +50,15 @@ export const EmojiInput = forwardRef<HTMLInputElement, EmojiInputProps>(
                 😀
               </Button>
             </PopoverTrigger>
-            <PopoverContent w="auto" maxW="300px">
+            <PopoverContent w="auto" bg="transparent" border="none" boxShadow="none">
               <PopoverArrow />
-              <PopoverBody>
-                {EMOJI_GROUPS.map((group) => (
-                  <Box key={group.label} mb={2}>
-                    <Text fontSize="xs" color="TextSecondary" mb={1}>
-                      {group.label}
-                    </Text>
-                    <SimpleGrid columns={6} spacing={1}>
-                      {group.emojis.map((emoji) => (
-                        <Button
-                          key={emoji}
-                          size="sm"
-                          variant="ghost"
-                          fontSize="lg"
-                          aria-label={`Use ${emoji}`}
-                          onClick={() => {
-                            onChange(emoji);
-                            onClose();
-                          }}
-                        >
-                          {emoji}
-                        </Button>
-                      ))}
-                    </SimpleGrid>
-                  </Box>
-                ))}
+              <PopoverBody p={0}>
+                <EmojiMartPicker
+                  onSelect={(native) => {
+                    onChange(native);
+                    onClose();
+                  }}
+                />
               </PopoverBody>
             </PopoverContent>
           </Popover>
