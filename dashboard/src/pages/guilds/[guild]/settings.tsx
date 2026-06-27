@@ -184,7 +184,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
 
   return (
     <Flex direction="column" gap={5}>
-      <Flex align="center" gap={3}>
+      <Flex align="center" gap={3} wrap="wrap">
         <Heading fontSize="2xl" fontWeight="600">
           Overview
         </Heading>

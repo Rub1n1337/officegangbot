@@ -61,6 +61,9 @@ export default function EmojiMartInner({
       skinTonePosition="none"
       navPosition="top"
       perLine={8}
+      // Fill the popover width so the picker fits narrow (mobile) screens
+      // instead of overflowing at its default ~352px.
+      dynamicWidth
     />
   );
 }
