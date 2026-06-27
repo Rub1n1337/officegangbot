@@ -23,6 +23,14 @@ BOT_START_TIME = time.time()
 _redis: Optional[RedisManager] = None
 _redis_last_ok: float = 0.0  # timestamp of last successful RPC call
 
+# Lazy-reconnect bookkeeping (exponential backoff so an outage doesn't make every
+# request pay a slow reconnect, and a counter exposed via /health for ops).
+_redis_reconnects: int = 0          # successful lazy reconnects since startup
+_reconnect_fail_streak: int = 0     # consecutive failed reconnect attempts
+_reconnect_retry_after: float = 0.0  # earliest monotonic-ish time to retry
+_RECONNECT_BASE_DELAY = 0.5
+_RECONNECT_MAX_DELAY = 30.0
+
 # Global bot instance for direct access (when embedded in bot process)
 bot_instance = None
 
@@ -87,7 +95,7 @@ async def _ensure_redis() -> Optional[RedisManager]:
     This handles the case where the initial startup connection failed or
     the connection was lost after startup.
     """
-    global _redis
+    global _redis, _redis_reconnects, _reconnect_fail_streak, _reconnect_retry_after
     if _redis is not None:
         try:
             await _redis.redis.ping()
@@ -95,16 +103,30 @@ async def _ensure_redis() -> Optional[RedisManager]:
         except Exception as e:
             logger.warning(f"Existing Redis connection failed ping check: {e}. Attempting reconnect.")
             _redis = None
-    # Attempt lazy reconnect
+
+    # Exponential backoff: during an outage, reconnecting on every request both
+    # slows each request and hammers Redis. Wait out the current backoff window.
+    if time.time() < _reconnect_retry_after:
+        return None
+
     logger.warning("Redis is unavailable or connection is stale — attempting lazy reconnect...")
     try:
         new_redis = RedisManager()
         await new_redis.connect()
         _redis = new_redis
-        logger.info("Redis lazy reconnect succeeded.")
+        _redis_reconnects += 1
+        _reconnect_fail_streak = 0
+        _reconnect_retry_after = 0.0
+        logger.info(f"Redis lazy reconnect succeeded (total reconnects: {_redis_reconnects}).")
         return _redis
     except Exception as e:
-        logger.error(f"Redis lazy reconnect failed: {e}")
+        _reconnect_fail_streak += 1
+        delay = min(_RECONNECT_MAX_DELAY, _RECONNECT_BASE_DELAY * (2 ** (_reconnect_fail_streak - 1)))
+        _reconnect_retry_after = time.time() + delay
+        logger.error(
+            f"Redis lazy reconnect failed (streak {_reconnect_fail_streak}, "
+            f"next retry in {delay:.1f}s): {e}"
+        )
         return None
 
 async def _rpc(action: str, **kwargs) -> Any:
@@ -159,17 +181,18 @@ async def get_guild_info(request: Request, guild_id: str):
 async def health_check():
     """Health check endpoint for uptime monitoring services."""
     if _redis is None:
-        return {"status": "starting", "bot": False}
+        return {"status": "starting", "bot": False, "redis_reconnects": _redis_reconnects}
     try:
         data = await _rpc("get_stats")
         return {
             "status": "ok",
             "bot": True,
             "latency_ms": data.get("latency_ms", 0),
-            "guilds": data.get("guilds", 0)
+            "guilds": data.get("guilds", 0),
+            "redis_reconnects": _redis_reconnects,
         }
     except Exception:
-        return {"status": "starting", "bot": False}
+        return {"status": "starting", "bot": False, "redis_reconnects": _redis_reconnects}
 
 
 @app.get("/api/stats", dependencies=[Depends(verify_api_key)])
@@ -183,6 +206,7 @@ async def get_bot_stats(request: Request):
     minutes, seconds = divmod(remainder, 60)
     data["uptime"] = f"{hours}h {minutes}m {seconds}s"
     data["uptime_seconds"] = uptime_seconds
+    data["redis_reconnects"] = _redis_reconnects
     return data
 
 
