@@ -1,5 +1,5 @@
 import { Box, Center, Flex, Text } from '@chakra-ui/layout';
-import { Button, ButtonGroup, Card, CardBody, CardFooter } from '@chakra-ui/react';
+import { Badge, Button, ButtonGroup, Card, CardBody, CardFooter } from '@chakra-ui/react';
 import { IdFeature } from '@/utils/common';
 import { IoOpen, IoOptions } from 'react-icons/io5';
 import { useEnableFeatureMutation } from '@/api/hooks';
@@ -35,9 +35,19 @@ export function FeatureItem({
           {feature.icon}
         </Center>
         <Box flex={1}>
-          <Text fontSize={{ base: '16px', md: 'lg' }} fontWeight="600">
-            {feature.name}
-          </Text>
+          <Flex align="center" gap={2} wrap="wrap">
+            <Text fontSize={{ base: '16px', md: 'lg' }} fontWeight="600">
+              {feature.name}
+            </Text>
+            <Badge
+              colorScheme={enabled ? 'green' : 'gray'}
+              rounded="md"
+              fontSize="0.65em"
+              textTransform="uppercase"
+            >
+              {enabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+          </Flex>
           <Text fontSize={{ base: 'sm', md: 'md' }} color="TextSecondary">
             {feature.description}
           </Text>
