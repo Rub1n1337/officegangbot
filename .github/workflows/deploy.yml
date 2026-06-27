@@ -69,6 +69,13 @@ jobs:
         # `up` uploads and builds the freshly checked-out commit, so the bot
         # always deploys the latest main. `redeploy` only re-ran the previous
         # deployment, which could leave the bot on stale code.
-        run: railway up --service officegangbot --ci
+        #
+        # `--detach` returns once the build is uploaded/triggered instead of
+        # streaming build logs. The log stream is flaky ("Failed to stream build
+        # logs") and made the step exit 1 even when the build succeeded, so every
+        # deploy showed red. With --detach the step reflects the upload, not the
+        # log stream. (Trade-off: a later build failure isn't surfaced here —
+        # check the Railway dashboard if a deploy doesn't take effect.)
+        run: railway up --service officegangbot --ci --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

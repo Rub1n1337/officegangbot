@@ -172,7 +172,7 @@ officegangbot/
 │   ├── redis_manager.py    # Redis cache / cooldowns / RPC
 │   ├── permissions.py      # has_permission() check
 │   ├── health_monitor.py   # Health monitoring
-│   ├── command_blocker.py  # Command gating helpers
+│   ├── i18n.py             # Per-guild EN/RU translations
 │   └── logger.py           # Rotating file logger
 ├── cogs/                  # moderation, levels, filter, reaction_roles,
 │   └── …                  # warnings, welcome, tickets, logging, automod, …
