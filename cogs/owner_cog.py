@@ -1,9 +1,10 @@
 # cogs/owner_cog.py
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
 from typing import List, Literal
+import asyncio
 import os
 from .utils import reply
 
@@ -21,9 +22,67 @@ class OwnerCog(commands.Cog, name="👑 Owner"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # Assume healthy at startup; alerts are edge-triggered on state change.
+        self._db_ok = True
+        self._redis_ok = True
+        self.infra_watch.start()
+
+    def cog_unload(self):
+        self.infra_watch.cancel()
 
     async def cog_check(self, ctx: commands.Context) -> bool:
         return await self.bot.is_owner(ctx.author)
+
+    async def _dm_owner(self, message: str) -> None:
+        """Best-effort DM to the bot owner for infra alerts."""
+        try:
+            owner_id = int(os.getenv("BOT_OWNER_ID", "0")) or (self.bot.owner_id or 0)
+            if not owner_id:
+                return
+            user = self.bot.get_user(owner_id) or await self.bot.fetch_user(owner_id)
+            if user:
+                await user.send(message)
+        except Exception as e:
+            logger.warning(f"Could not DM owner with infra alert: {e}")
+
+    @tasks.loop(minutes=2)
+    async def infra_watch(self):
+        """Pings PostgreSQL and Redis; DMs the owner when a service goes
+        down or comes back (edge-triggered, so no repeat spam)."""
+        # --- PostgreSQL ---
+        db_ok, db_err = False, "not connected"
+        try:
+            if self.bot.db and getattr(self.bot.db, "_pool", None):
+                async with self.bot.db.pool.acquire() as conn:
+                    await asyncio.wait_for(conn.fetchval("SELECT 1"), timeout=5)
+                db_ok = True
+        except Exception as e:
+            db_err = str(e)
+        if db_ok != self._db_ok:
+            self._db_ok = db_ok
+            if db_ok:
+                await self._dm_owner("✅ **PostgreSQL recovered** — the database is reachable again.")
+            else:
+                await self._dm_owner(f"⚠️ **PostgreSQL is DOWN** — `{db_err[:200]}`")
+
+        # --- Redis ---
+        redis_ok, redis_err = False, "not connected"
+        try:
+            if self.bot.redis:
+                await asyncio.wait_for(self.bot.redis.redis.ping(), timeout=5)
+                redis_ok = True
+        except Exception as e:
+            redis_err = str(e)
+        if redis_ok != self._redis_ok:
+            self._redis_ok = redis_ok
+            if redis_ok:
+                await self._dm_owner("✅ **Redis recovered** — caching / RPC is back online.")
+            else:
+                await self._dm_owner(f"⚠️ **Redis is DOWN** — `{redis_err[:200]}`")
+
+    @infra_watch.before_loop
+    async def before_infra_watch(self):
+        await self.bot.wait_until_ready()
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.CheckFailure):
