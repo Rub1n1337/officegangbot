@@ -36,8 +36,30 @@ jobs:
           echo "✅ All Python files passed syntax check"
 
   test:
-    name: Unit Tests
+    name: Unit & Integration Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: officegangbot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +75,11 @@ jobs:
 
       - name: Run pytest
         run: pytest -q
+        env:
+          # Service containers — integration tests use these; pure unit tests
+          # ignore them. Locally (no env) the integration tests skip themselves.
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/officegangbot_test
+          REDIS_URL: redis://localhost:6379
 
   deploy:
     name: Deploy to Railway
