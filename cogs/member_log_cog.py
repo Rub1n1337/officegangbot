@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import datetime
 from core.logger import logger
+from core.i18n import t
 
 class MemberLogCog(commands.Cog):
     """Handles logging for members leaving the server."""
@@ -32,13 +33,14 @@ class MemberLogCog(commands.Cog):
                 logger.warning(f"Leave log channel {log_channel_id} not found or inaccessible.")
                 return
 
+        loc = await self.bot.db.get_locale(member.guild.id)
         embed = discord.Embed(
-            description=f"{member.mention} has left the server.",
+            description=t(loc, "memberlog.left_desc", member=member.mention),
             color=discord.Color.dark_grey(),
             timestamp=datetime.datetime.now(datetime.timezone.utc)
         )
         embed.set_author(name=f"{member.name} ({member.id})", icon_url=member.display_avatar.url)
-        embed.set_footer(text="User Left")
+        embed.set_footer(text=t(loc, "memberlog.footer"))
 
         try:
             await log_channel.send(embed=embed)
