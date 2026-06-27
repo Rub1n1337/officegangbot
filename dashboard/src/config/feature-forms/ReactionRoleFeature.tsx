@@ -1,8 +1,28 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Flex, IconButton, SimpleGrid, Text } from '@chakra-ui/react';
+import { Box, Button, Flex, IconButton, Image, SimpleGrid, Text } from '@chakra-ui/react';
 import { MdAdd, MdDelete } from 'react-icons/md';
+
+// Renders the current emoji next to a reaction-role row: a custom server emoji
+// (<:name:id> / <a:name:id>) as its image, otherwise the unicode character.
+function EmojiPreview({ emoji }: { emoji?: string }) {
+  const custom = emoji?.match(/^<(a)?:\w+:(\d+)>$/);
+  if (custom) {
+    return (
+      <Image
+        src={`https://cdn.discordapp.com/emojis/${custom[2]}.${custom[1] ? 'gif' : 'png'}`}
+        alt="emoji"
+        boxSize="22px"
+      />
+    );
+  }
+  return (
+    <Text fontSize="xl" lineHeight="1">
+      {emoji || '—'}
+    </Text>
+  );
+}
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
@@ -32,7 +52,7 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
   data: ReactionRoleFeature,
   onSubmit: (data: string) => Promise<any>
 ) => {
-  const { register, reset, handleSubmit, formState, control } = useForm<Input>({
+  const { register, reset, handleSubmit, formState, control, watch } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
     defaultValues: {
@@ -58,7 +78,10 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
         {fields.map((field, index) => (
           <Box key={field.id} bg="CardBackground" rounded="2xl" p={4} position="relative">
             <Flex justify="space-between" align="center" mb={2}>
-              <Text fontWeight="600">Reaction role #{index + 1}</Text>
+              <Flex align="center" gap={2}>
+                <Text fontWeight="600">Reaction role #{index + 1}</Text>
+                <EmojiPreview emoji={watch(`items.${index}.emoji`)} />
+              </Flex>
               <IconButton
                 aria-label="Remove reaction role"
                 icon={<MdDelete />}

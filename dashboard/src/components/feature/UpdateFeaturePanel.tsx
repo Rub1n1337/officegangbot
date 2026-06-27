@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { RiErrorWarningFill as WarningIcon } from 'react-icons/ri';
 import { Box, Flex, Heading, Spacer, Text } from '@chakra-ui/layout';
 import { ButtonGroup, Button, Icon, Switch } from '@chakra-ui/react';
@@ -37,6 +38,18 @@ export function UpdateFeaturePanel({
 
   // Warn before navigating away with unsaved edits.
   useUnsavedChanges(enabled && Boolean(result.canSave));
+
+  // Ctrl/Cmd+S saves the form when there are unsaved changes.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (enabled && result.canSave) result.onSubmit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [enabled, result]);
 
   return (
     <Flex as="form" direction="column" gap={5} w="full" h="full">
