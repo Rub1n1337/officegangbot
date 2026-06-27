@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Divider, SimpleGrid } from '@chakra-ui/react';
+import { Box, Divider, Flex, SimpleGrid, Text } from '@chakra-ui/react';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { TextAreaForm } from '@/components/forms/TextAreaForm';
 import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
@@ -13,7 +13,10 @@ import type { UseFormRender } from '@/config/types/types';
 
 const schema = z.object({
   channel: z.string().optional(),
-  message: z.string().min(10, 'Rules message must be at least 10 characters'),
+  message: z
+    .string()
+    .min(10, 'Rules message must be at least 10 characters')
+    .max(4000, 'Rules message is too long (max 4000 characters)'),
   reactionEnabled: z.boolean(),
   reactionEmoji: z.string().optional(),
   reactionRole: z.string().optional(),
@@ -48,18 +51,25 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
           }}
           controller={{ control, name: 'channel' }}
         />
-        <TextAreaForm
-          control={{
-            label: 'Rules Message',
-            description: 'Enter the server rules. A scrollbar appears when the text is longer than the box.',
-            error: formState.errors.message?.message,
-          }}
-          placeholder="Be respectful..."
-          h="260px"
-          resize="vertical"
-          overflowY="auto"
-          {...register('message')}
-        />
+        <Box>
+          <TextAreaForm
+            control={{
+              label: 'Rules Message',
+              description: 'Enter the server rules. A scrollbar appears when the text is longer than the box.',
+              error: formState.errors.message?.message,
+            }}
+            placeholder="Be respectful..."
+            h="260px"
+            resize="vertical"
+            overflowY="auto"
+            {...register('message')}
+          />
+          <Flex justify="flex-end" mt={1}>
+            <Text fontSize="xs" color={(message?.length ?? 0) > 4000 ? 'red.400' : 'TextSecondary'}>
+              {(message?.length ?? 0).toLocaleString()} / 4,000
+            </Text>
+          </Flex>
+        </Box>
         <Divider my={1} />
         <SwitchFieldForm
           control={{
