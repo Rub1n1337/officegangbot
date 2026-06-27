@@ -12,7 +12,12 @@ import type { UseFormRender } from '@/config/types/types';
 
 const itemSchema = z.object({
   channelId: z.string().optional(),
-  messageId: z.string().optional(),
+  messageId: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^\d{17,20}$/.test(v.trim()), {
+      message: 'Message ID must be 17–20 digits (Developer Mode → right-click message → Copy Message ID).',
+    }),
   emoji: z.string().min(1, 'Emoji is required'),
   roleId: z.string().optional(),
 });
@@ -70,7 +75,7 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
               <InputForm
                 control={{
                   label: 'Message ID',
-                  description: 'ID of the message to watch',
+                  description: 'Developer Mode → right-click the message → Copy Message ID.',
                   error: formState.errors.items?.[index]?.messageId?.message,
                 }}
                 placeholder="123456789012345678"
