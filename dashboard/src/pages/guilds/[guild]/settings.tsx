@@ -1,4 +1,4 @@
-import { Badge, Box, Flex, Heading, Icon, SimpleGrid, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Icon, SimpleGrid, Skeleton, SkeletonText, Text } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import {
   MdPeople,
@@ -15,7 +15,6 @@ import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
 import { useGuildInfoQuery, useGuildStatsQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
-import { LoadingPanel } from '@/components/panel/LoadingPanel';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
 import type { GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 
@@ -125,6 +124,25 @@ function Overview({ stats }: { stats: GuildStats }) {
   );
 }
 
+function OverviewSkeleton() {
+  return (
+    <Flex direction="column" gap={4}>
+      <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={3}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Box key={i} bg="CardBackground" rounded="2xl" p={5}>
+            <Skeleton h="14px" w="55%" mb={3} rounded="md" />
+            <Skeleton h="28px" w="40%" rounded="md" />
+          </Box>
+        ))}
+      </SimpleGrid>
+      <Box bg="CardBackground" rounded="2xl" p={5}>
+        <Skeleton h="16px" w="40%" mb={4} rounded="md" />
+        <SkeletonText noOfLines={3} spacing={3} skeletonHeight={3} />
+      </Box>
+    </Flex>
+  );
+}
+
 const pulse = keyframes`
   0% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
   70% { box-shadow: 0 0 0 7px rgba(72, 187, 120, 0); }
@@ -178,7 +196,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           </Badge>
         ) : null}
       </Flex>
-      <QueryStatus query={statsQuery} loading={<LoadingPanel />} error="Failed to load guild stats.">
+      <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error="Failed to load guild stats.">
         {statsQuery.data && <Overview stats={statsQuery.data} />}
       </QueryStatus>
     </Flex>

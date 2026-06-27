@@ -8,6 +8,7 @@ import { useEnableFeatureMutation, useGuildInfoQuery, useUpdateFeatureMutation }
 import { Params } from '@/pages/guilds/[guild]/features/[feature]';
 import { feature as view } from '@/config/translations/feature';
 import { useRouter } from 'next/router';
+import { useUnsavedChanges } from '@/utils/useUnsavedChanges';
 
 export function UpdateFeaturePanel({
   feature,
@@ -33,6 +34,9 @@ export function UpdateFeaturePanel({
   const onToggle = (next: boolean) => {
     enableMutation.mutate({ enabled: next, guild, feature: featureId });
   };
+
+  // Warn before navigating away with unsaved edits.
+  useUnsavedChanges(enabled && Boolean(result.canSave));
 
   return (
     <Flex as="form" direction="column" gap={5} w="full" h="full">
