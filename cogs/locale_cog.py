@@ -10,22 +10,32 @@ from .utils import reply
 class LocaleCog(commands.Cog, name="🌐 Language"):
     """Per-guild language selection for the bot's responses."""
 
+    _CHOICES = [
+        app_commands.Choice(name="English", value="en"),
+        app_commands.Choice(name="Русский", value="ru"),
+    ]
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="language", description="Set the bot's language for this server.")
-    @app_commands.describe(locale="The language to use.")
-    @app_commands.choices(
-        locale=[
-            app_commands.Choice(name="English", value="en"),
-            app_commands.Choice(name="Русский", value="ru"),
-        ]
-    )
-    @has_permission("config")
-    async def language(self, ctx: commands.Context, locale: str):
+    async def _apply_language(self, ctx: commands.Context, locale: str):
         await self.bot.db.set_locale(ctx.guild.id, locale)
         # Confirm in the language just chosen.
         await reply(ctx, t(locale, "language.set"), ephemeral=True)
+
+    @commands.hybrid_command(name="language", description="Set the bot's language for this server.")
+    @app_commands.describe(locale="The language to use.")
+    @app_commands.choices(locale=_CHOICES)
+    @has_permission("config")
+    async def language(self, ctx: commands.Context, locale: str):
+        await self._apply_language(ctx, locale)
+
+    @commands.hybrid_command(name="lang", description="Set the bot's language (alias of /language).")
+    @app_commands.describe(locale="The language to use.")
+    @app_commands.choices(locale=_CHOICES)
+    @has_permission("config")
+    async def lang(self, ctx: commands.Context, locale: str):
+        await self._apply_language(ctx, locale)
 
 
 async def setup(bot: commands.Bot):
