@@ -177,8 +177,7 @@ officegangbot/
 ├── cogs/                  # moderation, levels, filter, reaction_roles,
 │   └── …                  # warnings, welcome, tickets, logging, automod, …
 ├── scripts/
-│   ├── init_db.sql         # Idempotent schema (applied on startup)
-│   └── migrate_json_to_pg.py
+│   └── init_db.sql         # Idempotent schema (applied on startup)
 ├── tests/                 # pytest suite
 └── dashboard/             # Next.js web dashboard
 ```
