@@ -43,6 +43,12 @@ export type CustomFeatures = {
   'filter': FilterFeature;
   'levels': LevelsFeature;
   'automod': AutomodFeature;
+  'tickets': TicketsFeature;
+};
+
+export type TicketsFeature = {
+  supportRole?: string | null;
+  category?: string | null;
 };
 
 // AutoMod has no configurable options — its rules are fixed and it's controlled

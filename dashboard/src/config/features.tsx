@@ -8,6 +8,7 @@ import {
   MdBlock,
   MdTrendingUp,
   MdGppGood,
+  MdConfirmationNumber,
 } from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
@@ -18,6 +19,7 @@ import { useModerationFeature } from './feature-forms/ModerationFeature';
 import { useFilterFeature } from './feature-forms/FilterFeature';
 import { useLevelsFeature } from './feature-forms/LevelsFeature';
 import { useAutomodFeature } from './feature-forms/AutomodFeature';
+import { useTicketsFeature } from './feature-forms/TicketsFeature';
 
 // Ordered feature categories, used to group the feature grid and the sidebar.
 export const featureCategories: { id: string; label: string }[] = [
@@ -81,5 +83,12 @@ export const features: FeaturesConfig = {
     icon: <Icon as={MdGppGood} />,
     category: 'safety',
     useRender: useAutomodFeature,
+  },
+  'tickets': {
+    name: 'Tickets',
+    description: 'Support ticket system with an Open Ticket button',
+    icon: <Icon as={MdConfirmationNumber} />,
+    category: 'safety',
+    useRender: useTicketsFeature,
   },
 };

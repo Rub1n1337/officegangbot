@@ -94,6 +94,14 @@ class OpenTicketView(discord.ui.View):
         bot = interaction.client
         loc = await bot.db.get_locale(guild.id)
 
+        # The dashboard toggle controls the ticket system via enabled_features.
+        enabled_features = await bot.db.get_enabled_features(guild.id)
+        if "tickets" not in enabled_features:
+            await interaction.response.send_message(
+                t(loc, "tickets.disabled"), ephemeral=True
+            )
+            return
+
         # Sanitize channel name for Unicode safety
         clean_name = re.sub(r'[^a-z0-9-]', '', member.name.lower()) or str(member.id)
         channel_name = f"ticket-{clean_name}-{member.id}"
