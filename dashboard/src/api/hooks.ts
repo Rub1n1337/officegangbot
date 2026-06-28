@@ -77,7 +77,17 @@ export function useMyBotGuilds() {
       if (!res.ok) throw new Error('Failed to load bot guilds');
       return res.json();
     },
-    { enabled: accessToken != null, staleTime: 60_000, retry: 1, retryDelay: 1000 }
+    {
+      enabled: accessToken != null,
+      staleTime: 60_000,
+      retry: 1,
+      retryDelay: 1000,
+      // A cold serverless start can briefly degrade to botReachable:false (the
+      // route returns 200, so this isn't an error). Poll until the bot is
+      // reachable so the presence badges appear without a manual reload, then
+      // stop refetching.
+      refetchInterval: (data) => (data && data.botReachable === false ? 4000 : false),
+    }
   );
 }
 
