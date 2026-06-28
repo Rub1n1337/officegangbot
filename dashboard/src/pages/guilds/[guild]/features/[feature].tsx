@@ -1,7 +1,7 @@
 import { Icon } from '@chakra-ui/react';
 import { Center, Heading, Text } from '@chakra-ui/layout';
 import { Button } from '@chakra-ui/react';
-import { LoadingPanel } from '@/components/panel/LoadingPanel';
+import { FeatureFormSkeleton } from '@/components/feature/FeatureFormSkeleton';
 import { features } from '@/config/features';
 import { CustomFeatures, FeatureConfig } from '@/config/types';
 import { BsSearch } from 'react-icons/bs';
@@ -28,7 +28,7 @@ const FeaturePage: NextPageWithLayout = () => {
 
   if (featureConfig == null) return <NotFound />;
   if (query.isError) return <NotEnabled />;
-  if (query.isLoading) return skeleton != null ? <>{skeleton}</> : <LoadingPanel />;
+  if (query.isLoading) return skeleton != null ? <>{skeleton}</> : <FeatureFormSkeleton />;
   return <UpdateFeaturePanel key={feature} feature={query.data} config={featureConfig} />;
 };
 

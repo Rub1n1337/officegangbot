@@ -1,7 +1,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Divider, Flex, IconButton, SimpleGrid, Text } from '@chakra-ui/react';
+import { Badge, Box, Button, Divider, Flex, IconButton, Progress, SimpleGrid, Text } from '@chakra-ui/react';
 import { MdAdd, MdDelete } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
@@ -43,6 +43,21 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
   return {
     component: (
       <Flex direction="column" gap={4}>
+        <Box bg="CardBackground" rounded="2xl" p={4}>
+          <Flex justify="space-between" align="center" mb={2}>
+            <Text fontWeight="600" fontSize="sm">
+              How <Text as="span" color="Brand">/rank</Text> looks to members
+            </Text>
+            <Badge colorScheme="purple" rounded="md">
+              Level 5
+            </Badge>
+          </Flex>
+          <Progress value={62} size="sm" rounded="full" colorScheme="purple" />
+          <Text fontSize="xs" color="TextSecondary" mt={1.5}>
+            620 / 1,000 XP · 380 to level 6
+          </Text>
+        </Box>
+
         <ChannelSelectForm
           control={{
             label: 'Level-up announcement channel',

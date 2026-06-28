@@ -1,7 +1,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Flex, IconButton, Image, SimpleGrid, Text } from '@chakra-ui/react';
+import { Badge, Box, Button, Flex, IconButton, Image, SimpleGrid, Text } from '@chakra-ui/react';
 import { MdAdd, MdDelete } from 'react-icons/md';
 
 // Renders the current emoji next to a reaction-role row: a custom server emoji
@@ -27,8 +27,34 @@ import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
 import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
+import { useRouter } from 'next/router';
+import { useGuildRolesQuery } from '@/api/hooks';
+import { toRGB } from '@/utils/common';
+import type { Role } from '@/api/bot';
 import type { ReactionRoleFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
+
+// A small "React [emoji] → get @Role" line so admins can sanity-check each rule.
+function RolePill({ roleId, roles }: { roleId?: string; roles: Role[] }) {
+  const role = roleId ? roles.find((r) => r.id === roleId) : undefined;
+  if (!role) {
+    return (
+      <Text as="span" color="TextSecondary">
+        a role
+      </Text>
+    );
+  }
+  const color = role.color ? toRGB(role.color) : undefined;
+  return (
+    <Badge
+      rounded="md"
+      variant="subtle"
+      {...(color ? { color, borderWidth: '1px', borderColor: color } : {})}
+    >
+      @{role.name}
+    </Badge>
+  );
+}
 
 const itemSchema = z.object({
   channelId: z.string().optional(),
@@ -66,6 +92,9 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+
+  const guildId = useRouter().query.guild as string;
+  const roles = useGuildRolesQuery(guildId).data ?? [];
 
   return {
     component: (
@@ -117,6 +146,12 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
                 controller={{ control, name: `items.${index}.roleId` }}
               />
             </SimpleGrid>
+            <Flex mt={3} align="center" gap={2} fontSize="sm" color="TextSecondary" wrap="wrap">
+              <Text>Preview: React</Text>
+              <EmojiPreview emoji={watch(`items.${index}.emoji`)} />
+              <Text>→ get</Text>
+              <RolePill roleId={watch(`items.${index}.roleId`)} roles={roles} />
+            </Flex>
           </Box>
         ))}
         <Button
