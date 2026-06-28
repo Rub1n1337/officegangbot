@@ -6,6 +6,7 @@ import {
   Icon,
   SimpleGrid,
   Skeleton,
+  Progress,
   SkeletonText,
   Text,
   useToken,
@@ -21,13 +22,16 @@ import {
   MdToggleOn,
 } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
+import { IoCheckmarkCircle, IoArrowForward } from 'react-icons/io5';
 import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
 import { useGuildInfoQuery, useGuildStatsQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
+import { getFeatures } from '@/utils/common';
 import type { GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 
 function StatCard({
@@ -196,6 +200,69 @@ function LiveIndicator({ updatedAt }: { updatedAt: number }) {
   );
 }
 
+// A gentle setup nudge: each feature is a step, ticked off once it's enabled.
+// Hidden once everything is configured. Doubles as quick links into each
+// feature's settings.
+function OnboardingChecklist({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
+  const all = getFeatures();
+  const enabled = new Set(enabledFeatures);
+  const done = all.filter((f) => enabled.has(f.id)).length;
+
+  if (done === all.length) return null;
+
+  const pct = Math.round((done / all.length) * 100);
+
+  return (
+    <Box bg="CardBackground" rounded="2xl" p={5}>
+      <Flex align="center" justify="space-between" gap={3} mb={2} wrap="wrap">
+        <Heading size="sm">Finish setting up</Heading>
+        <Text fontSize="sm" color="TextSecondary">
+          {done} / {all.length} configured
+        </Text>
+      </Flex>
+      <Progress value={pct} size="sm" rounded="full" colorScheme="brand" mb={4} />
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={2}>
+        {all.map((feature) => {
+          const isDone = enabled.has(feature.id);
+          return (
+            <Flex
+              key={feature.id}
+              as={Link}
+              href={`/guilds/${guild}/features/${feature.id}`}
+              align="center"
+              gap={3}
+              px={3}
+              py={2.5}
+              rounded="xl"
+              bg="blackAlpha.200"
+              _dark={{ bg: 'whiteAlpha.50' }}
+              _hover={{ bg: 'blackAlpha.300', _dark: { bg: 'whiteAlpha.100' } }}
+              opacity={isDone ? 0.65 : 1}
+            >
+              {isDone ? (
+                <Icon as={IoCheckmarkCircle} color="green.400" boxSize={5} />
+              ) : (
+                <Box color="Brand" display="flex">
+                  {feature.icon}
+                </Box>
+              )}
+              <Text
+                flex={1}
+                fontWeight={isDone ? '400' : '600'}
+                textDecoration={isDone ? 'line-through' : 'none'}
+                isTruncated
+              >
+                {feature.name}
+              </Text>
+              {!isDone && <Icon as={IoArrowForward} color="TextSecondary" />}
+            </Flex>
+          );
+        })}
+      </SimpleGrid>
+    </Box>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -221,6 +288,12 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           </Badge>
         ) : null}
       </Flex>
+      {infoQuery.data && (
+        <OnboardingChecklist
+          guild={guild}
+          enabledFeatures={infoQuery.data.enabledFeatures ?? []}
+        />
+      )}
       <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error="Failed to load guild stats.">
         {statsQuery.data && <Overview stats={statsQuery.data} />}
       </QueryStatus>
