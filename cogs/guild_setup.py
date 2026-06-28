@@ -12,6 +12,7 @@ DEFAULT_WELCOME_MESSAGE = "Welcome {user.mention} to **{server.name}**! We're gl
 # stored in the audit_log_id column (kept identical to the old text wizard).
 SETTING_COLUMNS = {
     "rules_channel_id": "rules_channel_id",
+    "welcome_channel_id": "welcome_channel_id",
     "welcome_message": "welcome_message",
     "punishment_log_id": "punishment_log_id",
     "usage_log_id": "usage_log_id",
@@ -111,10 +112,71 @@ class LogsView(discord.ui.View):
         return embed
 
 
-class WelcomeModal(discord.ui.Modal):
+class _WelcomeChannelSelect(discord.ui.ChannelSelect):
+    """Welcome-channel picker; stays on the welcome sub-panel."""
+
+    def __init__(self, placeholder: str):
+        super().__init__(
+            channel_types=[discord.ChannelType.text],
+            placeholder=placeholder,
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        sub: "WelcomeView" = self.view  # type: ignore[assignment]
+        sub.panel.data["welcome_channel_id"] = self.values[0].id
+        await interaction.response.edit_message(embed=sub.embed(), view=sub)
+
+
+class _EditWelcomeMessageButton(discord.ui.Button):
+    def __init__(self, loc: str):
+        super().__init__(label=t(loc, "setup.welcome_edit_message"), style=discord.ButtonStyle.primary, row=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        sub: "WelcomeView" = self.view  # type: ignore[assignment]
+        await interaction.response.send_modal(WelcomeModal(sub.panel, return_to=sub))
+
+
+class WelcomeView(discord.ui.View):
+    """Welcome sub-panel: pick the channel and edit the message text."""
+
     def __init__(self, panel: "SetupView"):
+        super().__init__(timeout=panel.timeout)
+        self.panel = panel
+        self.add_item(_WelcomeChannelSelect(t(panel.loc, "setup.welcome_channel_placeholder")))
+        self.add_item(_EditWelcomeMessageButton(panel.loc))
+        self.add_item(_BackButton(panel.loc))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return await self.panel.interaction_check(interaction)
+
+    def embed(self) -> discord.Embed:
+        loc = self.panel.loc
+        embed = discord.Embed(
+            title=t(loc, "setup.welcome_title"),
+            description=t(loc, "setup.welcome_desc"),
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(
+            name=t(loc, "setup.field_welcome_channel"),
+            value=_channel_value(loc, self.panel.data, "welcome_channel_id"),
+            inline=False,
+        )
+        welcome = self.panel.data.get("welcome_message")
+        embed.add_field(
+            name=t(loc, "setup.field_welcome_message"),
+            value=(f"`{welcome[:200]}`" if welcome else t(loc, "setup.welcome_default")),
+            inline=False,
+        )
+        return embed
+
+
+class WelcomeModal(discord.ui.Modal):
+    def __init__(self, panel: "SetupView", return_to: "WelcomeView | None" = None):
         super().__init__(title=t(panel.loc, "setup.welcome_modal_title"))
         self.panel = panel
+        self.return_to = return_to
         self.message = discord.ui.TextInput(
             label=t(panel.loc, "setup.welcome_input_label"),
             style=discord.TextStyle.paragraph,
@@ -127,7 +189,10 @@ class WelcomeModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         self.panel.data["welcome_message"] = self.message.value.strip()
-        await self.panel.show_main(interaction)
+        if self.return_to is not None:
+            await interaction.response.edit_message(embed=self.return_to.embed(), view=self.return_to)
+        else:
+            await self.panel.show_main(interaction)
 
 
 class SetupView(discord.ui.View):
@@ -193,7 +258,8 @@ class SetupView(discord.ui.View):
 
     @discord.ui.button(label="Welcome Message", emoji="👋", style=discord.ButtonStyle.secondary, row=0)
     async def welcome_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(WelcomeModal(self))
+        view = WelcomeView(self)
+        await interaction.response.edit_message(embed=view.embed(), view=view)
 
     @discord.ui.button(label="Log Channels", emoji="🪵", style=discord.ButtonStyle.secondary, row=0)
     async def logs_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -218,6 +284,11 @@ class SetupView(discord.ui.View):
                 value = self.data.get(key)
                 if value is not None:
                     await self.bot.db.set_guild_setting(self.guild_id, column, value)
+            # The welcome system only fires when the "welcome-message" feature is
+            # in enabled_features (not just the columns). If an admin picked a
+            # welcome channel here, turn the system on so it actually works.
+            if self.data.get("welcome_channel_id"):
+                await self.bot.db.set_feature_enabled(self.guild_id, "welcome-message", True)
         except Exception as e:
             logger.error(f"Setup save failed for guild {self.guild_id}: {e}", exc_info=True)
             await interaction.response.edit_message(
