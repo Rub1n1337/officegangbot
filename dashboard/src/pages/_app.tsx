@@ -6,6 +6,7 @@ import { client } from '@/api/hooks';
 import { NextPage } from 'next';
 import { ReactNode, useEffect, useState } from 'react';  // Added imports
 import Head from 'next/head';
+import { AppChrome } from '@/components/AppChrome';
 
 import '@/styles/global.css';
 import 'react-calendar/dist/Calendar.css';
@@ -44,6 +45,7 @@ export default function App({ Component, pageProps }: AppPropsWithLayout) {
         <Head>
           <title>OfficeGangBot</title>
         </Head>
+        <AppChrome />
         {getLayout(<Component {...pageProps} />)}
       </QueryClientProvider>
     </ChakraProvider>
