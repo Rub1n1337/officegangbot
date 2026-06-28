@@ -1,5 +1,13 @@
 import { Icon } from '@chakra-ui/react';
-import { MdMessage, MdSecurity, MdHistory, MdAddReaction, MdPeople, MdBlock } from 'react-icons/md';
+import {
+  MdMessage,
+  MdSecurity,
+  MdHistory,
+  MdAddReaction,
+  MdPeople,
+  MdBlock,
+  MdTrendingUp,
+} from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
 import { useRulesFeature } from './feature-forms/RulesFeature';
@@ -7,6 +15,7 @@ import { useReactionRoleFeature } from './feature-forms/ReactionRoleFeature';
 import { useLoggingFeature } from './feature-forms/LoggingFeature';
 import { useModerationFeature } from './feature-forms/ModerationFeature';
 import { useFilterFeature } from './feature-forms/FilterFeature';
+import { useLevelsFeature } from './feature-forms/LevelsFeature';
 
 // Ordered feature categories, used to group the feature grid and the sidebar.
 export const featureCategories: { id: string; label: string }[] = [
@@ -35,6 +44,13 @@ export const features: FeaturesConfig = {
     icon: <Icon as={MdAddReaction} />,
     category: 'engagement',
     useRender: useReactionRoleFeature,
+  },
+  'levels': {
+    name: 'Levels',
+    description: 'XP, level-up announcements and role rewards',
+    icon: <Icon as={MdTrendingUp} />,
+    category: 'engagement',
+    useRender: useLevelsFeature,
   },
   'moderation': {
     name: 'Moderation',
