@@ -275,7 +275,7 @@ class MyBot(commands.Bot):
         _needs_guild = {
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
-            "get_moderation", "delete_warning",
+            "get_moderation", "delete_warning", "set_locale",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -294,6 +294,7 @@ class MyBot(commands.Bot):
                 "icon": str(guild.icon) if guild.icon else None,
                 "member_count": guild.member_count,
                 "owner_id": str(guild.owner_id),
+                "locale": settings.get("locale") or "en",
                 "settings": settings,
                 "enabledFeatures": enabled_features,
             }
@@ -471,6 +472,15 @@ class MyBot(commands.Bot):
                 return {"error": "Invalid warning id"}
             removed = await self.db.delete_warning(guild_id, warning_id)
             return {"success": removed}
+
+        if action == "set_locale":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            locale = payload.get("locale")
+            if locale not in ("en", "ru"):
+                return {"error": "Unsupported locale"}
+            await self.db.set_locale(guild_id, locale)
+            return {"success": True, "locale": locale}
 
         if action == "enable_feature":
             feature = payload.get("feature")

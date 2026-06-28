@@ -86,6 +86,20 @@ export async function deleteWarning(session: AccessToken, guild: string, warning
   );
 }
 
+/** Sets the guild's bot language ('en' / 'ru'). */
+export async function setGuildLocale(session: AccessToken, guild: string, locale: string) {
+  return await callDefault(
+    `/api/guild/${guild}/locale`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale }),
+      },
+    })
+  );
+}
+
 export type GuildEmoji = {
   id: string;
   name: string;

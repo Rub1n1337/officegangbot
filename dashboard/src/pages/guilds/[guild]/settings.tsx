@@ -1,6 +1,8 @@
 import {
   Badge,
   Box,
+  Button,
+  ButtonGroup,
   Flex,
   Heading,
   Icon,
@@ -8,6 +10,7 @@ import {
   Skeleton,
   Progress,
   SkeletonText,
+  Spacer,
   Text,
   usePrefersReducedMotion,
   useToken,
@@ -29,7 +32,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useGuildInfoQuery, useGuildStatsQuery } from '@/api/hooks';
+import { useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
 import { getFeatures } from '@/utils/common';
@@ -271,6 +274,34 @@ function OnboardingChecklist({ guild, enabledFeatures }: { guild: string; enable
   );
 }
 
+// Sets the language the *bot* speaks in this server (its Discord replies),
+// not the dashboard UI language.
+function BotLanguage({ guild, locale }: { guild: string; locale: string }) {
+  const mutation = useSetLocaleMutation();
+  const current = locale === 'ru' ? 'ru' : 'en';
+  return (
+    <Flex align="center" gap={2}>
+      <Text fontSize="xs" color="TextSecondary">
+        Bot language
+      </Text>
+      <ButtonGroup size="sm" isAttached variant="outline" isDisabled={mutation.isLoading}>
+        {(['en', 'ru'] as const).map((l) => (
+          <Button
+            key={l}
+            onClick={() => current !== l && mutation.mutate({ guild, locale: l })}
+            textTransform="uppercase"
+            {...(current === l
+              ? { variant: 'solid', colorScheme: 'brand' }
+              : { variant: 'outline' })}
+          >
+            {l}
+          </Button>
+        ))}
+      </ButtonGroup>
+    </Flex>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -295,6 +326,8 @@ const GuildOverviewPage: NextPageWithLayout = () => {
             Bot offline
           </Badge>
         ) : null}
+        <Spacer />
+        {infoQuery.data && <BotLanguage guild={guild} locale={infoQuery.data.locale ?? 'en'} />}
       </Flex>
       {infoQuery.data && (
         <OnboardingChecklist

@@ -252,6 +252,14 @@ async def delete_warning(request: Request, guild_id: int, warning_id: int):
     data = await _rpc("delete_warning", guild_id=guild_id, warning_id=warning_id)
     return data
 
+@app.post("/api/guild/{guild_id}/locale", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def set_locale(request: Request, guild_id: int):
+    """Sets the guild's bot language ('en' / 'ru')."""
+    body = await request.json()
+    data = await _rpc("set_locale", guild_id=guild_id, locale=body.get("locale"))
+    return data
+
 # --- Endpoints required for fuma-nama/discord-bot-dashboard ---
 
 @app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])
