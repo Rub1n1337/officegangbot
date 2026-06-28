@@ -77,7 +77,7 @@ export function useMyBotGuilds() {
       if (!res.ok) throw new Error('Failed to load bot guilds');
       return res.json();
     },
-    { enabled: accessToken != null, staleTime: 60_000, retry: false }
+    { enabled: accessToken != null, staleTime: 60_000, retry: 1, retryDelay: 1000 }
   );
 }
 
