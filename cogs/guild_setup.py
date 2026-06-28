@@ -34,6 +34,20 @@ def _channel_value(loc: str, data: dict, key: str) -> str:
     return f"<#{cid}>" if cid else t(loc, "setup.not_set")
 
 
+async def _warn_if_cant_send(interaction: discord.Interaction, channel_id: int, loc: str) -> None:
+    """Warn the admin (ephemerally) if the bot can't post in the chosen channel,
+    so rules/welcome don't silently fail later."""
+    channel = interaction.guild.get_channel(channel_id) if interaction.guild else None
+    if channel and not channel.permissions_for(interaction.guild.me).send_messages:
+        try:
+            await interaction.followup.send(
+                t(loc, "setup.channel_no_send_perms", channel=channel.mention),
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            pass
+
+
 class _PickChannelSelect(discord.ui.ChannelSelect):
     """Single text-channel picker that writes one field then returns to the panel."""
 
@@ -50,6 +64,7 @@ class _PickChannelSelect(discord.ui.ChannelSelect):
         panel: "SetupView" = self.view.panel  # type: ignore[attr-defined]
         panel.data[self.field] = self.values[0].id
         await panel.show_main(interaction)
+        await _warn_if_cant_send(interaction, self.values[0].id, panel.loc)
 
 
 class _LogChannelSelect(discord.ui.ChannelSelect):
@@ -127,6 +142,7 @@ class _WelcomeChannelSelect(discord.ui.ChannelSelect):
         sub: "WelcomeView" = self.view  # type: ignore[assignment]
         sub.panel.data["welcome_channel_id"] = self.values[0].id
         await interaction.response.edit_message(embed=sub.embed(), view=sub)
+        await _warn_if_cant_send(interaction, self.values[0].id, sub.panel.loc)
 
 
 class _EditWelcomeMessageButton(discord.ui.Button):
