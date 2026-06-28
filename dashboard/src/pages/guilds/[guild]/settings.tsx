@@ -1,5 +1,17 @@
-import { Badge, Box, Flex, Heading, Icon, SimpleGrid, Skeleton, SkeletonText, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  Flex,
+  Heading,
+  Icon,
+  SimpleGrid,
+  Skeleton,
+  SkeletonText,
+  Text,
+  useToken,
+} from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
+import { StyledChart } from '@/components/chart/StyledChart';
 import {
   MdPeople,
   MdTag,
@@ -47,8 +59,42 @@ function StatCard({
   );
 }
 
-function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
+function XpBarChart({ rows }: { rows: GuildStatsTopXp[] }) {
   const medals = ['🥇', '🥈', '🥉'];
+  const [brand] = useToken('colors', ['brand.500']);
+
+  const series = [{ name: 'XP', data: rows.map((r) => r.xp) }];
+  const options: ApexCharts.ApexOptions = {
+    chart: { type: 'bar', sparkline: { enabled: false } },
+    colors: [brand],
+    plotOptions: {
+      bar: { horizontal: true, borderRadius: 6, barHeight: '68%' },
+    },
+    dataLabels: {
+      enabled: true,
+      // Show the member's level inside the bar; the bar length is their XP.
+      formatter: (_val, opts) => `Lvl ${rows[opts.dataPointIndex].level}`,
+      style: { colors: ['#fff'], fontWeight: '700' },
+    },
+    xaxis: {
+      categories: rows.map((r, i) => `${medals[i] ?? `#${i + 1}`} ${r.name}`),
+    },
+    tooltip: {
+      y: { formatter: (val: number) => `${val.toLocaleString()} XP` },
+    },
+  };
+
+  return (
+    <StyledChart
+      type="bar"
+      series={series}
+      options={options}
+      height={Math.max(160, rows.length * 46)}
+    />
+  );
+}
+
+function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
   return (
     <Box bg="CardBackground" rounded="2xl" p={5}>
       <Flex align="center" gap={2} mb={4}>
@@ -60,28 +106,7 @@ function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
           No XP data yet. Enable the Levels feature and let members chat to populate the leaderboard.
         </Text>
       ) : (
-        <Flex direction="column" gap={2}>
-          {rows.map((row, i) => (
-            <Flex key={i} align="center" justify="space-between" gap={3}>
-              <Flex align="center" gap={3} minW={0}>
-                <Text fontSize="lg" w="1.5em" textAlign="center">
-                  {medals[i] ?? `#${i + 1}`}
-                </Text>
-                <Text fontWeight="600" isTruncated>
-                  {row.name}
-                </Text>
-              </Flex>
-              <Flex align="center" gap={3} flexShrink={0}>
-                <Badge colorScheme="purple" rounded="md">
-                  Lvl {row.level}
-                </Badge>
-                <Text fontSize="sm" color="TextSecondary">
-                  {row.xp.toLocaleString()} XP
-                </Text>
-              </Flex>
-            </Flex>
-          ))}
-        </Flex>
+        <XpBarChart rows={rows} />
       )}
     </Box>
   );
