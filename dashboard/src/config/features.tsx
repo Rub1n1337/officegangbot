@@ -7,6 +7,7 @@ import {
   MdPeople,
   MdBlock,
   MdTrendingUp,
+  MdGppGood,
 } from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
@@ -16,6 +17,7 @@ import { useLoggingFeature } from './feature-forms/LoggingFeature';
 import { useModerationFeature } from './feature-forms/ModerationFeature';
 import { useFilterFeature } from './feature-forms/FilterFeature';
 import { useLevelsFeature } from './feature-forms/LevelsFeature';
+import { useAutomodFeature } from './feature-forms/AutomodFeature';
 
 // Ordered feature categories, used to group the feature grid and the sidebar.
 export const featureCategories: { id: string; label: string }[] = [
@@ -72,5 +74,12 @@ export const features: FeaturesConfig = {
     icon: <Icon as={MdBlock} />,
     category: 'safety',
     useRender: useFilterFeature,
+  },
+  'automod': {
+    name: 'AutoMod',
+    description: 'Automatic anti-spam and anti-mention-spam protection',
+    icon: <Icon as={MdGppGood} />,
+    category: 'safety',
+    useRender: useAutomodFeature,
   },
 };

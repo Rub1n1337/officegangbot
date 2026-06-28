@@ -42,7 +42,13 @@ export type CustomFeatures = {
   'logging': LoggingFeature;
   'filter': FilterFeature;
   'levels': LevelsFeature;
+  'automod': AutomodFeature;
 };
+
+// AutoMod has no configurable options — its rules are fixed and it's controlled
+// purely by the enable/disable toggle. The empty shape keeps it in the feature
+// system without a settings form.
+export type AutomodFeature = Record<string, never>;
 
 export type WelcomeMessageFeature = {
   channel?: string | null;
