@@ -252,6 +252,10 @@ class MyBot(commands.Bot):
                     for lvl, rid in sorted(level_roles.items())
                 ],
             },
+            "tickets": {
+                "supportRole": self._snowflake_or_none(settings.get("ticket_support_role_id")),
+                "category": self._snowflake_or_none(settings.get("ticket_category_id")),
+            },
         }
         return feature_data.get(feature, {})
 
@@ -530,6 +534,7 @@ class MyBot(commands.Bot):
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",
                 "autorole_id", "level_up_channel_id",
+                "ticket_support_role_id", "ticket_category_id",
                 "reaction_role_id", "punishment_log_id",
                 "usage_log_id", "audit_log_id", "leave_log_id",
                 "config_role_id", "kick_role_id", "ban_role_id",
@@ -552,6 +557,10 @@ class MyBot(commands.Bot):
                     "usageChannel": "usage_log_id",
                     "messagesChannel": "audit_log_id",
                     "leaveChannel": "leave_log_id",
+                },
+                "tickets": {
+                    "supportRole": "ticket_support_role_id",
+                    "category": "ticket_category_id",
                 },
             }
 
