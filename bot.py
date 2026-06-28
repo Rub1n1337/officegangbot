@@ -276,6 +276,7 @@ class MyBot(commands.Bot):
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale",
+            "search_members", "get_member",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -481,6 +482,81 @@ class MyBot(commands.Bot):
                 return {"error": "Unsupported locale"}
             await self.db.set_locale(guild_id, locale)
             return {"success": True, "locale": locale}
+
+        if action == "search_members":
+            guild = self.get_guild(guild_id)
+            if not guild:
+                return {"error": "Guild not found"}
+            query = str(payload.get("query") or "").strip().lower()
+            members = [m for m in guild.members if not m.bot]
+            if query:
+                members = [
+                    m for m in members
+                    if query in m.name.lower()
+                    or query in m.display_name.lower()
+                    or str(m.id).startswith(query)
+                ]
+            members.sort(key=lambda m: m.display_name.lower())
+            return {
+                "members": [
+                    {
+                        "id": str(m.id),
+                        "name": m.name,
+                        "displayName": m.display_name,
+                        "avatar": str(m.display_avatar.url),
+                    }
+                    for m in members[:25]
+                ]
+            }
+
+        if action == "get_member":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            try:
+                user_id = _validate_discord_id(payload.get("user_id"))
+            except ValueError:
+                return {"error": "Invalid user id"}
+            guild = self.get_guild(guild_id)
+            member = guild.get_member(user_id) if guild else None
+            xp = await self.db.get_user_xp(guild_id, user_id)
+            warnings = await self.db.get_warnings(guild_id, user_id)
+            result = {
+                "id": str(user_id),
+                "level": xp.get("level", 0),
+                "xp": xp.get("xp", 0),
+                "warnings": [
+                    {
+                        "id": w["id"],
+                        "reason": w["reason"],
+                        "moderatorName": w["moderator_name"],
+                        "createdAt": w["created_at"].isoformat() if w["created_at"] else None,
+                    }
+                    for w in warnings
+                ],
+            }
+            if member:
+                result.update({
+                    "name": member.name,
+                    "displayName": member.display_name,
+                    "avatar": str(member.display_avatar.url),
+                    "joinedAt": member.joined_at.isoformat() if member.joined_at else None,
+                    "inServer": True,
+                    "roles": [
+                        {"id": str(r.id), "name": r.name, "color": r.color.value}
+                        for r in reversed(member.roles) if not r.is_default()
+                    ],
+                })
+            else:
+                name = xp.get("display_name") or f"User {user_id}"
+                result.update({
+                    "name": name,
+                    "displayName": name,
+                    "avatar": None,
+                    "joinedAt": None,
+                    "inServer": False,
+                    "roles": [],
+                })
+            return result
 
         if action == "enable_feature":
             feature = payload.get("feature")

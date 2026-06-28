@@ -50,6 +50,39 @@ export type ModerationData = {
   leaderboard: ModerationLeaderItem[];
 };
 
+export type MemberSearchItem = {
+  id: string;
+  name: string;
+  displayName: string;
+  avatar: string;
+};
+
+export type MemberRole = {
+  id: string;
+  name: string;
+  color: number;
+};
+
+export type MemberWarning = {
+  id: number;
+  reason: string;
+  moderatorName: string;
+  createdAt: string | null;
+};
+
+export type MemberDetail = {
+  id: string;
+  name: string;
+  displayName: string;
+  avatar: string | null;
+  joinedAt: string | null;
+  inServer: boolean;
+  roles: MemberRole[];
+  level: number;
+  xp: number;
+  warnings: MemberWarning[];
+};
+
 export type GuildStats = {
   id: string;
   name: string;
