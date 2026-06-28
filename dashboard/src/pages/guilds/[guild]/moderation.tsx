@@ -1,20 +1,26 @@
 import {
   Badge,
   Box,
+  Button,
   Flex,
   Heading,
   Icon,
   IconButton,
   Skeleton,
   Text,
+  useToast,
 } from '@chakra-ui/react';
 import { MdDelete, MdGavel, MdTimer } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useModerationQuery, useDeleteWarningMutation } from '@/api/hooks';
+import {
+  useModerationQuery,
+  useDeleteWarningMutation,
+  useModerateMemberMutation,
+} from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import type {
   ModerationLeaderItem,
@@ -73,8 +79,59 @@ function Section({
   );
 }
 
+const INITIAL_WARNINGS = 12;
+const INITIAL_LEADERS = 10;
+
 function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string }) {
   const del = useDeleteWarningMutation();
+  const undo = useModerateMemberMutation();
+  const toast = useToast();
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? rows : rows.slice(0, INITIAL_WARNINGS);
+
+  const handleDelete = (w: ModerationWarning) => {
+    del.mutate(
+      { guild, id: w.id },
+      {
+        onSuccess: () => {
+          toast({
+            duration: 6000,
+            isClosable: true,
+            position: 'bottom-right',
+            render: ({ onClose }) => (
+              <Flex
+                bg="CardBackground"
+                rounded="lg"
+                shadow="md"
+                p={3}
+                align="center"
+                gap={3}
+                borderWidth="1px"
+                borderColor="whiteAlpha.200"
+              >
+                <Text fontSize="sm">Warning removed</Text>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => {
+                    undo.mutate({
+                      guild,
+                      userId: w.userId,
+                      body: { act: 'warn', reason: w.reason, moderatorName: w.moderatorName },
+                    });
+                    onClose();
+                  }}
+                >
+                  Undo
+                </Button>
+              </Flex>
+            ),
+          });
+        },
+      }
+    );
+  };
+
   return (
     <Section icon={<Icon as={MdGavel} color="Brand" />} title="Recent warnings" count={rows.length}>
       {rows.length === 0 ? (
@@ -83,7 +140,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
         </Text>
       ) : (
         <Flex direction="column" gap={2}>
-          {rows.map((w) => (
+          {shown.map((w) => (
             <Flex
               key={w.id}
               align="center"
@@ -114,10 +171,15 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
                 variant="ghost"
                 colorScheme="red"
                 isLoading={del.isLoading && del.variables?.id === w.id}
-                onClick={() => del.mutate({ guild, id: w.id })}
+                onClick={() => handleDelete(w)}
               />
             </Flex>
           ))}
+          {rows.length > INITIAL_WARNINGS && (
+            <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Show less' : `Show all ${rows.length}`}
+            </Button>
+          )}
         </Flex>
       )}
     </Section>
@@ -176,6 +238,8 @@ function Punishments({ rows }: { rows: ModerationPunishment[] }) {
 
 function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
   const medals = ['🥇', '🥈', '🥉'];
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? rows : rows.slice(0, INITIAL_LEADERS);
   return (
     <Section
       icon={<Icon as={FaCrown} color="Brand" />}
@@ -188,7 +252,7 @@ function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
         </Text>
       ) : (
         <Flex direction="column" gap={1}>
-          {rows.map((r, i) => (
+          {shown.map((r, i) => (
             <Flex key={r.userId} align="center" justify="space-between" gap={3} py={1.5}>
               <Flex align="center" gap={3} minW={0}>
                 <Text fontSize="sm" w="1.8em" textAlign="center" color="TextSecondary">
@@ -208,6 +272,11 @@ function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
               </Flex>
             </Flex>
           ))}
+          {rows.length > INITIAL_LEADERS && (
+            <Button size="sm" variant="ghost" alignSelf="center" mt={1} onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Show less' : `Show all ${rows.length}`}
+            </Button>
+          )}
         </Flex>
       )}
     </Section>

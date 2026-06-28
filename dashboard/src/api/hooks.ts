@@ -353,16 +353,11 @@ export function useDeleteWarningMutation() {
     ({ guild, id }: { guild: string; id: number }) => deleteWarning(session!!, guild, id),
     {
       onSuccess(_, { guild, id }) {
+        // Optimistically drop it from the cached list. The success toast (with
+        // an Undo action) is shown by the caller, which has the warning's data.
         client.setQueryData<ModerationData>(['moderation', guild], (prev) =>
           prev ? { ...prev, warnings: prev.warnings.filter((w) => w.id !== id) } : prev
         );
-        toast({
-          title: 'Warning removed',
-          status: 'success',
-          duration: 2500,
-          isClosable: true,
-          position: 'bottom-right',
-        });
       },
       onError() {
         toast({
