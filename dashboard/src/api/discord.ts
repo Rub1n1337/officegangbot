@@ -19,7 +19,7 @@ export type UserInfo = {
 export type Guild = {
   id: string;
   name: string;
-  icon: string;
+  icon: string | null; // Discord sends null when the guild has no icon
   permissions: string;
 };
 
@@ -116,7 +116,10 @@ export async function getGuild(accessToken: string, id: string) {
   );
 }
 
-export function iconUrl(guild: Guild) {
+export function iconUrl(guild: Guild): string | undefined {
+  // No icon -> return undefined so <Avatar src> skips the request and falls back
+  // to initials, instead of fetching .../icons/<id>/null and 404/503-ing.
+  if (!guild.icon) return undefined;
   return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}`;
 }
 
