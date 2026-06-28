@@ -1,4 +1,5 @@
-import { Flex, Heading, SimpleGrid } from '@chakra-ui/react';
+import { Badge, Button, ButtonGroup, Flex, Heading, SimpleGrid, Text } from '@chakra-ui/react';
+import { useState } from 'react';
 import { LoadingPanel } from '@/components/panel/LoadingPanel';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { guild as view } from '@/config/translations/guild';
@@ -28,24 +29,60 @@ const GuildPage: NextPageWithLayout = () => {
   );
 };
 
+type FeatureFilter = 'all' | 'enabled' | 'disabled';
+
 function GuildPanel({ guild: id, info }: { guild: string; info: CustomGuildInfo }) {
   const t = view.useTranslations();
+  const [filter, setFilter] = useState<FeatureFilter>('all');
+
+  const all = getFeatures();
+  const enabledSet = new Set(info.enabledFeatures ?? []);
+  const enabledCount = all.filter((f) => enabledSet.has(f.id)).length;
+  const shown = all.filter((f) => {
+    if (filter === 'enabled') return enabledSet.has(f.id);
+    if (filter === 'disabled') return !enabledSet.has(f.id);
+    return true;
+  });
 
   return (
     <Flex direction="column" gap={5}>
       <Banner />
-      <Flex direction="column" gap={5} mt={3}>
-        <Heading size="md">{t.features}</Heading>
+      <Flex direction="column" gap={4} mt={3}>
+        <Flex align="center" justify="space-between" gap={3} wrap="wrap">
+          <Flex align="center" gap={3} wrap="wrap">
+            <Heading size="md">{t.features}</Heading>
+            <Badge colorScheme="green" rounded="md" px={2} py={1} fontSize="0.75em">
+              {enabledCount} / {all.length} enabled
+            </Badge>
+          </Flex>
+          <ButtonGroup size="sm" isAttached variant="outline">
+            {(['all', 'enabled', 'disabled'] as const).map((key) => (
+              <Button
+                key={key}
+                onClick={() => setFilter(key)}
+                textTransform="capitalize"
+                {...(filter === key
+                  ? { variant: 'solid', colorScheme: 'brand' }
+                  : { variant: 'outline' })}
+              >
+                {key}
+              </Button>
+            ))}
+          </ButtonGroup>
+        </Flex>
         <SimpleGrid columns={{ base: 1, md: 2, '2xl': 3 }} gap={3}>
-          {getFeatures().map((feature) => (
+          {shown.map((feature) => (
             <FeatureItem
               key={feature.id}
               guild={id}
               feature={feature}
-              enabled={(info.enabledFeatures ?? []).includes(feature.id)}
+              enabled={enabledSet.has(feature.id)}
             />
           ))}
         </SimpleGrid>
+        {shown.length === 0 && (
+          <Text color="TextSecondary">No {filter} features.</Text>
+        )}
       </Flex>
     </Flex>
   );
