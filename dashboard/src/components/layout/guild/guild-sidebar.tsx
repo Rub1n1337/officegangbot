@@ -1,11 +1,12 @@
 import { FaChevronLeft as ChevronLeftIcon } from 'react-icons/fa';
 import { Flex, HStack, Text, VStack } from '@chakra-ui/layout';
-import { Icon, IconButton } from '@chakra-ui/react';
+import { Button, Icon, IconButton, Kbd, Spacer } from '@chakra-ui/react';
 import { Fragment } from 'react';
 import { HSeparator } from '@/components/layout/Separator';
 import { getFeatures } from '@/utils/common';
 import { featureCategories } from '@/config/features';
-import { IoStatsChart } from 'react-icons/io5';
+import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
+import { IoStatsChart, IoSearch } from 'react-icons/io5';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
 import { guild as view } from '@/config/translations/guild';
@@ -33,6 +34,20 @@ export function InGuildSidebar() {
           {guild?.name}
         </Text>
       </HStack>
+      <Button
+        size="sm"
+        variant="outline"
+        justifyContent="flex-start"
+        leftIcon={<Icon as={IoSearch} />}
+        color="TextSecondary"
+        fontWeight="500"
+        mb={1}
+        onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE))}
+      >
+        Search…
+        <Spacer />
+        <Kbd>⌘K</Kbd>
+      </Button>
       <VStack align="stretch">
         <SidebarItem
           href={`/guilds/${guildId}/settings`}
