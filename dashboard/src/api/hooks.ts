@@ -12,6 +12,7 @@ import {
   fetchGuildStats,
   fetchModeration,
   getFeature,
+  setGuildLocale,
   updateFeature,
 } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
@@ -233,6 +234,39 @@ export function useGuildStatsQuery(guild: string) {
     refetchIntervalInBackground: false,
     retry: false,
   });
+}
+
+export function useSetLocaleMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, locale }: { guild: string; locale: string }) =>
+      setGuildLocale(session!!, guild, locale),
+    {
+      onSuccess(_, { guild, locale }) {
+        client.setQueryData<CustomGuildInfo | null>(Keys.guild_info(guild), (prev) =>
+          prev ? { ...prev, locale } : prev
+        );
+        toast({
+          title: 'Bot language updated',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError() {
+        toast({
+          title: 'Failed to update language',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
 }
 
 export function useModerationQuery(guild: string) {

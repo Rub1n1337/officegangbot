@@ -11,6 +11,7 @@ export type CustomGuildInfo = GuildInfo & {
   icon?: string | null;
   owner_id: string;
   member_count: number;
+  locale?: string;
 };
 
 export type GuildStatsTopXp = {
