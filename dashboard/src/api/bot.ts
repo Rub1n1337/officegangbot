@@ -1,4 +1,4 @@
-import { CustomFeatures, CustomGuildInfo, GuildStats } from '@/config/types/custom-types';
+import { CustomFeatures, CustomGuildInfo, GuildStats, ModerationData } from '@/config/types/custom-types';
 import { AccessToken } from '@/utils/auth/server';
 import { callDefault, callReturn } from '@/utils/fetch/core';
 import { botRequest } from '@/utils/fetch/requests';
@@ -58,6 +58,29 @@ export async function fetchGuildStats(session: AccessToken, guild: string): Prom
     botRequest(session, {
       request: {
         method: 'GET',
+      },
+    })
+  );
+}
+
+/** Moderation panel data: recent warnings, active timed punishments, leaderboard. */
+export async function fetchModeration(session: AccessToken, guild: string): Promise<ModerationData> {
+  return await callReturn<ModerationData>(
+    `/api/guild/${guild}/moderation`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
+export async function deleteWarning(session: AccessToken, guild: string, warningId: number) {
+  return await callDefault(
+    `/api/guild/${guild}/warnings/${warningId}`,
+    botRequest(session, {
+      request: {
+        method: 'DELETE',
       },
     })
   );

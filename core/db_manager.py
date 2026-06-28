@@ -297,6 +297,30 @@ class DatabaseManager:
             )
             return int(result.split()[-1])
 
+    async def get_recent_warnings(self, guild_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """Returns the most recent warnings across the whole guild (for the dashboard)."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, user_id, reason, moderator_id, moderator_name, created_at
+                FROM warnings
+                WHERE guild_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2
+                """,
+                guild_id, limit
+            )
+            return [dict(r) for r in rows]
+
+    async def delete_warning(self, guild_id: int, warning_id: int) -> bool:
+        """Deletes a single warning by id. Returns True if a row was removed."""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM warnings WHERE guild_id = $1 AND id = $2",
+                guild_id, warning_id
+            )
+            return int(result.split()[-1]) > 0
+
     # -------------------------
     # Timed Punishments
     # -------------------------

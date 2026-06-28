@@ -7,6 +7,7 @@ import { getFeatures } from '@/utils/common';
 import { featureCategories } from '@/config/features';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 import { IoStatsChart, IoSearch } from 'react-icons/io5';
+import { MdGavel } from 'react-icons/md';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
 import { guild as view } from '@/config/translations/guild';
@@ -54,6 +55,12 @@ export function InGuildSidebar() {
           active={router.route === `/guilds/[guild]/settings`}
           icon={<Icon as={IoStatsChart} />}
           name={t.bn.settings}
+        />
+        <SidebarItem
+          href={`/guilds/${guildId}/moderation`}
+          active={router.route === `/guilds/[guild]/moderation`}
+          icon={<Icon as={MdGavel} />}
+          name="Moderation"
         />
         {featureCategories.map((cat) => {
           const items = getFeatures().filter((f) => f.category === cat.id);
