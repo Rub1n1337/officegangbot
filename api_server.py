@@ -274,6 +274,23 @@ async def get_member(request: Request, guild_id: int, user_id: int):
     data = await _rpc("get_member", guild_id=guild_id, user_id=user_id)
     return data
 
+@app.post("/api/guild/{guild_id}/members/{user_id}/moderate", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def moderate_member(request: Request, guild_id: int, user_id: int):
+    """Performs a moderation action (warn/mute/unmute/kick/ban) on a member."""
+    body = await request.json()
+    data = await _rpc(
+        "moderate_member",
+        guild_id=guild_id,
+        user_id=user_id,
+        act=body.get("act"),
+        reason=body.get("reason"),
+        duration_minutes=body.get("durationMinutes"),
+        moderator_id=body.get("moderatorId"),
+        moderator_name=body.get("moderatorName"),
+    )
+    return data
+
 # --- Endpoints required for fuma-nama/discord-bot-dashboard ---
 
 @app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])

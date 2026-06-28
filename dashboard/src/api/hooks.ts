@@ -13,10 +13,12 @@ import {
   fetchMemberDetail,
   fetchModeration,
   getFeature,
+  moderateMember,
   searchMembers,
   setGuildLocale,
   updateFeature,
 } from '@/api/bot';
+import type { ModeratePayload } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
 import type { MemberDetail, MemberSearchItem, ModerationData } from '@/config/types/custom-types';
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
@@ -263,6 +265,39 @@ export function useMemberDetailQuery(guild: string, userId: string | null) {
       enabled: status === 'authenticated' && userId != null,
       staleTime: 15_000,
       retry: false,
+    }
+  );
+}
+
+export function useModerateMemberMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, userId, body }: { guild: string; userId: string; body: ModeratePayload }) =>
+      moderateMember(session!!, guild, userId, body),
+    {
+      onSuccess(res, { guild, userId }) {
+        client.invalidateQueries(['member_detail', guild, userId]);
+        client.invalidateQueries(['moderation', guild]);
+        toast({
+          title: res?.message ?? 'Action applied',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError(err) {
+        toast({
+          title: 'Action failed',
+          description: (err as Error).message,
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
     }
   );
 }

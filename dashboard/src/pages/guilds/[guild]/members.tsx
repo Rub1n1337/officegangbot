@@ -1,4 +1,10 @@
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Avatar,
   Badge,
   Box,
@@ -9,19 +15,27 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  Select,
   Skeleton,
   Text,
+  Textarea,
   Wrap,
   WrapItem,
 } from '@chakra-ui/react';
 import { IoSearch, IoArrowBack, IoWarning } from 'react-icons/io5';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useMemberSearchQuery, useMemberDetailQuery } from '@/api/hooks';
+import {
+  useMemberSearchQuery,
+  useMemberDetailQuery,
+  useModerateMemberMutation,
+  useSelfUserQuery,
+} from '@/api/hooks';
 import { useDebounce } from '@/utils/useDebounce';
 import { toRGB } from '@/utils/common';
+import type { ModerateAction } from '@/api/bot';
 import type { MemberDetail } from '@/config/types/custom-types';
 
 function fmtDate(iso: string | null): string {
@@ -31,7 +45,155 @@ function fmtDate(iso: string | null): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function DetailCard({ data, onBack }: { data: MemberDetail; onBack: () => void }) {
+function ModerateBar({
+  guild,
+  member,
+  moderatorId,
+  moderatorName,
+}: {
+  guild: string;
+  member: MemberDetail;
+  moderatorId?: string;
+  moderatorName?: string;
+}) {
+  const mutation = useModerateMemberMutation();
+  const [pending, setPending] = useState<ModerateAction | null>(null);
+  const [reason, setReason] = useState('');
+  const [minutes, setMinutes] = useState(60);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const open = (act: ModerateAction) => {
+    setReason('');
+    setMinutes(60);
+    setPending(act);
+  };
+  const danger = pending === 'kick' || pending === 'ban';
+
+  const confirm = () => {
+    if (!pending) return;
+    mutation.mutate(
+      {
+        guild,
+        userId: member.id,
+        body: {
+          act: pending,
+          reason,
+          durationMinutes: pending === 'mute' ? minutes : undefined,
+          moderatorId,
+          moderatorName,
+        },
+      },
+      { onSettled: () => setPending(null) }
+    );
+  };
+
+  return (
+    <Box mt={4}>
+      <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary" mb={2}>
+        Actions
+      </Text>
+      <Wrap>
+        <WrapItem>
+          <Button size="sm" onClick={() => open('warn')} isDisabled={!member.inServer}>
+            Warn
+          </Button>
+        </WrapItem>
+        <WrapItem>
+          <Button size="sm" onClick={() => open('mute')} isDisabled={!member.inServer}>
+            Mute
+          </Button>
+        </WrapItem>
+        <WrapItem>
+          <Button size="sm" variant="outline" onClick={() => open('unmute')} isDisabled={!member.inServer}>
+            Unmute
+          </Button>
+        </WrapItem>
+        <WrapItem>
+          <Button
+            size="sm"
+            colorScheme="orange"
+            variant="outline"
+            onClick={() => open('kick')}
+            isDisabled={!member.inServer}
+          >
+            Kick
+          </Button>
+        </WrapItem>
+        <WrapItem>
+          <Button size="sm" colorScheme="red" onClick={() => open('ban')}>
+            Ban
+          </Button>
+        </WrapItem>
+      </Wrap>
+
+      <AlertDialog
+        isOpen={pending != null}
+        leastDestructiveRef={cancelRef}
+        onClose={() => setPending(null)}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="CardBackground" mx={4}>
+            <AlertDialogHeader textTransform="capitalize">
+              {pending} {member.displayName}?
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              {pending !== 'unmute' && (
+                <Textarea
+                  placeholder="Reason (optional)"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  mb={pending === 'mute' ? 3 : 0}
+                />
+              )}
+              {pending === 'mute' && (
+                <Select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
+                  <option value={10}>10 minutes</option>
+                  <option value={60}>1 hour</option>
+                  <option value={1440}>1 day</option>
+                  <option value={10080}>7 days</option>
+                </Select>
+              )}
+              {danger && (
+                <Text fontSize="sm" color="red.400" mt={3}>
+                  This can’t be undone from the dashboard.
+                </Text>
+              )}
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={() => setPending(null)} variant="ghost">
+                Cancel
+              </Button>
+              <Button
+                colorScheme={danger ? 'red' : 'brand'}
+                ml={3}
+                isLoading={mutation.isLoading}
+                onClick={confirm}
+                textTransform="capitalize"
+              >
+                {pending}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+    </Box>
+  );
+}
+
+function DetailCard({
+  data,
+  onBack,
+  guild,
+  moderatorId,
+  moderatorName,
+}: {
+  data: MemberDetail;
+  onBack: () => void;
+  guild: string;
+  moderatorId?: string;
+  moderatorName?: string;
+}) {
   return (
     <Box bg="CardBackground" rounded="2xl" p={5}>
       <Flex align="center" gap={4} mb={4}>
@@ -108,6 +270,13 @@ function DetailCard({ data, onBack }: { data: MemberDetail; onBack: () => void }
           </Flex>
         )}
       </Box>
+
+      <ModerateBar
+        guild={guild}
+        member={data}
+        moderatorId={moderatorId}
+        moderatorName={moderatorName}
+      />
     </Box>
   );
 }
@@ -117,6 +286,10 @@ const MembersPage: NextPageWithLayout = () => {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const debounced = useDebounce(query, 300);
+
+  const self = useSelfUserQuery();
+  const moderatorName = self.data ? self.data.username : undefined;
+  const moderatorId = self.data?.id;
 
   const search = useMemberSearchQuery(guild, debounced);
   const detail = useMemberDetailQuery(guild, selected);
@@ -147,7 +320,13 @@ const MembersPage: NextPageWithLayout = () => {
         detail.isLoading ? (
           <Skeleton h="220px" rounded="2xl" />
         ) : detail.data ? (
-          <DetailCard data={detail.data} onBack={() => setSelected(null)} />
+          <DetailCard
+            data={detail.data}
+            onBack={() => setSelected(null)}
+            guild={guild}
+            moderatorId={moderatorId}
+            moderatorName={moderatorName}
+          />
         ) : (
           <Text color="TextSecondary">Couldn’t load this member.</Text>
         )
