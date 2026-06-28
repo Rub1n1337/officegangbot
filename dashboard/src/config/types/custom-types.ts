@@ -41,11 +41,23 @@ export type CustomFeatures = {
   'moderation': ModerationFeature;
   'logging': LoggingFeature;
   'filter': FilterFeature;
+  'levels': LevelsFeature;
 };
 
 export type WelcomeMessageFeature = {
   channel?: string | null;
   message: string;
+  autorole?: string | null;
+};
+
+export type LevelRewardItem = {
+  level: number;
+  roleId?: string | null;
+};
+
+export type LevelsFeature = {
+  channel?: string | null;
+  rewards: LevelRewardItem[];
 };
 
 export type RulesFeature = {

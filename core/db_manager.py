@@ -381,6 +381,14 @@ class DatabaseManager:
             )
             return {r['level']: r['role_id'] for r in rows}
 
+    async def remove_level_role(self, guild_id: int, level: int) -> None:
+        """Removes the role reward configured for a specific level."""
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM level_roles WHERE guild_id = $1 AND level = $2",
+                guild_id, level
+            )
+
     # -------------------------
     # Mod Roles
     # -------------------------

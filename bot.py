@@ -195,6 +195,7 @@ class MyBot(commands.Bot):
         settings = await self.db.get_all_guild_settings(guild_id)
         mod_roles = await self.db.get_mod_roles(guild_id)
         reaction_roles = await self.db.get_reaction_roles(guild_id)
+        level_roles = await self.db.get_level_roles(guild_id)
 
         def _first_role(perm: str):
             ids = mod_roles.get(perm) or []
@@ -222,6 +223,7 @@ class MyBot(commands.Bot):
             "welcome-message": {
                 "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
                 "message": str(settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!"),
+                "autorole": self._snowflake_or_none(settings.get("autorole_id")),
             },
             "reaction-role": {
                 "items": standalone_rr,
@@ -242,6 +244,13 @@ class MyBot(commands.Bot):
             },
             "filter": {
                 "words": settings.get("filter_words") or [],
+            },
+            "levels": {
+                "channel": self._snowflake_or_none(settings.get("level_up_channel_id")),
+                "rewards": [
+                    {"level": lvl, "roleId": str(rid)}
+                    for lvl, rid in sorted(level_roles.items())
+                ],
             },
         }
         return feature_data.get(feature, {})
@@ -443,6 +452,41 @@ class MyBot(commands.Bot):
                         await self.db.set_mod_role(guild_id, role_id, perm)
                 return {"success": True}
 
+            # Level role rewards live in the level_roles table (one role per
+            # level), not in guilds columns, so they are reconciled separately:
+            # set/replace the levels present and drop the ones removed. The
+            # level-up announce channel is a normal column.
+            if feature == "levels":
+                if "channel" in options and options.get("channel") is not None:
+                    try:
+                        await self.db.set_guild_setting(
+                            guild_id, "level_up_channel_id", int(options["channel"])
+                        )
+                    except (TypeError, ValueError):
+                        return {"error": "Invalid level-up channel id"}
+                rewards = options.get("rewards")
+                if isinstance(rewards, list):
+                    desired: dict[int, int] = {}
+                    for r in rewards:
+                        lvl_raw, role_raw = r.get("level"), r.get("roleId")
+                        if lvl_raw in (None, "") or not role_raw:
+                            continue
+                        try:
+                            lvl = int(lvl_raw)
+                            role_id = _validate_discord_id(role_raw)
+                        except (TypeError, ValueError):
+                            return {"error": "Invalid level reward (level must be a number, role a valid id)"}
+                        if lvl < 1:
+                            continue
+                        desired[lvl] = role_id
+                    current = await self.db.get_level_roles(guild_id)
+                    for lvl in current:
+                        if lvl not in desired:
+                            await self.db.remove_level_role(guild_id, lvl)
+                    for lvl, role_id in desired.items():
+                        await self.db.set_level_role(guild_id, lvl, role_id)
+                return {"success": True}
+
             # Filter word list is a TEXT[] column and feeds a cached compiled
             # regex, so it is handled separately: normalise the list and
             # invalidate the filter cog's pattern cache so changes apply at once.
@@ -485,6 +529,7 @@ class MyBot(commands.Bot):
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",
+                "autorole_id", "level_up_channel_id",
                 "reaction_role_id", "punishment_log_id",
                 "usage_log_id", "audit_log_id", "leave_log_id",
                 "config_role_id", "kick_role_id", "ban_role_id",
@@ -500,6 +545,7 @@ class MyBot(commands.Bot):
                 "welcome-message": {
                     "channel": "welcome_channel_id",
                     "message": "welcome_message",
+                    "autorole": "autorole_id",
                 },
                 "logging": {
                     "logChannel": "punishment_log_id",

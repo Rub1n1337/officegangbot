@@ -6,12 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/router';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
+import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { WelcomePreview } from '@/components/feature/WelcomePreview';
 import { useGuildPreview } from '@/api/hooks';
 
 const schema = z.object({
   message: z.string().min(1),
   channel: z.string().optional(),
+  autorole: z.string().optional(),
 });
 
 type Input = z.infer<typeof schema>;
@@ -23,6 +25,7 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
     defaultValues: {
       channel: data.channel ?? undefined,
       message: data.message ?? '',
+      autorole: data.autorole ?? undefined,
     },
   });
 
@@ -50,6 +53,13 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
             placeholder="Welcome {user.mention} to {server.name}! We're glad to have you."
             {...register('message')}
           />
+          <RoleSelectForm
+            control={{
+              label: 'Auto-role (optional)',
+              description: 'Automatically given to every member when they join.',
+            }}
+            controller={{ control, name: 'autorole' }}
+          />
         </SimpleGrid>
         <Divider my={1} />
         <WelcomePreview message={message ?? ''} serverName={guild?.name ?? 'your server'} />
@@ -60,12 +70,14 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
         JSON.stringify({
           message: e.message,
           channel: e.channel,
+          autorole: e.autorole,
         })
       );
 
       reset({
         ...data,
         channel: data.channel ?? undefined,
+        autorole: data.autorole ?? undefined,
       });
     }),
     canSave: formState.isDirty,
