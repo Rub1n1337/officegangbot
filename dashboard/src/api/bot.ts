@@ -125,6 +125,36 @@ export async function fetchMemberDetail(
   );
 }
 
+export type ModerateAction = 'warn' | 'mute' | 'unmute' | 'kick' | 'ban';
+export type ModeratePayload = {
+  act: ModerateAction;
+  reason?: string;
+  durationMinutes?: number;
+  moderatorId?: string;
+  moderatorName?: string;
+};
+
+/** Performs a moderation action on a member. Throws with the bot's message on failure. */
+export async function moderateMember(
+  session: AccessToken,
+  guild: string,
+  userId: string,
+  body: ModeratePayload
+): Promise<{ success?: boolean; message?: string }> {
+  const res = await callReturn<{ success?: boolean; message?: string; error?: string }>(
+    `/api/guild/${guild}/members/${userId}/moderate`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    })
+  );
+  if (res?.error) throw new Error(res.error);
+  return res;
+}
+
 /** Sets the guild's bot language ('en' / 'ru'). */
 export async function setGuildLocale(session: AccessToken, guild: string, locale: string) {
   return await callDefault(

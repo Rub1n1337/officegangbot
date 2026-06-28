@@ -2,6 +2,7 @@
 # This is the main application file for the Discord Bot. It's the "brain" of the operation.
 
 import os
+import datetime
 from typing import Optional
 from pathlib import Path
 
@@ -276,7 +277,7 @@ class MyBot(commands.Bot):
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale",
-            "search_members", "get_member",
+            "search_members", "get_member", "moderate_member",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -557,6 +558,81 @@ class MyBot(commands.Bot):
                     "roles": [],
                 })
             return result
+
+        if action == "moderate_member":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            try:
+                user_id = _validate_discord_id(payload.get("user_id"))
+            except ValueError:
+                return {"error": "Invalid user id"}
+            act = payload.get("act")
+            reason = (str(payload.get("reason") or "").strip() or "No reason provided")[:500]
+            mod_name = (str(payload.get("moderator_name") or "Dashboard").strip() or "Dashboard")[:100]
+            try:
+                mod_id = int(payload.get("moderator_id")) if payload.get("moderator_id") else 0
+            except (TypeError, ValueError):
+                mod_id = 0
+            guild = self.get_guild(guild_id)
+            if not guild:
+                return {"error": "Guild not found"}
+            member = guild.get_member(user_id)
+            tag = f"{reason} (via dashboard: {mod_name})"
+
+            # The bot can only act on members strictly below its own top role
+            # (and never the owner or itself).
+            def _bot_can_act(m):
+                if m is None:
+                    return True  # banning a user not in the server
+                if m.id == self.user.id or m.id == guild.owner_id:
+                    return False
+                return guild.me.top_role > m.top_role
+
+            try:
+                if act == "warn":
+                    if member is None:
+                        return {"error": "Member is not in the server"}
+                    wid = await self.db.add_warning(guild_id, user_id, reason, mod_id, mod_name)
+                    return {"success": True, "message": "Warning added", "warningId": wid}
+
+                if act == "unmute":
+                    if member is None:
+                        return {"error": "Member is not in the server"}
+                    await member.timeout(None, reason=tag)
+                    return {"success": True, "message": "Timeout removed"}
+
+                if act == "mute":
+                    if member is None:
+                        return {"error": "Member is not in the server"}
+                    if not _bot_can_act(member):
+                        return {"error": "I can't moderate this member (role hierarchy)."}
+                    try:
+                        minutes = int(payload.get("duration_minutes") or 10)
+                    except (TypeError, ValueError):
+                        minutes = 10
+                    minutes = max(1, min(minutes, 40320))  # Discord caps timeout at 28 days
+                    await member.timeout(datetime.timedelta(minutes=minutes), reason=tag)
+                    return {"success": True, "message": f"Muted for {minutes} min"}
+
+                if act == "kick":
+                    if member is None:
+                        return {"error": "Member is not in the server"}
+                    if not _bot_can_act(member):
+                        return {"error": "I can't moderate this member (role hierarchy)."}
+                    await member.kick(reason=tag)
+                    return {"success": True, "message": "Member kicked"}
+
+                if act == "ban":
+                    if member is not None and not _bot_can_act(member):
+                        return {"error": "I can't moderate this member (role hierarchy)."}
+                    await guild.ban(member or discord.Object(id=user_id), reason=tag)
+                    return {"success": True, "message": "Member banned"}
+
+                return {"error": "Unknown action"}
+            except discord.Forbidden:
+                return {"error": "I don't have permission to do that."}
+            except discord.HTTPException as e:
+                return {"error": f"Discord error: {getattr(e, 'text', str(e))}"}
 
         if action == "enable_feature":
             feature = payload.get("feature")
