@@ -1,8 +1,10 @@
 import { FaChevronLeft as ChevronLeftIcon } from 'react-icons/fa';
 import { Flex, HStack, Text, VStack } from '@chakra-ui/layout';
 import { Icon, IconButton } from '@chakra-ui/react';
+import { Fragment } from 'react';
 import { HSeparator } from '@/components/layout/Separator';
 import { getFeatures } from '@/utils/common';
+import { featureCategories } from '@/config/features';
 import { IoStatsChart } from 'react-icons/io5';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
@@ -38,16 +40,24 @@ export function InGuildSidebar() {
           icon={<Icon as={IoStatsChart} />}
           name={t.bn.settings}
         />
-        <HSeparator>Features</HSeparator>
-        {getFeatures().map((feature) => (
-          <SidebarItem
-            key={feature.id}
-            name={feature.name}
-            icon={feature.icon}
-            active={activeId === feature.id}
-            href={`/guilds/${guildId}/features/${feature.id}`}
-          />
-        ))}
+        {featureCategories.map((cat) => {
+          const items = getFeatures().filter((f) => f.category === cat.id);
+          if (items.length === 0) return null;
+          return (
+            <Fragment key={cat.id}>
+              <HSeparator>{cat.label}</HSeparator>
+              {items.map((feature) => (
+                <SidebarItem
+                  key={feature.id}
+                  name={feature.name}
+                  icon={feature.icon}
+                  active={activeId === feature.id}
+                  href={`/guilds/${guildId}/features/${feature.id}`}
+                />
+              ))}
+            </Fragment>
+          );
+        })}
       </VStack>
     </Flex>
   );

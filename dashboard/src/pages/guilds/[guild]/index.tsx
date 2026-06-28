@@ -6,6 +6,7 @@ import { guild as view } from '@/config/translations/guild';
 import { useGuildInfoQuery } from '@/api/hooks';
 import { useRouter } from 'next/router';
 import { getFeatures } from '@/utils/common';
+import { featureCategories } from '@/config/features';
 import { Banner } from '@/components/GuildBanner';
 import { FeatureItem } from '@/components/feature/FeatureItem';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
@@ -70,18 +71,38 @@ function GuildPanel({ guild: id, info }: { guild: string; info: CustomGuildInfo 
             ))}
           </ButtonGroup>
         </Flex>
-        <SimpleGrid columns={{ base: 1, md: 2, '2xl': 3 }} gap={3}>
-          {shown.map((feature) => (
-            <FeatureItem
-              key={feature.id}
-              guild={id}
-              feature={feature}
-              enabled={enabledSet.has(feature.id)}
-            />
-          ))}
-        </SimpleGrid>
-        {shown.length === 0 && (
+        {shown.length === 0 ? (
           <Text color="TextSecondary">No {filter} features.</Text>
+        ) : (
+          <Flex direction="column" gap={6}>
+            {featureCategories.map((cat) => {
+              const items = shown.filter((f) => f.category === cat.id);
+              if (items.length === 0) return null;
+              return (
+                <Flex key={cat.id} direction="column" gap={3}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="700"
+                    textTransform="uppercase"
+                    letterSpacing="wide"
+                    color="TextSecondary"
+                  >
+                    {cat.label}
+                  </Text>
+                  <SimpleGrid columns={{ base: 1, md: 2, '2xl': 3 }} gap={3}>
+                    {items.map((feature) => (
+                      <FeatureItem
+                        key={feature.id}
+                        guild={id}
+                        feature={feature}
+                        enabled={enabledSet.has(feature.id)}
+                      />
+                    ))}
+                  </SimpleGrid>
+                </Flex>
+              );
+            })}
+          </Flex>
         )}
       </Flex>
     </Flex>

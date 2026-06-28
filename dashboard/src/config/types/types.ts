@@ -56,6 +56,11 @@ export interface FeatureConfig<K extends keyof CustomFeatures> {
   description?: ReactNode;
   icon?: ReactElement;
   /**
+   * Category id used to group features in the list and sidebar
+   * (see `featureCategories` in config/features).
+   */
+  category?: string;
+  /**
    * Render content in Feature view
    */
   useRender: UseFormRender<CustomFeatures[K]>;
