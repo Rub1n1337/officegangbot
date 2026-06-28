@@ -19,6 +19,36 @@ export type GuildStatsTopXp = {
   xp: number;
 };
 
+export type ModerationWarning = {
+  id: number;
+  userId: string;
+  userName: string;
+  reason: string;
+  moderatorName: string;
+  createdAt: string | null;
+};
+
+export type ModerationPunishment = {
+  userId: string;
+  userName: string;
+  type: 'mute' | 'ban';
+  reason?: string | null;
+  expiresAt: string | null;
+};
+
+export type ModerationLeaderItem = {
+  userId: string;
+  name: string;
+  level: number;
+  xp: number;
+};
+
+export type ModerationData = {
+  warnings: ModerationWarning[];
+  punishments: ModerationPunishment[];
+  leaderboard: ModerationLeaderItem[];
+};
+
 export type GuildStats = {
   id: string;
   name: string;

@@ -2,6 +2,7 @@ import { CustomFeatures, CustomGuildInfo } from '../config/types';
 import { QueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
 import {
+  deleteWarning,
   disableFeature,
   enableFeature,
   fetchGuildChannels,
@@ -9,10 +10,12 @@ import {
   fetchGuildInfo,
   fetchGuildRoles,
   fetchGuildStats,
+  fetchModeration,
   getFeature,
   updateFeature,
 } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
+import type { ModerationData } from '@/config/types/custom-types';
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
 import { useToast } from '@chakra-ui/react';
 
@@ -230,6 +233,48 @@ export function useGuildStatsQuery(guild: string) {
     refetchIntervalInBackground: false,
     retry: false,
   });
+}
+
+export function useModerationQuery(guild: string) {
+  const { status, session } = useSession();
+
+  return useQuery<ModerationData>(['moderation', guild], () => fetchModeration(session!!, guild), {
+    enabled: status === 'authenticated',
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useDeleteWarningMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, id }: { guild: string; id: number }) => deleteWarning(session!!, guild, id),
+    {
+      onSuccess(_, { guild, id }) {
+        client.setQueryData<ModerationData>(['moderation', guild], (prev) =>
+          prev ? { ...prev, warnings: prev.warnings.filter((w) => w.id !== id) } : prev
+        );
+        toast({
+          title: 'Warning removed',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError() {
+        toast({
+          title: 'Failed to remove warning',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
 }
 
 export function useGuildEmojisQuery(guild: string) {

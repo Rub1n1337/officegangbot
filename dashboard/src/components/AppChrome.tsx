@@ -84,6 +84,7 @@ function CommandPalette() {
     const list: Command[] = [];
     if (guildId) {
       list.push({ id: 'overview', label: 'Overview', hint: 'Stats', href: `/guilds/${guildId}/settings` });
+      list.push({ id: 'moderation', label: 'Moderation', hint: 'Panel', href: `/guilds/${guildId}/moderation` });
       for (const f of getFeatures()) {
         list.push({
           id: `f-${f.id}`,

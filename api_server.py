@@ -238,6 +238,20 @@ async def get_guild_emojis(request: Request, guild_id: int):
     data = await _rpc("get_guild_emojis", guild_id=guild_id)
     return data
 
+@app.get("/api/guild/{guild_id}/moderation", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_moderation(request: Request, guild_id: int):
+    """Returns recent warnings, active timed punishments and the XP leaderboard."""
+    data = await _rpc("get_moderation", guild_id=guild_id)
+    return data
+
+@app.delete("/api/guild/{guild_id}/warnings/{warning_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def delete_warning(request: Request, guild_id: int, warning_id: int):
+    """Deletes a single warning by id."""
+    data = await _rpc("delete_warning", guild_id=guild_id, warning_id=warning_id)
+    return data
+
 # --- Endpoints required for fuma-nama/discord-bot-dashboard ---
 
 @app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])

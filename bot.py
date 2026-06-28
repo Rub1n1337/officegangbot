@@ -275,6 +275,7 @@ class MyBot(commands.Bot):
         _needs_guild = {
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
+            "get_moderation", "delete_warning",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -415,6 +416,61 @@ class MyBot(commands.Bot):
             # shows the config form (greyed out) for disabled features and reads
             # the enabled flag from the guild info query, not from here.
             return await self._get_feature_payload(guild_id, feature)
+
+        if action == "get_moderation":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            guild = self.get_guild(guild_id)
+
+            def _member_name(uid):
+                m = guild.get_member(int(uid)) if guild else None
+                return m.display_name if m else f"User {uid}"
+
+            warnings = await self.db.get_recent_warnings(guild_id, 50)
+            punishments = await self.db.get_timed_punishments(guild_id)
+            leaderboard = await self.db.get_leaderboard(guild_id, 25)
+            return {
+                "warnings": [
+                    {
+                        "id": w["id"],
+                        "userId": str(w["user_id"]),
+                        "userName": _member_name(w["user_id"]),
+                        "reason": w["reason"],
+                        "moderatorName": w["moderator_name"],
+                        "createdAt": w["created_at"].isoformat() if w["created_at"] else None,
+                    }
+                    for w in warnings
+                ],
+                "punishments": [
+                    {
+                        "userId": str(p["user_id"]),
+                        "userName": _member_name(p["user_id"]),
+                        "type": p["punishment_type"],
+                        "reason": p.get("reason"),
+                        "expiresAt": p["expires_at"].isoformat() if p["expires_at"] else None,
+                    }
+                    for p in punishments
+                ],
+                "leaderboard": [
+                    {
+                        "userId": str(r["user_id"]),
+                        "name": r["display_name"] or _member_name(r["user_id"]),
+                        "level": r["level"],
+                        "xp": r["xp"],
+                    }
+                    for r in leaderboard
+                ],
+            }
+
+        if action == "delete_warning":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            try:
+                warning_id = int(payload.get("warning_id"))
+            except (TypeError, ValueError):
+                return {"error": "Invalid warning id"}
+            removed = await self.db.delete_warning(guild_id, warning_id)
+            return {"success": removed}
 
         if action == "enable_feature":
             feature = payload.get("feature")
