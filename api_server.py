@@ -260,6 +260,20 @@ async def set_locale(request: Request, guild_id: int):
     data = await _rpc("set_locale", guild_id=guild_id, locale=body.get("locale"))
     return data
 
+@app.get("/api/guild/{guild_id}/members", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def search_members(request: Request, guild_id: int, q: str = ""):
+    """Searches the guild's members by name/id (max 25 results)."""
+    data = await _rpc("search_members", guild_id=guild_id, query=q)
+    return data
+
+@app.get("/api/guild/{guild_id}/members/{user_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def get_member(request: Request, guild_id: int, user_id: int):
+    """Returns a member's profile: roles, level/XP and warnings."""
+    data = await _rpc("get_member", guild_id=guild_id, user_id=user_id)
+    return data
+
 # --- Endpoints required for fuma-nama/discord-bot-dashboard ---
 
 @app.get("/guilds/{guild_id}/roles", dependencies=[Depends(verify_api_key)])

@@ -1,4 +1,11 @@
-import { CustomFeatures, CustomGuildInfo, GuildStats, ModerationData } from '@/config/types/custom-types';
+import {
+  CustomFeatures,
+  CustomGuildInfo,
+  GuildStats,
+  MemberDetail,
+  MemberSearchItem,
+  ModerationData,
+} from '@/config/types/custom-types';
 import { AccessToken } from '@/utils/auth/server';
 import { callDefault, callReturn } from '@/utils/fetch/core';
 import { botRequest } from '@/utils/fetch/requests';
@@ -81,6 +88,38 @@ export async function deleteWarning(session: AccessToken, guild: string, warning
     botRequest(session, {
       request: {
         method: 'DELETE',
+      },
+    })
+  );
+}
+
+/** Searches the guild's members by name/id (max 25 results). */
+export async function searchMembers(
+  session: AccessToken,
+  guild: string,
+  query: string
+): Promise<{ members: MemberSearchItem[] }> {
+  return await callReturn<{ members: MemberSearchItem[] }>(
+    `/api/guild/${guild}/members?q=${encodeURIComponent(query)}`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
+/** A member's profile: roles, level/XP and warnings. */
+export async function fetchMemberDetail(
+  session: AccessToken,
+  guild: string,
+  userId: string
+): Promise<MemberDetail> {
+  return await callReturn<MemberDetail>(
+    `/api/guild/${guild}/members/${userId}`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
       },
     })
   );

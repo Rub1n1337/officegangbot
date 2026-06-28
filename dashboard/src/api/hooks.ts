@@ -10,13 +10,15 @@ import {
   fetchGuildInfo,
   fetchGuildRoles,
   fetchGuildStats,
+  fetchMemberDetail,
   fetchModeration,
   getFeature,
+  searchMembers,
   setGuildLocale,
   updateFeature,
 } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
-import type { ModerationData } from '@/config/types/custom-types';
+import type { MemberDetail, MemberSearchItem, ModerationData } from '@/config/types/custom-types';
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
 import { useToast } from '@chakra-ui/react';
 
@@ -234,6 +236,35 @@ export function useGuildStatsQuery(guild: string) {
     refetchIntervalInBackground: false,
     retry: false,
   });
+}
+
+export function useMemberSearchQuery(guild: string, query: string) {
+  const { status, session } = useSession();
+
+  return useQuery<MemberSearchItem[]>(
+    ['member_search', guild, query],
+    async () => (await searchMembers(session!!, guild, query)).members,
+    {
+      enabled: status === 'authenticated' && query.trim().length >= 2,
+      keepPreviousData: true,
+      staleTime: 30_000,
+      retry: false,
+    }
+  );
+}
+
+export function useMemberDetailQuery(guild: string, userId: string | null) {
+  const { status, session } = useSession();
+
+  return useQuery<MemberDetail>(
+    ['member_detail', guild, userId],
+    () => fetchMemberDetail(session!!, guild, userId!!),
+    {
+      enabled: status === 'authenticated' && userId != null,
+      staleTime: 15_000,
+      retry: false,
+    }
+  );
 }
 
 export function useSetLocaleMutation() {
