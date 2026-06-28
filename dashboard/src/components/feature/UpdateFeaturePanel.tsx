@@ -1,7 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RiErrorWarningFill as WarningIcon } from 'react-icons/ri';
 import { Box, Flex, Heading, Spacer, Text } from '@chakra-ui/layout';
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
@@ -50,6 +56,15 @@ export function UpdateFeaturePanel({
 
   const onToggle = (next: boolean) => {
     enableMutation.mutate({ enabled: next, guild, feature: featureId });
+  };
+
+  // Disabling a feature stops it working server-wide, so confirm first.
+  // Enabling is harmless and stays instant.
+  const [confirmingDisable, setConfirmingDisable] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const onSwitch = (next: boolean) => {
+    if (!next && enabled) setConfirmingDisable(true);
+    else onToggle(next);
   };
 
   // Warn before navigating away with unsaved edits.
@@ -104,7 +119,7 @@ export function UpdateFeaturePanel({
             aria-label={`${enabled ? 'Disable' : 'Enable'} ${config.name}`}
             isChecked={enabled}
             isDisabled={enableMutation.isLoading || guildQuery.isLoading}
-            onChange={(e) => onToggle(e.target.checked)}
+            onChange={(e) => onSwitch(e.target.checked)}
           />
         </Flex>
       </Flex>
@@ -170,6 +185,39 @@ export function UpdateFeaturePanel({
       </Box>
 
       {enabled && <Savebar isLoading={mutation.isLoading} result={result} />}
+
+      <AlertDialog
+        isOpen={confirmingDisable}
+        leastDestructiveRef={cancelRef}
+        onClose={() => setConfirmingDisable(false)}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="CardBackground" mx={4}>
+            <AlertDialogHeader>Disable {config.name}?</AlertDialogHeader>
+            <AlertDialogBody>
+              This stops {config.name} working across the server. Your settings are kept, so you can
+              re-enable it any time.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} variant="ghost" onClick={() => setConfirmingDisable(false)}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="red"
+                ml={3}
+                isLoading={enableMutation.isLoading}
+                onClick={() => {
+                  onToggle(false);
+                  setConfirmingDisable(false);
+                }}
+              >
+                Disable
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Flex>
   );
 }
