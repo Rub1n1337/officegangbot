@@ -101,6 +101,7 @@ export function UpdateFeaturePanel({
           <Switch
             variant="main"
             size="lg"
+            aria-label={`${enabled ? 'Disable' : 'Enable'} ${config.name}`}
             isChecked={enabled}
             isDisabled={enableMutation.isLoading || guildQuery.isLoading}
             onChange={(e) => onToggle(e.target.checked)}

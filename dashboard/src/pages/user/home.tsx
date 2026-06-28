@@ -111,6 +111,11 @@ export function GuildSelect() {
                 href={`/guilds/${guild.id}`}
                 transition="transform 0.15s ease, box-shadow 0.15s ease"
                 _hover={{ transform: 'translateY(-2px)', shadow: 'md' }}
+                _focusVisible={{
+                  outline: '2px solid',
+                  outlineColor: 'Brand',
+                  outlineOffset: '2px',
+                }}
               >
                 <CardHeader as={Flex} flexDirection="row" align="center" gap={3}>
                   <Avatar src={iconUrl(guild)} name={guild.name} size="md" />

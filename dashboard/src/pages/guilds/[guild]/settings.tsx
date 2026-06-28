@@ -9,6 +9,7 @@ import {
   Progress,
   SkeletonText,
   Text,
+  usePrefersReducedMotion,
   useToken,
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
@@ -182,6 +183,7 @@ const pulse = keyframes`
 // stats query's auto-refetch (every 8s).
 function LiveIndicator({ updatedAt }: { updatedAt: number }) {
   const [, setTick] = useState(0);
+  const reduceMotion = usePrefersReducedMotion();
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
@@ -189,7 +191,13 @@ function LiveIndicator({ updatedAt }: { updatedAt: number }) {
   const secs = updatedAt ? Math.max(0, Math.round((Date.now() - updatedAt) / 1000)) : 0;
   return (
     <Flex align="center" gap={2}>
-      <Box w="9px" h="9px" rounded="full" bg="green.400" animation={`${pulse} 2s infinite`} />
+      <Box
+        w="9px"
+        h="9px"
+        rounded="full"
+        bg="green.400"
+        animation={reduceMotion ? undefined : `${pulse} 2s infinite`}
+      />
       <Text fontSize="sm" fontWeight="700" color="green.400" letterSpacing="wide">
         LIVE
       </Text>
