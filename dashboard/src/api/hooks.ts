@@ -59,6 +59,28 @@ export function useGuilds() {
   });
 }
 
+export type MyBotGuild = { id: string; member_count: number };
+export type MyBotGuildsResult = { botReachable: boolean; guilds: MyBotGuild[] };
+
+/**
+ * Which of the user's admin guilds the bot is actually in (+ member counts).
+ * Backed by the server-side `/api/me/guilds` route so the bot's full guild list
+ * never reaches the browser.
+ */
+export function useMyBotGuilds() {
+  const accessToken = useAccessToken();
+
+  return useQuery<MyBotGuildsResult>(
+    ['me_bot_guilds'],
+    async () => {
+      const res = await fetch('/api/me/guilds');
+      if (!res.ok) throw new Error('Failed to load bot guilds');
+      return res.json();
+    },
+    { enabled: accessToken != null, staleTime: 60_000, retry: false }
+  );
+}
+
 export function useSelfUserQuery() {
   const accessToken = useAccessToken();
 
