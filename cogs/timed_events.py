@@ -3,10 +3,19 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
-from core.permissions import has_permission
+from core.permissions import has_permission, member_hierarchy_block
 from .utils import reply
 import datetime
 import re
+
+# Map the shared hierarchy reason codes to this cog's user-facing messages.
+_HIERARCHY_MESSAGES = {
+    "self": "You cannot moderate yourself.",
+    "bot_self": "I cannot moderate myself.",
+    "owner": "You cannot moderate the server owner.",
+    "higher": "You cannot moderate a member with a higher role.",
+    "bot_higher": "I cannot moderate a member with an equal or higher role than me.",
+}
 
 def parse_duration(duration_str: str) -> int | None:
     """Parses a duration string like '30m', '2h', '1d' into seconds."""
@@ -42,19 +51,21 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         self.check_expired_punishments.cancel()
 
     def _check_hierarchy(self, ctx: commands.Context, target: discord.Member):
-        """Checks if the author can perform an action on the target."""
-        if target.id == ctx.author.id:
-            raise commands.CheckFailure("You cannot moderate yourself.")
-        if target.id == self.bot.user.id:
-            raise commands.CheckFailure("I cannot moderate myself.")
-        if target.id == ctx.guild.owner_id:
-            raise commands.CheckFailure("You cannot moderate the server owner.")
-        # Moderators may act on members with an EQUAL top role; only a strictly
-        # higher target is blocked (matches the Moderation cog's policy).
-        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role < target.top_role:
-            raise commands.CheckFailure("You cannot moderate a member with a higher role.")
-        if ctx.guild.me.top_role <= target.top_role:
-            raise commands.CheckFailure("I cannot moderate a member with an equal or higher role than me.")
+        """Checks if the author can perform an action on the target.
+
+        Uses the shared member_hierarchy_block so /tempban and /mute stay in lockstep
+        with /ban and /mute in the Moderation cog."""
+        code = member_hierarchy_block(
+            author_id=ctx.author.id,
+            author_top_role_pos=ctx.author.top_role.position,
+            target_id=target.id,
+            target_top_role_pos=target.top_role.position,
+            bot_id=self.bot.user.id,
+            bot_top_role_pos=ctx.guild.me.top_role.position,
+            owner_id=ctx.guild.owner_id,
+        )
+        if code:
+            raise commands.CheckFailure(_HIERARCHY_MESSAGES[code])
 
     @tasks.loop(seconds=60)
     async def check_expired_punishments(self):
