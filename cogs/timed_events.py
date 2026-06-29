@@ -49,8 +49,10 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
             raise commands.CheckFailure("I cannot moderate myself.")
         if target.id == ctx.guild.owner_id:
             raise commands.CheckFailure("You cannot moderate the server owner.")
-        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role <= target.top_role:
-            raise commands.CheckFailure("You cannot moderate a member with an equal or higher role.")
+        # Moderators may act on members with an EQUAL top role; only a strictly
+        # higher target is blocked (matches the Moderation cog's policy).
+        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role < target.top_role:
+            raise commands.CheckFailure("You cannot moderate a member with a higher role.")
         if ctx.guild.me.top_role <= target.top_role:
             raise commands.CheckFailure("I cannot moderate a member with an equal or higher role than me.")
 
@@ -186,10 +188,14 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         duration="Duration (e.g. 30m, 2h, 1d).",
         reason="Reason for the ban."
     )
+    @commands.bot_has_permissions(ban_members=True)
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("ban")
     async def tempban(self, ctx: commands.Context, member: discord.Member,
                       duration: str, *, reason: str = "No reason provided"):
+        # Enforce the role hierarchy like /ban and /mute do, otherwise a mod with
+        # the ban permission could tempban members above their own role.
+        self._check_hierarchy(ctx, member)
         seconds = parse_duration(duration)
         if not seconds:
             return await reply(ctx,
@@ -209,7 +215,12 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         except discord.Forbidden:
             pass
 
-        await member.ban(reason=f"{reason} | Moderator: {ctx.author} | Duration: {format_duration(seconds)}")
+        try:
+            await member.ban(reason=f"{reason} | Moderator: {ctx.author} | Duration: {format_duration(seconds)}")
+        except discord.Forbidden:
+            return await reply(ctx, "❌ I don't have permission to ban this member.", ephemeral=True)
+        except discord.HTTPException as e:
+            return await reply(ctx, f"❌ Discord error: {getattr(e, 'text', str(e))}", ephemeral=True)
 
         expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=seconds)
         expires_at = expires_at_dt.timestamp()
