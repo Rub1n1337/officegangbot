@@ -37,6 +37,10 @@ class DatabaseManager:
         self._pool: Optional[asyncpg.Pool] = None
         # Per-guild locale cache (locale changes rarely; invalidated on set_locale).
         self._locale_cache: Dict[int, str] = {}
+        # Per-guild enabled-features cache. get_enabled_features is called on
+        # every message (automod/filter/levels), so hitting Postgres each time
+        # would hammer the DB on busy servers. Invalidated on set_feature_enabled.
+        self._enabled_features_cache: Dict[int, List[str]] = {}
 
     async def connect(self) -> None:
         """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""
@@ -148,21 +152,25 @@ class DatabaseManager:
             return data
 
     async def get_enabled_features(self, guild_id: int) -> List[str]:
-        """Returns the list of enabled features for a guild."""
+        """Returns the list of enabled features for a guild, cached in memory
+        (called on every message; invalidated on set_feature_enabled)."""
+        cached = self._enabled_features_cache.get(guild_id)
+        if cached is not None:
+            return cached
         await self.ensure_guild(guild_id)
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 "SELECT enabled_features FROM guilds WHERE guild_id = $1",
                 guild_id
             )
-            if row is None:
-                return []
-            features = row['enabled_features']
-            return features if features else []
+            features = list(row['enabled_features']) if row and row['enabled_features'] else []
+        self._enabled_features_cache[guild_id] = features
+        return features
 
     async def set_feature_enabled(self, guild_id: int, feature: str, enabled: bool) -> None:
         """Enables or disables a feature for a guild by adding/removing it from enabled_features."""
         await self.ensure_guild(guild_id)
+        self._enabled_features_cache.pop(guild_id, None)  # invalidate the cache
         async with self.pool.acquire() as conn:
             if enabled:
                 await conn.execute(
