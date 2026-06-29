@@ -13,7 +13,24 @@ import uuid
 import datetime
 from decimal import Decimal
 from typing import Any, Optional
+from urllib.parse import urlsplit, urlunsplit
 from core.logger import logger
+
+
+def _redact_url(url: str) -> str:
+    """Strip credentials from a Redis URL so it can be logged safely.
+    Upstash URLs look like ``rediss://default:<password>@host:port`` — the
+    password must never reach the logs."""
+    try:
+        parts = urlsplit(url)
+        if parts.username or parts.password:
+            netloc = parts.hostname or ""
+            if parts.port:
+                netloc = f"{netloc}:{parts.port}"
+            return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+        return url
+    except Exception:
+        return "<redacted>"
 
 
 def _json_default(obj):
@@ -51,7 +68,7 @@ class RedisManager:
             await self._redis.ping()
             logger.info("Redis connection established successfully.")
         except Exception as e:
-            logger.critical(f"Failed to connect to Redis at {url}: {e}", exc_info=True)
+            logger.critical(f"Failed to connect to Redis at {_redact_url(url)}: {e}", exc_info=True)
             raise
 
     async def close(self) -> None:
