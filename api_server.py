@@ -3,7 +3,8 @@
 
 from fastapi import FastAPI, HTTPException, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Any, Optional
+from pydantic import BaseModel
+from typing import Any, Optional, Literal
 import os
 import secrets
 from urllib.parse import unquote
@@ -183,6 +184,21 @@ def _actor(request: Request) -> dict:
     return {"actor_id": aid, "actor_name": unquote(aname) if aname else None}
 
 
+# --- Request bodies (validated by FastAPI -> clean 422 on bad input, instead
+# of a 502/404 surfacing from deep inside the bot) ---
+
+class ModeratePayload(BaseModel):
+    act: Literal["warn", "mute", "unmute", "kick", "ban"]
+    reason: Optional[str] = None
+    durationMinutes: Optional[int] = None
+    moderatorId: Optional[str] = None
+    moderatorName: Optional[str] = None
+
+
+class LocalePayload(BaseModel):
+    locale: Literal["en", "ru"]
+
+
 # --- API Endpoints ---
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
@@ -279,10 +295,9 @@ async def delete_warning(request: Request, guild_id: int, warning_id: int):
 
 @app.post("/api/guild/{guild_id}/locale", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
-async def set_locale(request: Request, guild_id: int):
+async def set_locale(request: Request, guild_id: int, payload: LocalePayload):
     """Sets the guild's bot language ('en' / 'ru')."""
-    body = await request.json()
-    data = await _rpc("set_locale", guild_id=guild_id, locale=body.get("locale"), **_actor(request))
+    data = await _rpc("set_locale", guild_id=guild_id, locale=payload.locale, **_actor(request))
     return data
 
 @app.get("/api/guild/{guild_id}/members", dependencies=[Depends(verify_api_key)])
@@ -301,20 +316,19 @@ async def get_member(request: Request, guild_id: int, user_id: int):
 
 @app.post("/api/guild/{guild_id}/members/{user_id}/moderate", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
-async def moderate_member(request: Request, guild_id: int, user_id: int):
+async def moderate_member(request: Request, guild_id: int, user_id: int, payload: ModeratePayload):
     """Performs a moderation action (warn/mute/unmute/kick/ban) on a member."""
-    body = await request.json()
     actor = _actor(request)
     data = await _rpc(
         "moderate_member",
         guild_id=guild_id,
         user_id=user_id,
-        act=body.get("act"),
-        reason=body.get("reason"),
-        duration_minutes=body.get("durationMinutes"),
+        act=payload.act,
+        reason=payload.reason,
+        duration_minutes=payload.durationMinutes,
         # Prefer the server-derived actor over the client-supplied fields.
-        moderator_id=actor["actor_id"] or body.get("moderatorId"),
-        moderator_name=actor["actor_name"] or body.get("moderatorName"),
+        moderator_id=actor["actor_id"] or payload.moderatorId,
+        moderator_name=actor["actor_name"] or payload.moderatorName,
     )
     return data
 
