@@ -35,6 +35,25 @@ async function getAdminGuildIds(accessToken: string): Promise<Set<string> | null
   return ids;
 }
 
+// Short-lived cache of the caller's Discord identity, so mutating requests can
+// be attributed in the bot's audit trail without a Discord call each time.
+type Actor = { id: string; name: string };
+const actorCache = new Map<string, { actor: Actor; expires: number }>();
+
+async function getActor(accessToken: string): Promise<Actor | null> {
+  const cached = actorCache.get(accessToken);
+  if (cached && cached.expires > Date.now()) return cached.actor;
+
+  const resp = await fetch('https://discord.com/api/v10/users/@me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!resp.ok) return null;
+  const u = (await resp.json()) as { id: string; username: string; global_name?: string | null };
+  const actor: Actor = { id: u.id, name: u.global_name || u.username };
+  actorCache.set(accessToken, { actor, expires: Date.now() + CACHE_TTL_MS });
+  return actor;
+}
+
 // The guild id, if this is a guild-scoped path (/guilds/{id}/... or /api/guild/{id}).
 function guildIdFromPath(segments: string[]): string | null {
   if (segments[0] === 'guilds' && /^\d+$/.test(segments[1] ?? '')) return segments[1];
@@ -61,7 +80,7 @@ function buildTargetUrl(req: NextApiRequest) {
   return target.toString();
 }
 
-function buildHeaders(req: NextApiRequest, apiKey: string, hasBody: boolean) {
+function buildHeaders(req: NextApiRequest, apiKey: string, hasBody: boolean, actor?: Actor | null) {
   // Forward only a minimal, safe header set to the bot API. Forwarding the raw
   // browser headers (origin, cookie, sec-fetch-*, transfer-encoding, …) made
   // undici's fetch reject body-less POST/DELETE requests, so enable/disable
@@ -72,6 +91,12 @@ function buildHeaders(req: NextApiRequest, apiKey: string, hasBody: boolean) {
   if (hasBody) {
     const ct = req.headers['content-type'];
     headers.set('Content-Type', (Array.isArray(ct) ? ct[0] : ct) ?? 'application/json');
+  }
+  // Attribution for the bot's audit trail (server-derived from the session, so
+  // the client can't spoof it).
+  if (actor) {
+    headers.set('X-Actor-Id', actor.id);
+    headers.set('X-Actor-Name', encodeURIComponent(actor.name));
   }
   return headers;
 }
@@ -121,9 +146,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const method = req.method ?? 'GET';
     const rawBody = method === 'GET' || method === 'HEAD' ? undefined : await readRawBody(req);
     const body = rawBody && rawBody.length > 0 ? rawBody : undefined;
+    // Attribute mutating requests to the acting admin for the audit trail.
+    const mutating = method !== 'GET' && method !== 'HEAD';
+    const actor = mutating ? await getActor(accessToken) : null;
     const upstream = await fetch(buildTargetUrl(req), {
       method,
-      headers: buildHeaders(req, apiKey, body != null),
+      headers: buildHeaders(req, apiKey, body != null, actor),
       body: body as any,
     });
 

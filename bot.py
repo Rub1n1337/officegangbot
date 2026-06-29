@@ -292,6 +292,24 @@ class MyBot(commands.Bot):
         except Exception as e:
             logger.warning(f"Dashboard action log failed for guild {guild.id}: {e}")
 
+    async def _record_audit(self, guild_id: int, payload: dict, action: str, target=None, detail=None) -> None:
+        """Record a dashboard action in the audit trail. The actor is derived
+        server-side (proxy → headers → payload); best-effort, never raises."""
+        if not self.db:
+            return
+        try:
+            actor_id = int(payload.get("actor_id")) if payload.get("actor_id") else None
+        except (TypeError, ValueError):
+            actor_id = None
+        await self.db.add_dashboard_audit(
+            guild_id,
+            actor_id=actor_id,
+            actor_name=payload.get("actor_name"),
+            action=action,
+            target=target,
+            detail=detail,
+        )
+
     async def _handle_rpc_request(self, payload: dict) -> dict:
         """Top-level RPC entrypoint: dispatches and converts any unhandled
         exception into a clean error response, so a handler bug returns an
@@ -323,7 +341,7 @@ class MyBot(commands.Bot):
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale",
-            "search_members", "get_member", "moderate_member",
+            "search_members", "get_member", "moderate_member", "get_audit",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -511,6 +529,25 @@ class MyBot(commands.Bot):
                 ],
             }
 
+        if action == "get_audit":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            entries = await self.db.get_dashboard_audit(guild_id, 50)
+            return {
+                "entries": [
+                    {
+                        "id": e["id"],
+                        "actorId": str(e["actor_id"]) if e["actor_id"] else None,
+                        "actorName": e["actor_name"],
+                        "action": e["action"],
+                        "target": e["target"],
+                        "detail": e["detail"],
+                        "createdAt": e["created_at"].isoformat() if e["created_at"] else None,
+                    }
+                    for e in entries
+                ]
+            }
+
         if action == "delete_warning":
             if not self.db:
                 return {"error": "Database unavailable"}
@@ -519,6 +556,8 @@ class MyBot(commands.Bot):
             except (TypeError, ValueError):
                 return {"error": "Invalid warning id"}
             removed = await self.db.delete_warning(guild_id, warning_id)
+            if removed:
+                await self._record_audit(guild_id, payload, "delete_warning", target=str(warning_id))
             return {"success": removed}
 
         if action == "set_locale":
@@ -528,6 +567,7 @@ class MyBot(commands.Bot):
             if locale not in ("en", "ru"):
                 return {"error": "Unsupported locale"}
             await self.db.set_locale(guild_id, locale)
+            await self._record_audit(guild_id, payload, "set_locale", detail=locale)
             return {"success": True, "locale": locale}
 
         if action == "search_members":
@@ -619,7 +659,7 @@ class MyBot(commands.Bot):
                 mod_id = int(payload.get("moderator_id")) if payload.get("moderator_id") else 0
             except (TypeError, ValueError):
                 mod_id = 0
-            return await perform_moderation(
+            result = await perform_moderation(
                 db=self.db,
                 guild=guild,
                 bot_user_id=self.user.id,
@@ -631,6 +671,15 @@ class MyBot(commands.Bot):
                 duration_minutes=payload.get("duration_minutes"),
                 log_action=self._log_dashboard_action,
             )
+            if isinstance(result, dict) and result.get("success"):
+                await self._record_audit(
+                    guild_id,
+                    {"actor_id": payload.get("moderator_id"), "actor_name": payload.get("moderator_name")},
+                    payload.get("act") or "moderate",
+                    target=str(user_id),
+                    detail=payload.get("reason"),
+                )
+            return result
 
         if action == "enable_feature":
             feature = payload.get("feature")
@@ -638,6 +687,7 @@ class MyBot(commands.Bot):
                 return {"error": "Database unavailable"}
             await self.db.set_feature_enabled(guild_id, feature, True)
             enabled_features = await self.db.get_enabled_features(guild_id)
+            await self._record_audit(guild_id, payload, "enable_feature", target=feature)
             return {"success": True, "enabled_features": enabled_features}
 
         if action == "disable_feature":
@@ -646,6 +696,7 @@ class MyBot(commands.Bot):
                 return {"error": "Database unavailable"}
             await self.db.set_feature_enabled(guild_id, feature, False)
             enabled_features = await self.db.get_enabled_features(guild_id)
+            await self._record_audit(guild_id, payload, "disable_feature", target=feature)
             return {"success": True, "enabled_features": enabled_features}
 
         if action == "update_feature":
@@ -653,6 +704,7 @@ class MyBot(commands.Bot):
             options = payload.get("options", {})
             if not self.db:
                 return {"error": "Database unavailable"}
+            await self._record_audit(guild_id, payload, "update_feature", target=feature)
 
             # Moderation permission roles live in the mod_roles table, not in
             # guilds columns, so they are handled separately from the column
