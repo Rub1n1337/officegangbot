@@ -358,6 +358,9 @@ export function useDeleteWarningMutation() {
         client.setQueryData<ModerationData>(['moderation', guild], (prev) =>
           prev ? { ...prev, warnings: prev.warnings.filter((w) => w.id !== id) } : prev
         );
+        // The same warning may be shown on a member's card — refetch member
+        // details for this guild so they don't show a stale warning.
+        client.invalidateQueries(['member_detail', guild]);
       },
       onError() {
         toast({
