@@ -687,6 +687,8 @@ class MyBot(commands.Bot):
                         return {"error": "Invalid level-up channel id"}
                 rewards = options.get("rewards")
                 if isinstance(rewards, list):
+                    if len(rewards) > 100:
+                        return {"error": "Too many level rewards (max 100)."}
                     desired: dict[int, int] = {}
                     for r in rewards:
                         lvl_raw, role_raw = r.get("level"), r.get("roleId")
@@ -714,7 +716,11 @@ class MyBot(commands.Bot):
             if feature == "filter":
                 words = options.get("words")
                 if isinstance(words, list):
-                    cleaned = sorted({str(w).strip().lower() for w in words if str(w).strip()})
+                    # Cap word length (and overall count) so a bad payload can't
+                    # bloat the TEXT[] column or the compiled filter regex.
+                    cleaned = sorted({str(w).strip().lower()[:100] for w in words if str(w).strip()})
+                    if len(cleaned) > 500:
+                        return {"error": "Too many filter words (max 500)."}
                     await self.db.set_guild_setting(guild_id, "filter_words", cleaned)
                     filter_cog = self.get_cog("🚫 Filter")
                     if filter_cog:
@@ -727,6 +733,8 @@ class MyBot(commands.Bot):
             if feature == "reaction-role":
                 items = options.get("items")
                 if isinstance(items, list):
+                    if len(items) > 100:
+                        return {"error": "Too many reaction roles (max 100)."}
                     rows = []
                     for it in items:
                         ch, msg = it.get("channelId"), it.get("messageId")
