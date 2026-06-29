@@ -91,6 +91,7 @@ export function GuildSelect() {
         </InputLeftElement>
         <Input
           variant="main"
+          pl="2.75rem"
           placeholder="Search servers…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
