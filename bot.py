@@ -2,7 +2,6 @@
 # This is the main application file for the Discord Bot. It's the "brain" of the operation.
 
 import os
-import datetime
 from typing import Optional
 from pathlib import Path
 
@@ -21,7 +20,7 @@ from config import load_config
 from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
-from core.permissions import bot_can_act_on, clamp_mute_minutes
+from core.moderation_actions import perform_moderation
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -260,6 +259,38 @@ class MyBot(commands.Bot):
             },
         }
         return feature_data.get(feature, {})
+
+    async def _log_dashboard_action(
+        self, guild, action: str, target_id: int, moderator_name: str, reason: str, **extra
+    ) -> None:
+        """Mirror a dashboard moderation action into the guild's punishment-log
+        channel, so Discord-side moderators see actions taken from the web too.
+        No-ops when logging is off or no log channel is configured."""
+        if not self.db:
+            return
+        try:
+            enabled = await self.db.get_enabled_features(guild.id)
+            if "logging" not in enabled:
+                return
+            log_channel_id = await self.db.get_guild_setting(guild.id, "punishment_log_id")
+            if not log_channel_id:
+                return
+            channel = guild.get_channel(int(log_channel_id))
+            if not channel:
+                return
+            embed = discord.Embed(
+                title=action, color=discord.Color.orange(), timestamp=discord.utils.utcnow()
+            )
+            embed.add_field(name="Target", value=f"<@{target_id}> (`{target_id}`)", inline=False)
+            embed.add_field(name="Moderator", value=f"{moderator_name} (via dashboard)", inline=False)
+            embed.add_field(name="Reason", value=f"```{reason}```", inline=False)
+            for key, value in extra.items():
+                embed.add_field(name=key.replace("_", " ").title(), value=value, inline=True)
+            await channel.send(embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+        except Exception as e:
+            logger.warning(f"Dashboard action log failed for guild {guild.id}: {e}")
 
     async def _handle_rpc_request(self, payload: dict) -> dict:
         """Top-level RPC entrypoint: dispatches and converts any unhandled
@@ -581,73 +612,25 @@ class MyBot(commands.Bot):
                 user_id = _validate_discord_id(payload.get("user_id"))
             except ValueError:
                 return {"error": "Invalid user id"}
-            act = payload.get("act")
-            reason = (str(payload.get("reason") or "").strip() or "No reason provided")[:500]
-            mod_name = (str(payload.get("moderator_name") or "Dashboard").strip() or "Dashboard")[:100]
+            guild = self.get_guild(guild_id)
+            if not guild:
+                return {"error": "Guild not found"}
             try:
                 mod_id = int(payload.get("moderator_id")) if payload.get("moderator_id") else 0
             except (TypeError, ValueError):
                 mod_id = 0
-            guild = self.get_guild(guild_id)
-            if not guild:
-                return {"error": "Guild not found"}
-            member = guild.get_member(user_id)
-            tag = f"{reason} (via dashboard: {mod_name})"
-
-            # The bot can only act on members strictly below its own top role
-            # (and never the owner or itself). See core.permissions.bot_can_act_on.
-            def _bot_can_act(m):
-                if m is None:
-                    return True  # banning a user not in the server
-                return bot_can_act_on(
-                    target_id=m.id,
-                    target_top_role_pos=m.top_role.position,
-                    bot_id=self.user.id,
-                    bot_top_role_pos=guild.me.top_role.position,
-                    owner_id=guild.owner_id,
-                )
-
-            try:
-                if act == "warn":
-                    if member is None:
-                        return {"error": "Member is not in the server"}
-                    wid = await self.db.add_warning(guild_id, user_id, reason, mod_id, mod_name)
-                    return {"success": True, "message": "Warning added", "warningId": wid}
-
-                if act == "unmute":
-                    if member is None:
-                        return {"error": "Member is not in the server"}
-                    await member.timeout(None, reason=tag)
-                    return {"success": True, "message": "Timeout removed"}
-
-                if act == "mute":
-                    if member is None:
-                        return {"error": "Member is not in the server"}
-                    if not _bot_can_act(member):
-                        return {"error": "I can't moderate this member (role hierarchy)."}
-                    minutes = clamp_mute_minutes(payload.get("duration_minutes"))
-                    await member.timeout(datetime.timedelta(minutes=minutes), reason=tag)
-                    return {"success": True, "message": f"Muted for {minutes} min"}
-
-                if act == "kick":
-                    if member is None:
-                        return {"error": "Member is not in the server"}
-                    if not _bot_can_act(member):
-                        return {"error": "I can't moderate this member (role hierarchy)."}
-                    await member.kick(reason=tag)
-                    return {"success": True, "message": "Member kicked"}
-
-                if act == "ban":
-                    if member is not None and not _bot_can_act(member):
-                        return {"error": "I can't moderate this member (role hierarchy)."}
-                    await guild.ban(member or discord.Object(id=user_id), reason=tag)
-                    return {"success": True, "message": "Member banned"}
-
-                return {"error": "Unknown action"}
-            except discord.Forbidden:
-                return {"error": "I don't have permission to do that."}
-            except discord.HTTPException as e:
-                return {"error": f"Discord error: {getattr(e, 'text', str(e))}"}
+            return await perform_moderation(
+                db=self.db,
+                guild=guild,
+                bot_user_id=self.user.id,
+                user_id=user_id,
+                act=payload.get("act"),
+                reason=payload.get("reason"),
+                mod_name=payload.get("moderator_name"),
+                mod_id=mod_id,
+                duration_minutes=payload.get("duration_minutes"),
+                log_action=self._log_dashboard_action,
+            )
 
         if action == "enable_feature":
             feature = payload.get("feature")
