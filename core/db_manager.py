@@ -297,6 +297,44 @@ class DatabaseManager:
             )
             return int(result.split()[-1])
 
+    # -------------------------
+    # Dashboard audit trail
+    # -------------------------
+
+    async def add_dashboard_audit(
+        self, guild_id: int, *, actor_id: int, actor_name: str,
+        action: str, target: str = None, detail: str = None,
+    ) -> None:
+        """Records a dashboard action (best-effort; never raises to the caller)."""
+        try:
+            await self.ensure_guild(guild_id)
+            async with self.pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO dashboard_audit (guild_id, actor_id, actor_name, action, target, detail)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    """,
+                    guild_id, actor_id or None, (actor_name or None),
+                    action, (target[:200] if target else None), (detail[:1000] if detail else None),
+                )
+        except Exception as e:
+            logger.warning(f"Failed to write dashboard_audit for guild {guild_id}: {e}")
+
+    async def get_dashboard_audit(self, guild_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """Returns the most recent dashboard audit entries for a guild."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, actor_id, actor_name, action, target, detail, created_at
+                FROM dashboard_audit
+                WHERE guild_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2
+                """,
+                guild_id, limit,
+            )
+            return [dict(r) for r in rows]
+
     async def get_recent_warnings(self, guild_id: int, limit: int = 50) -> List[Dict[str, Any]]:
         """Returns the most recent warnings across the whole guild (for the dashboard)."""
         async with self.pool.acquire() as conn:

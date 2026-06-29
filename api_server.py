@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Any, Optional
 import os
 import secrets
+from urllib.parse import unquote
 from dotenv import load_dotenv
 load_dotenv()
 import time
@@ -174,6 +175,14 @@ async def _rpc(action: str, **kwargs) -> Any:
     return result
 
 
+def _actor(request: Request) -> dict:
+    """The acting admin's identity, injected by the dashboard proxy from the
+    session (server-derived, so it can't be spoofed by the client)."""
+    aid = request.headers.get("x-actor-id")
+    aname = request.headers.get("x-actor-name")
+    return {"actor_id": aid, "actor_name": unquote(aname) if aname else None}
+
+
 # --- API Endpoints ---
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
@@ -254,11 +263,18 @@ async def get_moderation(request: Request, guild_id: int):
     data = await _rpc("get_moderation", guild_id=guild_id)
     return data
 
+@app.get("/api/guild/{guild_id}/audit", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_audit(request: Request, guild_id: int):
+    """Returns the recent dashboard audit trail for a guild."""
+    data = await _rpc("get_audit", guild_id=guild_id)
+    return data
+
 @app.delete("/api/guild/{guild_id}/warnings/{warning_id}", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def delete_warning(request: Request, guild_id: int, warning_id: int):
     """Deletes a single warning by id."""
-    data = await _rpc("delete_warning", guild_id=guild_id, warning_id=warning_id)
+    data = await _rpc("delete_warning", guild_id=guild_id, warning_id=warning_id, **_actor(request))
     return data
 
 @app.post("/api/guild/{guild_id}/locale", dependencies=[Depends(verify_api_key)])
@@ -266,7 +282,7 @@ async def delete_warning(request: Request, guild_id: int, warning_id: int):
 async def set_locale(request: Request, guild_id: int):
     """Sets the guild's bot language ('en' / 'ru')."""
     body = await request.json()
-    data = await _rpc("set_locale", guild_id=guild_id, locale=body.get("locale"))
+    data = await _rpc("set_locale", guild_id=guild_id, locale=body.get("locale"), **_actor(request))
     return data
 
 @app.get("/api/guild/{guild_id}/members", dependencies=[Depends(verify_api_key)])
@@ -288,6 +304,7 @@ async def get_member(request: Request, guild_id: int, user_id: int):
 async def moderate_member(request: Request, guild_id: int, user_id: int):
     """Performs a moderation action (warn/mute/unmute/kick/ban) on a member."""
     body = await request.json()
+    actor = _actor(request)
     data = await _rpc(
         "moderate_member",
         guild_id=guild_id,
@@ -295,8 +312,9 @@ async def moderate_member(request: Request, guild_id: int, user_id: int):
         act=body.get("act"),
         reason=body.get("reason"),
         duration_minutes=body.get("durationMinutes"),
-        moderator_id=body.get("moderatorId"),
-        moderator_name=body.get("moderatorName"),
+        # Prefer the server-derived actor over the client-supplied fields.
+        moderator_id=actor["actor_id"] or body.get("moderatorId"),
+        moderator_name=actor["actor_name"] or body.get("moderatorName"),
     )
     return data
 
@@ -327,14 +345,14 @@ async def get_feature(request: Request, guild_id: str, feature: str):
 @limiter.limit("10/minute")
 async def enable_feature(request: Request, guild_id: str, feature: str):
     """Enables a feature for a guild."""
-    data = await _rpc("enable_feature", guild_id=guild_id, feature=feature)
+    data = await _rpc("enable_feature", guild_id=guild_id, feature=feature, **_actor(request))
     return data
 
 @app.delete("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
 @limiter.limit("10/minute")
 async def disable_feature(request: Request, guild_id: str, feature: str):
     """Disables a feature for a guild."""
-    data = await _rpc("disable_feature", guild_id=guild_id, feature=feature)
+    data = await _rpc("disable_feature", guild_id=guild_id, feature=feature, **_actor(request))
     return data
 
 @app.patch("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
@@ -342,7 +360,7 @@ async def disable_feature(request: Request, guild_id: str, feature: str):
 async def update_feature(request: Request, guild_id: str, feature: str):
     """Updates feature settings for a guild."""
     body = await request.json()
-    data = await _rpc("update_feature", guild_id=guild_id, feature=feature, options=body)
+    data = await _rpc("update_feature", guild_id=guild_id, feature=feature, options=body, **_actor(request))
     return data
 
 if __name__ == "__main__":
