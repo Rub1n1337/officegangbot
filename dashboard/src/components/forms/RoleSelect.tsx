@@ -19,7 +19,7 @@ type Props = Override<
   SelectProps<Option, false>,
   {
     value?: string;
-    onChange: (role: string) => void;
+    onChange: (role: string | null) => void;
   }
 >;
 
@@ -48,9 +48,12 @@ export const RoleSelect = forwardRef<SelectInstance<Option, false>, Props>((prop
     <SelectField<Option>
       isDisabled={isLoading}
       isLoading={isLoading}
+      isClearable
       placeholder={<common.T text="select role" />}
       value={selected != null ? render(selected) : null}
-      onChange={(e) => e != null && onChange(e.value)}
+      // Pass null on clear so an optional role can actually be unset (the form
+      // sends null and the bot clears the column).
+      onChange={(e) => onChange(e?.value ?? null)}
       options={rolesQuery.data?.map(render)}
       ref={ref}
       {...rest}
