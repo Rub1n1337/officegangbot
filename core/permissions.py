@@ -5,6 +5,40 @@ from discord.ext.commands.errors import NoPrivateMessage
 from core.logger import logger
 from typing import Callable
 
+# Discord caps a member timeout at 28 days.
+MAX_TIMEOUT_MINUTES = 28 * 24 * 60  # 40320
+
+
+def bot_can_act_on(
+    *,
+    target_id: int,
+    target_top_role_pos: int,
+    bot_id: int,
+    bot_top_role_pos: int,
+    owner_id: int,
+) -> bool:
+    """Whether the bot may moderate a target member.
+
+    Never the bot itself or the server owner, and only members strictly below
+    the bot's top role. Pure (position-based) so it can be unit-tested without
+    discord objects.
+    """
+    if target_id == bot_id or target_id == owner_id:
+        return False
+    return bot_top_role_pos > target_top_role_pos
+
+
+def clamp_mute_minutes(raw, default: int = 10) -> int:
+    """Clamp a requested mute duration to Discord's [1 min, 28 days] window.
+
+    Non-numeric / missing values fall back to `default`; negatives clamp up to 1.
+    """
+    try:
+        minutes = int(raw) if raw is not None else default
+    except (TypeError, ValueError):
+        minutes = default
+    return max(1, min(minutes, MAX_TIMEOUT_MINUTES))
+
 def has_permission(permission_level: str) -> Callable:
     """
     Custom check decorator that verifies if the user has the required permission level.
