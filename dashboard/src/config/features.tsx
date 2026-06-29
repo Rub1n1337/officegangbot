@@ -57,8 +57,8 @@ export const features: FeaturesConfig = {
     useRender: useLevelsFeature,
   },
   'moderation': {
-    name: 'Moderation',
-    description: 'Configure moderation roles and settings',
+    name: 'Moderator Roles',
+    description: 'Which roles can use each moderation command',
     icon: <Icon as={MdSecurity} />,
     category: 'safety',
     useRender: useModerationFeature,

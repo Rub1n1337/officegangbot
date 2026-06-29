@@ -8,6 +8,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   useDisclosure,
 } from '@chakra-ui/react';
 import { forwardRef } from 'react';
@@ -50,23 +51,28 @@ export const EmojiInput = forwardRef<HTMLInputElement, EmojiInputProps>(
                 😀
               </Button>
             </PopoverTrigger>
-            <PopoverContent
-              w="auto"
-              maxW="calc(100vw - 1rem)"
-              bg="transparent"
-              border="none"
-              boxShadow="none"
-            >
-              <PopoverArrow />
-              <PopoverBody p={0}>
-                <EmojiMartPicker
-                  onSelect={(native) => {
-                    onChange(native);
-                    onClose();
-                  }}
-                />
-              </PopoverBody>
-            </PopoverContent>
+            {/* Portal + high z-index so the picker floats above the cards
+                below it (otherwise it slips under the next form card on mobile). */}
+            <Portal>
+              <PopoverContent
+                w="auto"
+                maxW="calc(100vw - 1rem)"
+                bg="transparent"
+                border="none"
+                boxShadow="none"
+                zIndex="popover"
+              >
+                <PopoverArrow />
+                <PopoverBody p={0}>
+                  <EmojiMartPicker
+                    onSelect={(native) => {
+                      onChange(native);
+                      onClose();
+                    }}
+                  />
+                </PopoverBody>
+              </PopoverContent>
+            </Portal>
           </Popover>
         </InputRightElement>
       </InputGroup>

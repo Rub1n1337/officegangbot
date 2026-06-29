@@ -307,6 +307,7 @@ const MembersPage: NextPageWithLayout = () => {
         </InputLeftElement>
         <Input
           variant="main"
+          pl="2.75rem"
           placeholder="Search members by name…"
           value={query}
           onChange={(e) => {
