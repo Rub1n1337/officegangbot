@@ -20,17 +20,34 @@ const tokenSchema = z.object({
   scope: z.string(),
 });
 
+const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30;
+
 const options: OptionsType = {
   httpOnly: true,
-  maxAge: 60 * 60 * 24 * 30,
+  // Not sent on cross-site requests, so the proxy can't be driven by CSRF; and
+  // only over HTTPS in production (localhost stays HTTP for dev).
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: DEFAULT_MAX_AGE,
 };
 
 export type AccessToken = z.infer<typeof tokenSchema>;
 
+// A malformed cookie (truncated / tampered) must be treated as "no session",
+// not crash the handler with a JSON.parse error.
+function safeJsonParse(raw: string | undefined): unknown {
+  if (raw == null) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 export function middleware_hasServerSession(req: NextRequest) {
   const raw = req.cookies.get(TokenCookie)?.value;
 
-  return raw != null && tokenSchema.safeParse(JSON.parse(raw)).success;
+  return raw != null && tokenSchema.safeParse(safeJsonParse(raw)).success;
 }
 
 export function getServerSession(
@@ -38,13 +55,15 @@ export function getServerSession(
     cookies: NextApiRequestCookies;
   }
 ) {
-  const raw = req.cookies[TokenCookie];
-
-  return tokenSchema.safeParse(raw == null ? raw : JSON.parse(raw));
+  return tokenSchema.safeParse(safeJsonParse(req.cookies[TokenCookie]));
 }
 
 export function setServerSession(req: NextApiRequest, res: NextApiResponse, data: AccessToken) {
-  setCookie(TokenCookie, data, { req, res, ...options });
+  // Tie the cookie lifetime to the Discord token's own lifetime so it can't
+  // outlive a token we don't refresh (a stale token otherwise fails the guild
+  // permission lookup and surfaces as a 502 on every dashboard call).
+  const maxAge = data.expires_in > 0 ? data.expires_in : DEFAULT_MAX_AGE;
+  setCookie(TokenCookie, data, { req, res, ...options, maxAge });
 }
 
 export async function removeSession(req: NextApiRequest, res: NextApiResponse) {
