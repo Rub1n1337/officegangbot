@@ -39,7 +39,16 @@ def set_bot_instance(bot_obj):
     global bot_instance
     bot_instance = bot_obj
 
-app = FastAPI(title="OfficeGangBot API", version="1.0.0")
+# Interactive docs (/docs, /redoc) and the OpenAPI schema are disabled: this
+# API sits behind the dashboard proxy and an X-API-Key, so a public schema would
+# only leak the endpoint surface to anyone hitting the Railway URL directly.
+app = FastAPI(
+    title="OfficeGangBot API",
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 # Rate limiting (per client IP). Health check is intentionally left unlimited.
 limiter = Limiter(key_func=get_remote_address)

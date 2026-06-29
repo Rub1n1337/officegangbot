@@ -149,6 +149,7 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         await reply(ctx, t(loc, "filter.added", word=word))
 
     @filter.command(name="add_defaults", description="Adds the default list of profanities to the filter.")
+    @has_permission("config")
     async def filter_add_defaults(self, ctx: commands.Context):
         """Adds a predefined list of common profanities to the server's filter."""
         loc = await self.bot.db.get_locale(ctx.guild.id)
