@@ -16,6 +16,17 @@ const ADMINISTRATOR = BigInt(1 << 3); // Discord ADMINISTRATOR permission flag
 const adminGuildCache = new Map<string, { ids: Set<string>; expires: number }>();
 const CACHE_TTL_MS = 60_000;
 
+// These caches are keyed by access token; without a bound they'd grow forever
+// across distinct sessions. Drop expired entries once a cache gets large.
+const MAX_CACHE_ENTRIES = 5_000;
+function pruneCache(cache: Map<string, { expires: number }>) {
+  if (cache.size < MAX_CACHE_ENTRIES) return;
+  const now = Date.now();
+  cache.forEach((value, key) => {
+    if (value.expires <= now) cache.delete(key);
+  });
+}
+
 async function getAdminGuildIds(accessToken: string): Promise<Set<string> | null> {
   const cached = adminGuildCache.get(accessToken);
   if (cached && cached.expires > Date.now()) return cached.ids;
@@ -31,6 +42,7 @@ async function getAdminGuildIds(accessToken: string): Promise<Set<string> | null
       .filter((g) => (BigInt(g.permissions) & ADMINISTRATOR) !== BigInt(0))
       .map((g) => g.id)
   );
+  pruneCache(adminGuildCache);
   adminGuildCache.set(accessToken, { ids, expires: Date.now() + CACHE_TTL_MS });
   return ids;
 }
@@ -50,6 +62,7 @@ async function getActor(accessToken: string): Promise<Actor | null> {
   if (!resp.ok) return null;
   const u = (await resp.json()) as { id: string; username: string; global_name?: string | null };
   const actor: Actor = { id: u.id, name: u.global_name?.trim() || u.username };
+  pruneCache(actorCache);
   actorCache.set(accessToken, { actor, expires: Date.now() + CACHE_TTL_MS });
   return actor;
 }
@@ -131,15 +144,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const rawPath = req.query.path;
   const segments = (Array.isArray(rawPath) ? rawPath : [rawPath ?? '']) as string[];
+
+  // Reject path traversal / odd segments so the guild authorized below is exactly
+  // the guild the bot receives. Without this, an encoded `..` segment passes the
+  // guild-id check on one guild but gets normalized away when the upstream URL is
+  // built (`new URL`), landing on a *different* guild — a cross-guild IDOR.
+  if (
+    segments.some((s) => s === '' || s.includes('/') || s.includes('\\')) ||
+    segments.join('/').includes('..')
+  ) {
+    return res.status(400).json({ detail: 'Invalid path' });
+  }
+
+  // Only guild-scoped paths are reachable through the proxy. This enforces the
+  // per-guild admin check AND keeps the bot's global endpoints (e.g. /api/guilds,
+  // /api/stats) from being callable by any logged-in user.
   const guildId = guildIdFromPath(segments);
-  if (guildId) {
-    const adminGuilds = await getAdminGuildIds(accessToken);
-    if (!adminGuilds) {
-      return res.status(502).json({ detail: 'Could not verify guild permissions' });
-    }
-    if (!adminGuilds.has(guildId)) {
-      return res.status(403).json({ detail: 'You are not an administrator of this guild' });
-    }
+  if (!guildId) {
+    return res.status(403).json({ detail: 'This endpoint is not accessible' });
+  }
+  const adminGuilds = await getAdminGuildIds(accessToken);
+  if (!adminGuilds) {
+    return res.status(502).json({ detail: 'Could not verify guild permissions' });
+  }
+  if (!adminGuilds.has(guildId)) {
+    return res.status(403).json({ detail: 'You are not an administrator of this guild' });
   }
 
   try {
@@ -163,10 +192,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (responseBody.length === 0) return res.end();
     return res.send(responseBody);
   } catch (error) {
+    // Log the detail server-side; don't leak internal error / infra detail to the client.
     console.error('Bot API proxy error:', error);
-    return res.status(502).json({
-      detail: 'Bot API proxy failed',
-      error: String((error as { cause?: unknown })?.cause ?? error),
-    });
+    return res.status(502).json({ detail: 'Bot API proxy failed' });
   }
 }
