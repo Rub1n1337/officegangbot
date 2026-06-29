@@ -23,6 +23,7 @@ from core.redis_manager import RedisManager
 from core.moderation_actions import perform_moderation
 from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
+from core.permissions import role_is_assignable
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -197,6 +198,29 @@ class MyBot(commands.Bot):
     @staticmethod
     def _snowflake_or_none(value) -> Optional[str]:
         return str(value) if value else None
+
+    def _unassignable_roles(self, guild, role_ids):
+        """Of the given role ids, return [(id, label)] for roles the bot cannot
+        grant: unknown/deleted, managed, or at/above the bot's top role. Used to
+        reject auto-grant configs (autorole, level/reaction roles) at save time
+        instead of letting them silently fail later."""
+        if not guild or not guild.me:
+            return []
+        bot_top = guild.me.top_role.position
+        bad = []
+        for rid in role_ids:
+            try:
+                rid_int = int(rid)
+            except (TypeError, ValueError):
+                continue
+            role = guild.get_role(rid_int)
+            if role is None:
+                bad.append((rid_int, f"`{rid_int}`"))
+            elif not role_is_assignable(
+                role_managed=role.managed, role_position=role.position, bot_top_role_pos=bot_top
+            ):
+                bad.append((rid_int, f"@{role.name}"))
+        return bad
 
     async def _get_feature_payload(self, guild_id: int, feature: str) -> dict:
         if not self.db:
@@ -702,6 +726,10 @@ class MyBot(commands.Bot):
                         if lvl < 1:
                             continue
                         desired[lvl] = role_id
+                    bad = self._unassignable_roles(self.get_guild(guild_id), list(desired.values()))
+                    if bad:
+                        labels = ", ".join(label for _, label in bad)
+                        return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
                     current = await self.db.get_level_roles(guild_id)
                     for lvl in current:
                         if lvl not in desired:
@@ -751,6 +779,10 @@ class MyBot(commands.Bot):
                             })
                         except ValueError:
                             return {"error": "Invalid reaction-role entry (ids must be numeric)"}
+                    bad = self._unassignable_roles(self.get_guild(guild_id), [r["role_id"] for r in rows])
+                    if bad:
+                        labels = ", ".join(label for _, label in bad)
+                        return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
                     old_rows = await self.db.get_reaction_roles(guild_id, "reaction-role")
                     await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
                     await self._sync_reactions(guild_id, rows, old_rows)
@@ -792,6 +824,15 @@ class MyBot(commands.Bot):
                     "category": "ticket_category_id",
                 },
             }
+
+            # The welcome autorole is granted to every new member, so reject one
+            # the bot can't assign (above its role / managed) up front instead of
+            # letting it fail silently on each join.
+            if feature == "welcome-message" and options.get("autorole"):
+                bad = self._unassignable_roles(self.get_guild(guild_id), [options["autorole"]])
+                if bad:
+                    labels = ", ".join(label for _, label in bad)
+                    return {"error": f"I can't grant {labels} as the autorole — move my role above it (and it can't be a managed role)."}
 
             if feature in mapping:
                 for option_key, setting_key in mapping[feature].items():
