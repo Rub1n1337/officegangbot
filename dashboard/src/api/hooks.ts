@@ -3,6 +3,7 @@ import { QueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
 import {
   deleteWarning,
+  fetchAudit,
   disableFeature,
   enableFeature,
   fetchGuildChannels,
@@ -20,7 +21,12 @@ import {
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
-import type { MemberDetail, MemberSearchItem, ModerationData } from '@/config/types/custom-types';
+import type {
+  AuditEntry,
+  MemberDetail,
+  MemberSearchItem,
+  ModerationData,
+} from '@/config/types/custom-types';
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
 import { useToast } from '@chakra-ui/react';
 
@@ -331,6 +337,20 @@ export function useSetLocaleMutation() {
           position: 'bottom-right',
         });
       },
+    }
+  );
+}
+
+export function useAuditQuery(guild: string) {
+  const { status, session } = useSession();
+
+  return useQuery<AuditEntry[]>(
+    ['audit', guild],
+    async () => (await fetchAudit(session!!, guild)).entries,
+    {
+      enabled: status === 'authenticated',
+      staleTime: 20_000,
+      retry: false,
     }
   );
 }
