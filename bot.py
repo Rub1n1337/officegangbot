@@ -21,6 +21,7 @@ from config import load_config
 from core.health_monitor import HealthMonitor
 from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
+from core.permissions import bot_can_act_on, clamp_mute_minutes
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -261,6 +262,20 @@ class MyBot(commands.Bot):
         return feature_data.get(feature, {})
 
     async def _handle_rpc_request(self, payload: dict) -> dict:
+        """Top-level RPC entrypoint: dispatches and converts any unhandled
+        exception into a clean error response, so a handler bug returns an
+        immediate error instead of letting the API caller wait out an 8s
+        timeout (504)."""
+        try:
+            return await self._dispatch_rpc(payload)
+        except Exception as e:
+            logger.error(
+                f"Unhandled error in RPC action '{payload.get('action')}': {e}",
+                exc_info=True,
+            )
+            return {"error": "Internal bot error"}
+
+    async def _dispatch_rpc(self, payload: dict) -> dict:
         """Handles RPC requests from the API server via Redis Streams."""
         action = payload.get("action")
 
@@ -580,13 +595,17 @@ class MyBot(commands.Bot):
             tag = f"{reason} (via dashboard: {mod_name})"
 
             # The bot can only act on members strictly below its own top role
-            # (and never the owner or itself).
+            # (and never the owner or itself). See core.permissions.bot_can_act_on.
             def _bot_can_act(m):
                 if m is None:
                     return True  # banning a user not in the server
-                if m.id == self.user.id or m.id == guild.owner_id:
-                    return False
-                return guild.me.top_role > m.top_role
+                return bot_can_act_on(
+                    target_id=m.id,
+                    target_top_role_pos=m.top_role.position,
+                    bot_id=self.user.id,
+                    bot_top_role_pos=guild.me.top_role.position,
+                    owner_id=guild.owner_id,
+                )
 
             try:
                 if act == "warn":
@@ -606,11 +625,7 @@ class MyBot(commands.Bot):
                         return {"error": "Member is not in the server"}
                     if not _bot_can_act(member):
                         return {"error": "I can't moderate this member (role hierarchy)."}
-                    try:
-                        minutes = int(payload.get("duration_minutes") or 10)
-                    except (TypeError, ValueError):
-                        minutes = 10
-                    minutes = max(1, min(minutes, 40320))  # Discord caps timeout at 28 days
+                    minutes = clamp_mute_minutes(payload.get("duration_minutes"))
                     await member.timeout(datetime.timedelta(minutes=minutes), reason=tag)
                     return {"success": True, "message": f"Muted for {minutes} min"}
 
