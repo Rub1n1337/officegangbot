@@ -1,4 +1,5 @@
 import {
+  AuditEntry,
   CustomFeatures,
   CustomGuildInfo,
   GuildStats,
@@ -74,6 +75,18 @@ export async function fetchGuildStats(session: AccessToken, guild: string): Prom
 export async function fetchModeration(session: AccessToken, guild: string): Promise<ModerationData> {
   return await callReturn<ModerationData>(
     `/api/guild/${guild}/moderation`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
+/** The dashboard audit trail: who did what (moderation, settings) via the web. */
+export async function fetchAudit(session: AccessToken, guild: string): Promise<{ entries: AuditEntry[] }> {
+  return await callReturn<{ entries: AuditEntry[] }>(
+    `/api/guild/${guild}/audit`,
     botRequest(session, {
       request: {
         method: 'GET',

@@ -50,6 +50,16 @@ export type ModerationData = {
   leaderboard: ModerationLeaderItem[];
 };
 
+export type AuditEntry = {
+  id: number;
+  actorId: string | null;
+  actorName: string | null;
+  action: string;
+  target: string | null;
+  detail: string | null;
+  createdAt: string | null;
+};
+
 export type MemberSearchItem = {
   id: string;
   name: string;

@@ -10,7 +10,7 @@ import {
   Text,
   useToast,
 } from '@chakra-ui/react';
-import { MdDelete, MdGavel, MdTimer } from 'react-icons/md';
+import { MdDelete, MdGavel, MdTimer, MdHistory } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -20,9 +20,11 @@ import {
   useModerationQuery,
   useDeleteWarningMutation,
   useModerateMemberMutation,
+  useAuditQuery,
 } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import type {
+  AuditEntry,
   ModerationLeaderItem,
   ModerationPunishment,
   ModerationWarning,
@@ -283,6 +285,83 @@ function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
   );
 }
 
+const AUDIT_LABEL: Record<string, (e: AuditEntry) => string> = {
+  warn: () => 'warned a member',
+  mute: () => 'muted a member',
+  unmute: () => 'removed a timeout',
+  kick: () => 'kicked a member',
+  ban: () => 'banned a member',
+  enable_feature: (e) => `enabled ${e.target ?? 'a feature'}`,
+  disable_feature: (e) => `disabled ${e.target ?? 'a feature'}`,
+  update_feature: (e) => `updated ${e.target ?? 'a feature'} settings`,
+  set_locale: (e) => `set the bot language to ${e.detail ?? ''}`.trim(),
+  delete_warning: () => 'deleted a warning',
+};
+
+function describeAudit(e: AuditEntry): string {
+  const f = AUDIT_LABEL[e.action];
+  return f ? f(e) : e.action;
+}
+
+const INITIAL_AUDIT = 10;
+
+function AuditActivity({ rows }: { rows: AuditEntry[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? rows : rows.slice(0, INITIAL_AUDIT);
+  const isModeration = (a: string) => ['warn', 'mute', 'unmute', 'kick', 'ban'].includes(a);
+
+  return (
+    <Section
+      icon={<Icon as={MdHistory} color="Brand" />}
+      title="Dashboard activity"
+      count={rows.length}
+    >
+      {rows.length === 0 ? (
+        <Text fontSize="sm" color="TextSecondary">
+          No dashboard actions recorded yet.
+        </Text>
+      ) : (
+        <Flex direction="column" gap={2}>
+          {shown.map((e) => (
+            <Flex
+              key={e.id}
+              align="center"
+              justify="space-between"
+              gap={3}
+              p={3}
+              rounded="xl"
+              bg="blackAlpha.200"
+              _dark={{ bg: 'whiteAlpha.50' }}
+            >
+              <Box minW={0}>
+                <Text fontSize="sm" isTruncated>
+                  <Text as="span" fontWeight="600">
+                    {e.actorName ?? 'Someone'}
+                  </Text>{' '}
+                  {describeAudit(e)}
+                </Text>
+                {isModeration(e.action) && e.detail && (
+                  <Text fontSize="xs" color="TextSecondary" noOfLines={1}>
+                    {e.detail}
+                  </Text>
+                )}
+              </Box>
+              <Text fontSize="xs" color="TextSecondary" flexShrink={0}>
+                {timeAgo(e.createdAt)}
+              </Text>
+            </Flex>
+          ))}
+          {rows.length > INITIAL_AUDIT && (
+            <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Show less' : `Show all ${rows.length}`}
+            </Button>
+          )}
+        </Flex>
+      )}
+    </Section>
+  );
+}
+
 function ModerationSkeleton() {
   return (
     <Flex direction="column" gap={5}>
@@ -300,6 +379,7 @@ function ModerationSkeleton() {
 const ModerationPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const query = useModerationQuery(guild);
+  const audit = useAuditQuery(guild);
 
   return (
     <Flex direction="column" gap={5}>
@@ -319,6 +399,7 @@ const ModerationPage: NextPageWithLayout = () => {
           </Flex>
         )}
       </QueryStatus>
+      {audit.data && <AuditActivity rows={audit.data} />}
     </Flex>
   );
 };
