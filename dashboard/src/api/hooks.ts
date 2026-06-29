@@ -150,6 +150,7 @@ export function useEnableFeatureMutation() {
     {
       async onSuccess(_, { guild, feature, enabled }) {
         await client.invalidateQueries(Keys.features(guild, feature));
+        client.invalidateQueries(['audit', guild]);
         client.setQueryData<GuildInfo | null>(Keys.guild_info(guild), (prev) => {
           if (prev == null) return null;
 
@@ -208,6 +209,7 @@ export function useUpdateFeatureMutation() {
       onSuccess(updated, options) {
         const key = Keys.features(options.guild, options.feature);
         client.setQueryData(key, updated);
+        client.invalidateQueries(['audit', options.guild]);
         toast({
           title: 'Settings saved',
           description: 'Your changes have been saved successfully.',
@@ -286,6 +288,7 @@ export function useModerateMemberMutation() {
       onSuccess(res, { guild, userId }) {
         client.invalidateQueries(['member_detail', guild, userId]);
         client.invalidateQueries(['moderation', guild]);
+        client.invalidateQueries(['audit', guild]);
         toast({
           title: res?.message ?? 'Action applied',
           status: 'success',
@@ -320,6 +323,7 @@ export function useSetLocaleMutation() {
         client.setQueryData<CustomGuildInfo | null>(Keys.guild_info(guild), (prev) =>
           prev ? { ...prev, locale } : prev
         );
+        client.invalidateQueries(['audit', guild]);
         toast({
           title: 'Bot language updated',
           status: 'success',
@@ -381,6 +385,7 @@ export function useDeleteWarningMutation() {
         // The same warning may be shown on a member's card — refetch member
         // details for this guild so they don't show a stale warning.
         client.invalidateQueries(['member_detail', guild]);
+        client.invalidateQueries(['audit', guild]);
       },
       onError() {
         toast({
