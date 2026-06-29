@@ -49,7 +49,7 @@ async function getActor(accessToken: string): Promise<Actor | null> {
   });
   if (!resp.ok) return null;
   const u = (await resp.json()) as { id: string; username: string; global_name?: string | null };
-  const actor: Actor = { id: u.id, name: u.global_name || u.username };
+  const actor: Actor = { id: u.id, name: u.global_name?.trim() || u.username };
   actorCache.set(accessToken, { actor, expires: Date.now() + CACHE_TTL_MS });
   return actor;
 }
