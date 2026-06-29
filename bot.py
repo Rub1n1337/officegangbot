@@ -161,8 +161,14 @@ class MyBot(commands.Bot):
 
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
+        # testing_cog (owner-only /testall, which invokes every command) is a
+        # dev tool; never load it in production. Set LOAD_TESTING_COG=1 locally
+        # to enable it.
+        skip_cogs = {"utils.py"}
+        if os.getenv("LOAD_TESTING_COG") != "1":
+            skip_cogs.add("testing_cog.py")
         for filename in os.listdir(cogs_dir):
-            if filename.endswith(".py") and not filename.startswith("__") and filename != "utils.py":
+            if filename.endswith(".py") and not filename.startswith("__") and filename not in skip_cogs:
                 cog_name = f"cogs.{filename[:-3]}"
                 try:
                     await self.load_extension(cog_name)

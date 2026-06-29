@@ -8,6 +8,7 @@ import discord
 from core.permissions import bot_can_act_on, clamp_mute_minutes
 
 HIERARCHY_ERROR = "I can't moderate this member — they're higher than me in the role hierarchy."
+VALID_ACTIONS = {"warn", "mute", "unmute", "kick", "ban"}
 
 
 async def perform_moderation(
@@ -30,6 +31,8 @@ async def perform_moderation(
     via `log_action(guild, title, target_id, mod_name, reason, **extra)`.
     Returns ``{"success": True, "message": ...}`` or ``{"error": ...}``.
     """
+    if act not in VALID_ACTIONS:
+        return {"error": f"Unknown action: {act}"}
     reason = (str(reason or "").strip() or "No reason provided")[:500]
     mod_name = (str(mod_name or "Dashboard").strip() or "Dashboard")[:100]
     member = guild.get_member(user_id)
