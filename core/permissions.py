@@ -3,10 +3,49 @@ from discord.ext import commands
 from discord.ext.commands.errors import NoPrivateMessage
 
 from core.logger import logger
-from typing import Callable
+from typing import Callable, Optional
 
 # Discord caps a member timeout at 28 days.
 MAX_TIMEOUT_MINUTES = 28 * 24 * 60  # 40320
+
+# Reason codes returned by member_hierarchy_block (None means the action is allowed).
+HIERARCHY_SELF = "self"
+HIERARCHY_BOT_SELF = "bot_self"
+HIERARCHY_OWNER = "owner"
+HIERARCHY_TARGET_HIGHER = "higher"
+HIERARCHY_BOT_NOT_HIGHER = "bot_higher"
+
+
+def member_hierarchy_block(
+    *,
+    author_id: int,
+    author_top_role_pos: int,
+    target_id: int,
+    target_top_role_pos: int,
+    bot_id: int,
+    bot_top_role_pos: int,
+    owner_id: int,
+) -> Optional[str]:
+    """Whether a moderator (`author`) may act on `target` via a slash command.
+
+    Returns one of the HIERARCHY_* reason codes if the action must be blocked, or
+    None if allowed. Pure/position-based so it can be unit-tested without discord
+    objects, and shared by the Moderation and Timed Events cogs so their rules
+    can't drift apart. Policy: never self, the bot, or the owner; the author must
+    be at least as high as the target (equal allowed; the owner is exempt from the
+    author check); and the bot must be strictly higher than the target.
+    """
+    if target_id == author_id:
+        return HIERARCHY_SELF
+    if target_id == bot_id:
+        return HIERARCHY_BOT_SELF
+    if target_id == owner_id:
+        return HIERARCHY_OWNER
+    if author_id != owner_id and author_top_role_pos < target_top_role_pos:
+        return HIERARCHY_TARGET_HIGHER
+    if bot_top_role_pos <= target_top_role_pos:
+        return HIERARCHY_BOT_NOT_HIGHER
+    return None
 
 
 def bot_can_act_on(

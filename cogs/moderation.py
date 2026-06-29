@@ -3,10 +3,19 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
-from core.permissions import has_permission
+from core.permissions import has_permission, member_hierarchy_block
 from core.i18n import t
 from typing import Optional
 from .utils import reply
+
+# Map the shared hierarchy reason codes to this cog's i18n message keys.
+_HIERARCHY_KEYS = {
+    "self": "mod.hierarchy_self",
+    "bot_self": "mod.hierarchy_bot_self",
+    "owner": "mod.hierarchy_owner",
+    "higher": "mod.hierarchy_higher",
+    "bot_higher": "mod.hierarchy_bot_higher",
+}
 
 class BanConfirmView(discord.ui.View):
     """Confirmation view for the /ban command."""
@@ -97,18 +106,17 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
 
         Raises HierarchyError whose message is an i18n key, translated by the
         error handler in the guild's locale."""
-        if target.id == ctx.author.id:
-            raise HierarchyError("mod.hierarchy_self")
-        if target.id == self.bot.user.id:
-            raise HierarchyError("mod.hierarchy_bot_self")
-        if target.id == ctx.guild.owner_id:
-            raise HierarchyError("mod.hierarchy_owner")
-        # Moderators may act on members with an EQUAL top role; only a strictly
-        # higher target is blocked. (Bot-side check below stays <= on purpose.)
-        if ctx.author.id != ctx.guild.owner_id and ctx.author.top_role < target.top_role:
-            raise HierarchyError("mod.hierarchy_higher")
-        if ctx.guild.me.top_role <= target.top_role:
-            raise HierarchyError("mod.hierarchy_bot_higher")
+        code = member_hierarchy_block(
+            author_id=ctx.author.id,
+            author_top_role_pos=ctx.author.top_role.position,
+            target_id=target.id,
+            target_top_role_pos=target.top_role.position,
+            bot_id=self.bot.user.id,
+            bot_top_role_pos=ctx.guild.me.top_role.position,
+            owner_id=ctx.guild.owner_id,
+        )
+        if code:
+            raise HierarchyError(_HIERARCHY_KEYS[code])
 
     async def _notify_user(self, target: discord.Member, guild_name: str, title_key: str, reason: str, loc: str, duration: Optional[str] = None):
         """Sends a DM to the user about the moderation action, in the guild's locale."""
