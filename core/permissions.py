@@ -67,6 +67,16 @@ def bot_can_act_on(
     return bot_top_role_pos > target_top_role_pos
 
 
+def role_is_assignable(*, role_managed: bool, role_position: int, bot_top_role_pos: int) -> bool:
+    """Whether the bot can grant a role to a member.
+
+    A role is assignable only if it is below the bot's top role and not a managed
+    role (bot/integration/booster roles can't be granted manually). Pure/position-
+    based so it can be unit-tested without discord objects.
+    """
+    return (not role_managed) and role_position < bot_top_role_pos
+
+
 def clamp_mute_minutes(raw, default: int = 10) -> int:
     """Clamp a requested mute duration to Discord's [1 min, 28 days] window.
 
