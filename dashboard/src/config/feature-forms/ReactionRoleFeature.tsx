@@ -31,7 +31,7 @@ import { useRouter } from 'next/router';
 import { useGuildRolesQuery } from '@/api/hooks';
 import { toRGB } from '@/utils/common';
 import type { Role } from '@/api/bot';
-import type { ReactionRoleFeature } from '@/config/types/custom-types';
+import type { ReactionRoleFeature, ReactionRoleItem } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
 // A small "React [emoji] → get @Role" line so admins can sanity-check each rule.
@@ -174,7 +174,17 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
     ),
     onSubmit: handleSubmit(async (e) => {
       const result = await onSubmit(JSON.stringify({ items: e.items }));
-      reset(result);
+      // Re-sync the form to exactly what the server persisted (incomplete rows are
+      // dropped server-side), normalising null -> undefined like defaultValues so
+      // the form goes pristine and the Save bar hides.
+      reset({
+        items: ((result?.items ?? []) as ReactionRoleItem[]).map((it: ReactionRoleItem) => ({
+          channelId: it.channelId ?? undefined,
+          messageId: it.messageId ?? undefined,
+          emoji: it.emoji || '✅',
+          roleId: it.roleId ?? undefined,
+        })),
+      });
     }),
     canSave: formState.isDirty,
     reset: () => reset(control._defaultValues),

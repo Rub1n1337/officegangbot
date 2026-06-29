@@ -22,6 +22,7 @@ from core.db_manager import DatabaseManager
 from core.redis_manager import RedisManager
 from core.moderation_actions import perform_moderation
 from core.member_queries import search_guild_members, build_member_profile
+from core.reaction_sync import plan_reaction_changes
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -670,7 +671,7 @@ class MyBot(commands.Bot):
                         except ValueError:
                             return {"error": f"Invalid role id for {perm}: {raw}"}
                         await self.db.set_mod_role(guild_id, role_id, perm)
-                return {"success": True}
+                return await self._get_feature_payload(guild_id, feature)
 
             # Level role rewards live in the level_roles table (one role per
             # level), not in guilds columns, so they are reconciled separately:
@@ -705,7 +706,7 @@ class MyBot(commands.Bot):
                             await self.db.remove_level_role(guild_id, lvl)
                     for lvl, role_id in desired.items():
                         await self.db.set_level_role(guild_id, lvl, role_id)
-                return {"success": True}
+                return await self._get_feature_payload(guild_id, feature)
 
             # Filter word list is a TEXT[] column and feeds a cached compiled
             # regex, so it is handled separately: normalise the list and
@@ -718,7 +719,7 @@ class MyBot(commands.Bot):
                     filter_cog = self.get_cog("🚫 Filter")
                     if filter_cog:
                         await filter_cog._invalidate_pattern(guild_id)
-                return {"success": True}
+                return await self._get_feature_payload(guild_id, feature)
 
             # Reaction roles live in the reaction_roles table (many per guild).
             # Replace the standalone set and best-effort add each reaction to its
@@ -742,9 +743,13 @@ class MyBot(commands.Bot):
                             })
                         except ValueError:
                             return {"error": "Invalid reaction-role entry (ids must be numeric)"}
+                    old_rows = await self.db.get_reaction_roles(guild_id, "reaction-role")
                     await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
-                    await self._sync_reactions(guild_id, rows)
-                return {"success": True}
+                    await self._sync_reactions(guild_id, rows, old_rows)
+                # Return the freshly-persisted payload so the dashboard re-syncs its
+                # form state (otherwise the Save button stays enabled and edits look
+                # like they didn't apply).
+                return await self._get_feature_payload(guild_id, feature)
 
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
             BIGINT_SETTINGS = {
@@ -846,6 +851,7 @@ class MyBot(commands.Bot):
                         # Rules reaction-role (one mapping on the rules message)
                         rules_msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
                         rules_ch_id = await self.db.get_guild_setting(guild_id, "rules_channel_id")
+                        old_rules = await self.db.get_reaction_roles(guild_id, "rules")
                         if options.get("reactionEnabled") and options.get("reactionRole") and rules_msg_id and rules_ch_id:
                             try:
                                 rr = {
@@ -857,27 +863,48 @@ class MyBot(commands.Bot):
                             except ValueError:
                                 return {"error": "Invalid rules reaction role id"}
                             await self.db.replace_reaction_roles(guild_id, "rules", [rr])
-                            await self._sync_reactions(guild_id, [rr])
+                            await self._sync_reactions(guild_id, [rr], old_rules)
                         else:
                             await self.db.replace_reaction_roles(guild_id, "rules", [])
+                            # Remove the bot's stale reaction if the rules role was turned off.
+                            await self._sync_reactions(guild_id, [], old_rules)
 
-                return {"success": True}
+                return await self._get_feature_payload(guild_id, feature)
 
         return {"error": "Unknown action"}
 
-    async def _sync_reactions(self, guild_id: int, rows: list) -> None:
-        """Best-effort: add each mapping's emoji reaction to its message so
-        members can click it. A bad emoji or missing message just logs."""
+    async def _sync_reactions(self, guild_id: int, rows: list, old_rows: Optional[list] = None) -> None:
+        """Best-effort reconcile of the bot's own reactions on each mapped message:
+        add the current mapping's emoji, and remove the bot's reaction for emojis
+        that are no longer mapped on that message (e.g. after the admin changes the
+        emoji on a reaction role). Members' own reactions are left untouched; a bad
+        emoji or missing message just logs."""
         guild = self.get_guild(guild_id)
         if not guild:
             return
-        for r in rows:
+        plan = plan_reaction_changes(rows, old_rows)
+        for mid, change in plan.items():
+            ch_id = change["channel_id"]
+            if ch_id is None:
+                continue
             try:
-                channel = guild.get_channel(int(r["channel_id"])) or await guild.fetch_channel(int(r["channel_id"]))
-                msg = await channel.fetch_message(int(r["message_id"]))
-                await msg.add_reaction(r["emoji"])
+                channel = guild.get_channel(ch_id) or await guild.fetch_channel(ch_id)
+                msg = await channel.fetch_message(mid)
             except Exception as e:
-                logger.warning(f"Could not add reaction {r['emoji']} to message {r['message_id']}: {e}")
+                logger.warning(f"Reaction sync: could not load message {mid}: {e}")
+                continue
+            # Remove the bot's own reaction for emojis no longer mapped on this message.
+            for emoji in change["remove"]:
+                try:
+                    await msg.remove_reaction(emoji, self.user)
+                except Exception as e:
+                    logger.warning(f"Could not remove stale reaction {emoji} from message {mid}: {e}")
+            # Add the current emojis (no-op if the bot already reacted).
+            for emoji in change["add"]:
+                try:
+                    await msg.add_reaction(emoji)
+                except Exception as e:
+                    logger.warning(f"Could not add reaction {emoji} to message {mid}: {e}")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         """Global error handler for slash commands."""
