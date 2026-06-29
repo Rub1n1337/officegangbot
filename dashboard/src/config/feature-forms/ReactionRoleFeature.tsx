@@ -105,7 +105,15 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
           </Text>
         )}
         {fields.map((field, index) => (
-          <Box key={field.id} bg="CardBackground" rounded="2xl" p={4} position="relative">
+          <Box
+            key={field.id}
+            bg="CardBackground"
+            rounded="2xl"
+            p={4}
+            position="relative"
+            borderWidth="1px"
+            borderColor="CardBorder"
+          >
             <Flex justify="space-between" align="center" mb={2}>
               <Flex align="center" gap={2}>
                 <Text fontWeight="600">Reaction role #{index + 1}</Text>

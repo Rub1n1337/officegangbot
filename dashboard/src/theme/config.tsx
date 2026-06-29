@@ -77,6 +77,12 @@ export const theme = extendTheme({
         default: light.cardBg,
         _dark: dark.cardBg,
       },
+      // Subtle card outline so nested cards are visibly separated on both
+      // themes (a shadow alone disappears on the dark background).
+      CardBorder: {
+        default: 'blackAlpha.200',
+        _dark: 'whiteAlpha.200',
+      },
     },
   },
 });

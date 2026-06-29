@@ -23,6 +23,8 @@ export function Form(props: FormControlProps) {
       rounded="3xl"
       p={5}
       boxShadow="normal"
+      borderWidth="1px"
+      borderColor="CardBorder"
       {...props}
     >
       {props.children}
