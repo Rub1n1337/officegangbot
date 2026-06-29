@@ -787,16 +787,20 @@ class MyBot(commands.Bot):
 
             if feature in mapping:
                 for option_key, setting_key in mapping[feature].items():
-                    if option_key in options and options[option_key] is not None:
-                        value = options[option_key]
-                        if setting_key in BIGINT_SETTINGS:
-                            try:
-                                value = int(value)
-                            except (TypeError, ValueError):
-                                return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
-                        await self.db.set_guild_setting(
-                            guild_id, setting_key, value
-                        )
+                    if option_key not in options:
+                        continue
+                    value = options[option_key]
+                    if value is None:
+                        # Explicit null means the admin cleared an optional
+                        # channel/role in the dashboard — unset the column.
+                        await self.db.set_guild_setting(guild_id, setting_key, None)
+                        continue
+                    if setting_key in BIGINT_SETTINGS:
+                        try:
+                            value = int(value)
+                        except (TypeError, ValueError):
+                            return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
+                    await self.db.set_guild_setting(guild_id, setting_key, value)
                 
                 # --- E2E Sync: Rules ---
                 if feature == "rules":

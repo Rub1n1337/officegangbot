@@ -73,7 +73,7 @@ type Props = Override<
   SelectProps<Option, false>,
   {
     value?: string;
-    onChange: (v: string) => void;
+    onChange: (v: string | null) => void;
   }
 >;
 
@@ -93,10 +93,13 @@ export const ChannelSelect = forwardRef<SelectInstance<Option, false>, Props>(
       <SelectField<Option>
         isDisabled={isLoading}
         isLoading={isLoading}
+        isClearable
         placeholder={<common.T text="select channel" />}
         value={selected != null ? render(selected) : null}
         options={options}
-        onChange={(e) => e != null && onChange(e.value)}
+        // Pass null on clear so an optional channel can actually be unset (the
+        // form sends null and the bot clears the column).
+        onChange={(e) => onChange(e?.value ?? null)}
         ref={ref}
         {...rest}
       />
