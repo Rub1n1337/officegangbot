@@ -326,9 +326,11 @@ async def moderate_member(request: Request, guild_id: int, user_id: int, payload
         act=payload.act,
         reason=payload.reason,
         duration_minutes=payload.durationMinutes,
-        # Prefer the server-derived actor over the client-supplied fields.
-        moderator_id=actor["actor_id"] or payload.moderatorId,
-        moderator_name=actor["actor_name"] or payload.moderatorName,
+        # Actor is derived server-side from the session (proxy headers). The
+        # client-supplied moderator fields are accepted but ignored, so a caller
+        # can't forge who performed the action in the log / audit trail.
+        moderator_id=actor["actor_id"],
+        moderator_name=actor["actor_name"],
     )
     return data
 
