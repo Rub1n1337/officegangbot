@@ -42,7 +42,7 @@ export function WelcomePreview({ message, serverName }: { message: string; serve
         gap={3}
         align="flex-start"
         border="1px solid"
-        borderColor="whiteAlpha.200"
+        borderColor="CardBorder"
       >
         <Box w="40px" h="40px" rounded="full" bg="Brand" flexShrink={0} />
         <Box minW={0}>

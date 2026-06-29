@@ -33,15 +33,21 @@ function RenderedRules({ message }: { message: string }) {
         if (isQuote) {
           return (
             <Flex key={idx} gap={2}>
-              <Box w="3px" bg="whiteAlpha.400" rounded="full" flexShrink={0} />
-              <Text fontSize="sm" color="whiteAlpha.900">
+              <Box
+                w="3px"
+                bg="blackAlpha.300"
+                _dark={{ bg: 'whiteAlpha.400' }}
+                rounded="full"
+                flexShrink={0}
+              />
+              <Text fontSize="sm" color="TextPrimary">
                 {renderInline(content)}
               </Text>
             </Flex>
           );
         }
         return (
-          <Text key={idx} fontSize="sm" minH={raw === '' ? '0.5em' : undefined}>
+          <Text key={idx} fontSize="sm" color="TextPrimary" minH={raw === '' ? '0.5em' : undefined}>
             {renderInline(content)}
           </Text>
         );
@@ -66,7 +72,7 @@ export function RulesPreview({
         Preview
       </Text>
       {/* Discord-embed-style card: colored accent bar + body. */}
-      <Flex bg="CardBackground" rounded="md" overflow="hidden" border="1px solid" borderColor="whiteAlpha.200">
+      <Flex bg="CardBackground" rounded="md" overflow="hidden" border="1px solid" borderColor="CardBorder">
         <Box w="4px" bg="Brand" flexShrink={0} />
         <Box p={4} flex="1" minW={0}>
           <Text fontWeight="700" mb={2}>
@@ -86,7 +92,8 @@ export function RulesPreview({
               <Flex
                 align="center"
                 gap={1}
-                bg="whiteAlpha.200"
+                bg="blackAlpha.100"
+                _dark={{ bg: 'whiteAlpha.200' }}
                 rounded="md"
                 px={2}
                 py={0.5}
