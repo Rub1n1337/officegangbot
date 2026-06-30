@@ -20,6 +20,24 @@ export const guild = createI18n(provider, {
       settings: 'Overview',
     },
   },
+  ru: {
+    features: 'Функции',
+    banner: {
+      title: 'Начало работы',
+      description: 'Настройте бота за пару кликов',
+    },
+    error: {
+      'not found': 'Где же он?',
+      'not found description': 'Бот не на сервере — давайте пригласим его!',
+      load: 'Не удалось загрузить сервер',
+    },
+    bn: {
+      'enable feature': 'Включить',
+      'config feature': 'Настроить',
+      invite: 'Пригласить бота',
+      settings: 'Обзор',
+    },
+  },
   cn: {
     features: '管理機器人功能',
     banner: {

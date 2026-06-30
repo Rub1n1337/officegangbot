@@ -23,6 +23,27 @@ export const dashboard = createI18n(provider, {
       description: 'Use of commands of your server',
     },
   },
+  ru: {
+    pricing: 'Тарифы',
+    learn_more: 'Подробнее',
+    invite: {
+      title: 'Пригласить бота',
+      description: 'Подключите Discord-бота в один клик',
+      bn: 'Пригласить',
+    },
+    servers: {
+      title: 'Выбор сервера',
+      description: 'Выберите сервер для настройки',
+    },
+    vc: {
+      create: 'Создать голосовой канал',
+      'created channels': 'Созданные голосовые каналы',
+    },
+    command: {
+      title: 'Использование команд',
+      description: 'Использование команд на сервере',
+    },
+  },
   cn: {
     pricing: '價錢',
     learn_more: '了解更多',

@@ -7,6 +7,11 @@ export const auth = createI18n(provider, {
     'login description': 'Login and start using our bot today',
     login_bn: 'Login with Discord',
   },
+  ru: {
+    login: 'Вход',
+    'login description': 'Войдите и начните пользоваться ботом',
+    login_bn: 'Войти через Discord',
+  },
   cn: {
     login: '登入控制面板',
     'login description': '登錄並開始使用我們的機器人',
