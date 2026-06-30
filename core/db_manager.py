@@ -23,7 +23,8 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'reaction_emoji', 'reaction_role_id', 'setup_complete', 'levels_enabled',
     'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
     'ticket_support_role_id', 'ticket_category_id', 'enabled_features',
-    'locale',
+    'locale', 'automod_block_invites', 'automod_block_links',
+    'automod_allowed_domains',
 })
 
 
@@ -41,6 +42,9 @@ class DatabaseManager:
         # every message (automod/filter/levels), so hitting Postgres each time
         # would hammer the DB on busy servers. Invalidated on set_feature_enabled.
         self._enabled_features_cache: Dict[int, List[str]] = {}
+        # Per-guild AutoMod content-filter config (read on every message when
+        # AutoMod is on). Invalidated on set_automod_config.
+        self._automod_cache: Dict[int, Dict[str, Any]] = {}
 
     async def connect(self) -> None:
         """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""
@@ -619,3 +623,36 @@ class DatabaseManager:
                 "UPDATE scheduled_messages SET enabled = FALSE, last_sent_at = NOW() WHERE id = $1",
                 message_id,
             )
+
+    # --- AutoMod content-filter config -------------------------------------
+
+    async def get_automod_config(self, guild_id: int) -> Dict[str, Any]:
+        """Returns the guild's AutoMod content-filter config (cached, since it is
+        read on every message while AutoMod is enabled)."""
+        cached = self._automod_cache.get(guild_id)
+        if cached is not None:
+            return cached
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT automod_block_invites, automod_block_links, automod_allowed_domains "
+                "FROM guilds WHERE guild_id = $1",
+                guild_id,
+            )
+        config = {
+            "block_invites": bool(row["automod_block_invites"]) if row else False,
+            "block_links": bool(row["automod_block_links"]) if row else False,
+            "allowed_domains": list(row["automod_allowed_domains"]) if row and row["automod_allowed_domains"] else [],
+        }
+        self._automod_cache[guild_id] = config
+        return config
+
+    async def set_automod_config(self, guild_id: int, block_invites: bool, block_links: bool, allowed_domains: List[str]) -> None:
+        """Persists the AutoMod content-filter config and invalidates the cache."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE guilds SET automod_block_invites = $1, automod_block_links = $2, "
+                "automod_allowed_domains = $3, updated_at = NOW() WHERE guild_id = $4",
+                bool(block_invites), bool(block_links), list(allowed_domains), guild_id,
+            )
+        self._automod_cache.pop(guild_id, None)

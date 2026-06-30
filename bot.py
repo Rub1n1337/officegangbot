@@ -303,6 +303,11 @@ class MyBot(commands.Bot):
                 "supportRole": self._snowflake_or_none(settings.get("ticket_support_role_id")),
                 "category": self._snowflake_or_none(settings.get("ticket_category_id")),
             },
+            "automod": {
+                "blockInvites": bool(settings.get("automod_block_invites")),
+                "blockLinks": bool(settings.get("automod_block_links")),
+                "allowedDomains": list(settings.get("automod_allowed_domains") or []),
+            },
         }
         return feature_data.get(feature, {})
 
@@ -845,6 +850,16 @@ class MyBot(commands.Bot):
                             "enabled": enabled,
                         })
                     await self.db.replace_scheduled_messages(guild_id, rows)
+                return await self._get_feature_payload(guild_id, feature)
+
+            # AutoMod content-filter config (invite/link blocking) lives in guilds
+            # columns but is cached, so it goes through set_automod_config.
+            if feature == "automod":
+                block_invites = bool(options.get("blockInvites", False))
+                block_links = bool(options.get("blockLinks", False))
+                domains_raw = options.get("allowedDomains") or []
+                domains = sorted({str(d).strip().lower() for d in domains_raw if str(d).strip()})[:50]
+                await self.db.set_automod_config(guild_id, block_invites, block_links, domains)
                 return await self._get_feature_payload(guild_id, feature)
 
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
