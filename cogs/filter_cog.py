@@ -47,6 +47,10 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
         if self.bot.redis:
             await self.bot.redis.set_filter_pattern(guild_id, pattern_str)
         else:
+            # In-memory fallback when Redis is down — cap it so it can't grow
+            # unbounded across many guilds (drop the oldest entry past the cap).
+            if len(self._pattern_cache) >= 1000 and guild_id not in self._pattern_cache:
+                self._pattern_cache.pop(next(iter(self._pattern_cache)), None)
             self._pattern_cache[guild_id] = re.compile(pattern_str, re.IGNORECASE)
 
         return re.compile(pattern_str, re.IGNORECASE)
