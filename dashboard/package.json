@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:e2e": "playwright test",
     "preinstall": "npx only-allow pnpm"
   },
   "private": true,
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.21.0",
+    "@playwright/test": "^1.61.1",
     "@types/node": "16.11.7",
     "@types/react": "^18.0.0",
     "@types/react-calendar": "^3.5.2",
