@@ -22,6 +22,7 @@ import { useGuilds, useMyBotGuilds } from '@/api/hooks';
 import { NextPageWithLayout } from '@/pages/_app';
 import AppLayout from '@/components/layout/app';
 import { iconUrl } from '@/api/discord';
+import { ErrorPanel } from '@/components/panel/ErrorPanel';
 import Link from 'next/link';
 
 const HomePage: NextPageWithLayout = () => {
@@ -35,9 +36,13 @@ export function GuildSelect() {
 
   if (guilds.status === 'error')
     return (
-      <Button w="fit-content" variant="danger" onClick={() => guilds.refetch()}>
-        Try Again
-      </Button>
+      <ErrorPanel
+        retry={() => guilds.refetch()}
+        isRetrying={guilds.isFetching}
+        hint="Couldn't reach Discord — check your connection and try again."
+      >
+        Couldn&apos;t load your servers
+      </ErrorPanel>
     );
 
   if (guilds.status === 'loading')
