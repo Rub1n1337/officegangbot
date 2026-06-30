@@ -1,6 +1,6 @@
 import { Badge, Button, ButtonGroup, Flex, Heading, SimpleGrid, Text } from '@chakra-ui/react';
 import { useState } from 'react';
-import { LoadingPanel } from '@/components/panel/LoadingPanel';
+import { FeatureGridSkeleton } from '@/components/feature/FeatureGridSkeleton';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { guild as view } from '@/config/translations/guild';
 import { useGuildInfoQuery } from '@/api/hooks';
@@ -20,7 +20,7 @@ const GuildPage: NextPageWithLayout = () => {
   const query = useGuildInfoQuery(guild);
 
   return (
-    <QueryStatus query={query} loading={<LoadingPanel />} error={t.error.load}>
+    <QueryStatus query={query} loading={<FeatureGridSkeleton />} error={t.error.load}>
       {query.data != null ? (
         <GuildPanel guild={guild} info={query.data} />
       ) : (
