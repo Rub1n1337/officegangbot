@@ -1,8 +1,9 @@
 # 🤖 OfficeGangBot
 
 A feature-rich Discord bot for server management — moderation, leveling, content
-filtering, reaction roles, logging, and automation — with a companion **web
-dashboard** for point-and-click configuration.
+filtering, reaction roles, welcome messages, tickets, scheduled announcements,
+logging, and automod — with a companion **web dashboard** for point-and-click
+configuration.
 
 ---
 
@@ -122,16 +123,18 @@ always-up-to-date list with an interactive category menu.
 | `/userinfo [member]` · `/serverinfo` · `/ping` | Info & latency |
 | `/help [category\|command]` | Interactive help with a category dropdown |
 
-> Welcome messages, reaction roles, the rules message and logging are configured
-> from the **dashboard** (and partly via `/setup`).
+> Welcome messages, reaction roles, levels, tickets, scheduled announcements, the
+> rules message and logging are configured from the **dashboard** (and partly via
+> `/setup`).
 
 ---
 
 ## 🖥️ Dashboard
 
 A Next.js app (in `dashboard/`) deployed to Vercel. Admins sign in with Discord,
-and each guild gets feature panels (Rules, Reaction Role, Moderation, Logging,
-Word Filter, Welcome Message) that can be toggled on/off and configured.
+and each guild gets feature panels — Rules, Welcome Message, Reaction Role,
+Levels, Scheduled Messages, Moderator Roles, Logging, Word Filter, AutoMod and
+Tickets — that can be toggled on/off and configured.
 
 - Browser → `dashboard/src/pages/api/bot/[...path].ts` proxy → FastAPI (`X-API-Key`).
 - The proxy verifies the signed-in user is an **administrator of that guild**
