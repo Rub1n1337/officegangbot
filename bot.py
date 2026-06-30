@@ -399,6 +399,13 @@ class MyBot(commands.Bot):
             if not self.db:
                 return {"error": "Database unavailable"}
             settings = await self.db.get_all_guild_settings(guild_id)
+            # Snowflake ids are BIGINTs that exceed JS's safe-integer range, so
+            # serialize every *_id as a string — otherwise a JSON consumer (the
+            # dashboard, etc.) silently loses precision on the last few digits.
+            settings = {
+                k: (str(v) if (k.endswith("_id") and isinstance(v, int)) else v)
+                for k, v in settings.items()
+            }
             enabled_features = await self.db.get_enabled_features(guild_id)
             return {
                 "id": str(guild.id),
