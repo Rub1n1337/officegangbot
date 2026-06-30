@@ -145,6 +145,9 @@ export function useFeatureQuery<K extends keyof CustomFeatures>(guild: string, f
 
   return useQuery(Keys.features(guild, feature), () => getFeature(session!!, guild, feature), {
     enabled: status === 'authenticated',
+    // Recover from a transient failure (bot restarting) without a manual retry.
+    retry: 2,
+    retryDelay,
   });
 }
 
@@ -285,7 +288,8 @@ export function useMemberDetailQuery(guild: string, userId: string | null) {
     {
       enabled: status === 'authenticated' && userId != null,
       staleTime: 15_000,
-      retry: false,
+      retry: 2,
+      retryDelay,
     }
   );
 }
@@ -367,7 +371,8 @@ export function useAuditQuery(guild: string) {
     {
       enabled: status === 'authenticated',
       staleTime: 20_000,
-      retry: false,
+      retry: 2,
+      retryDelay,
     }
   );
 }
@@ -378,7 +383,8 @@ export function useModerationQuery(guild: string) {
   return useQuery<ModerationData>(['moderation', guild], () => fetchModeration(session!!, guild), {
     enabled: status === 'authenticated',
     staleTime: 30_000,
-    retry: false,
+    retry: 2,
+    retryDelay,
   });
 }
 
