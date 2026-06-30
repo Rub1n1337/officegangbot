@@ -346,6 +346,11 @@ const MembersPage: NextPageWithLayout = () => {
           {search.data!.map((m) => (
             <Flex
               key={m.id}
+              as="button"
+              type="button"
+              textAlign="left"
+              w="full"
+              aria-label={`View ${m.displayName}`}
               align="center"
               gap={3}
               p={3}
@@ -354,6 +359,7 @@ const MembersPage: NextPageWithLayout = () => {
               bg="CardBackground"
               transition="background 0.12s ease"
               _hover={{ bg: 'blackAlpha.100', _dark: { bg: 'whiteAlpha.100' } }}
+              _focusVisible={{ outline: '2px solid', outlineColor: 'Brand', outlineOffset: '2px' }}
               onClick={() => setSelected(m.id)}
             >
               <Avatar src={m.avatar} name={m.displayName} size="sm" />
