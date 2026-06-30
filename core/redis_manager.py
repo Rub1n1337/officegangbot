@@ -228,10 +228,11 @@ class RedisManager:
 
     async def rpc_request(self, channel: str, payload: dict, timeout: float = 8.0) -> Optional[dict]:
         """
-        Sends an RPC request via Redis Stream and polls for response.
-        More resilient to Upstash idle disconnects than Pub/Sub.
+        Sends an RPC request via a Redis Stream and waits for the response with a
+        blocking pop (BLPOP) rather than a GET poll loop — the bot RPUSHes the
+        response, so this returns the moment it's ready, in one round-trip instead
+        of polling every 300ms. Streams stay resilient to Upstash idle disconnects.
         """
-        import uuid
         request_id = str(uuid.uuid4())
         response_key = f"rpc:response:{request_id}"
 
@@ -244,20 +245,23 @@ class RedisManager:
             logger.error(f"Redis XADD error: {e}")
             return None
 
-        # Poll for response with short intervals (resilient to disconnects)
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
-            try:
-                result = await self.redis.get(response_key)
-                if result:
-                    await self.redis.delete(response_key)
-                    return json.loads(result)
-            except Exception as e:
-                logger.warning(f"Redis GET poll error (will retry): {e}")
-            await asyncio.sleep(0.3)
+        # Block until the bot pushes the response (or we hit the timeout). BLPOP
+        # returns (key, value); the bot sets a TTL on the key so a timed-out
+        # request can't leak a list.
+        try:
+            result = await self.redis.blpop(response_key, timeout=timeout)
+        except Exception as e:
+            logger.warning(f"Redis BLPOP error: {e}")
+            return None
 
-        logger.warning(f"RPC timeout for request {request_id}")
-        return None
+        if not result:
+            logger.warning(f"RPC timeout for request {request_id}")
+            return None
+        try:
+            return json.loads(result[1])
+        except Exception as e:
+            logger.error(f"RPC response decode error for {request_id}: {e}")
+            return None
 
     async def start_rpc_listener(self, channel: str, handler) -> None:
         """
@@ -291,9 +295,11 @@ class RedisManager:
                                     continue
 
                                 response = await handler(payload)
-                                await self.redis.set(
-                                    response_key, json.dumps(response, default=_json_default), ex=15
-                                )
+                                # Push the response onto a short-lived list that the
+                                # caller is BLPOP-ing, so it's delivered immediately.
+                                encoded = json.dumps(response, default=_json_default)
+                                await self.redis.rpush(response_key, encoded)
+                                await self.redis.expire(response_key, 15)
                             except Exception as e:
                                 logger.error(f"RPC handler error: {e}", exc_info=True)
 
