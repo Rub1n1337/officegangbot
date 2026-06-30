@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 from core.logger import logger
 from core.i18n import t
+from core.content_filter import contains_invite, first_disallowed_link
 import datetime
 
 class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
@@ -60,6 +61,22 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         except discord.Forbidden:
             pass
 
+    async def _block_message(self, message: discord.Message, loc: str, notice_key: str, log_description: str):
+        """Delete a message that broke a content rule, briefly notify the author,
+        and record it in the AutoMod log."""
+        try:
+            await message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            return
+        try:
+            await message.channel.send(
+                t(loc, notice_key, mention=message.author.mention),
+                delete_after=5,
+            )
+        except discord.Forbidden:
+            pass
+        await self._log_automod(message.guild, log_description)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
@@ -78,6 +95,23 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         user_id = message.author.id
         now = datetime.datetime.now(datetime.timezone.utc).timestamp()
         loc = await self.bot.db.get_locale(guild_id)
+
+        # --- Content filter (invite / link blocking) ---
+        config = await self.bot.db.get_automod_config(guild_id)
+        if config["block_invites"] and contains_invite(message.content):
+            await self._block_message(
+                message, loc, "automod.invite_blocked",
+                f"**Invite link** by {message.author.mention} (`{user_id}`) — message deleted.",
+            )
+            return
+        if config["block_links"]:
+            bad = first_disallowed_link(message.content, config["allowed_domains"])
+            if bad:
+                await self._block_message(
+                    message, loc, "automod.link_blocked",
+                    f"**Disallowed link** by {message.author.mention} (`{user_id}`) — message deleted.",
+                )
+                return
 
         # --- Anti-mention spam ---
         total_mentions = len(message.mentions) + len(message.role_mentions)

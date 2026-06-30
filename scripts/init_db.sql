@@ -148,6 +148,10 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages(sche
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS locale VARCHAR(5) DEFAULT 'en';
+-- AutoMod content-filter config (invite/link blocking).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_invites BOOLEAN DEFAULT FALSE;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_links BOOLEAN DEFAULT FALSE;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_allowed_domains TEXT[] DEFAULT '{}';
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')

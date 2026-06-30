@@ -138,10 +138,11 @@ export type TicketsFeature = {
   category?: string | null;
 };
 
-// AutoMod has no configurable options — its rules are fixed and it's controlled
-// purely by the enable/disable toggle. The empty shape keeps it in the feature
-// system without a settings form.
-export type AutomodFeature = Record<string, never>;
+export type AutomodFeature = {
+  blockInvites: boolean;
+  blockLinks: boolean;
+  allowedDomains: string[];
+};
 
 export type WelcomeMessageFeature = {
   channel?: string | null;
