@@ -2,6 +2,7 @@
 # This is the main application file for the Discord Bot. It's the "brain" of the operation.
 
 import os
+import datetime
 from typing import Optional
 from pathlib import Path
 
@@ -229,6 +230,7 @@ class MyBot(commands.Bot):
         mod_roles = await self.db.get_mod_roles(guild_id)
         reaction_roles = await self.db.get_reaction_roles(guild_id)
         level_roles = await self.db.get_level_roles(guild_id)
+        scheduled = await self.db.get_scheduled_messages(guild_id)
 
         def _first_role(perm: str):
             ids = mod_roles.get(perm) or []
@@ -260,6 +262,18 @@ class MyBot(commands.Bot):
             },
             "reaction-role": {
                 "items": standalone_rr,
+            },
+            "scheduled-messages": {
+                "items": [
+                    {
+                        "channelId": str(s["channel_id"]),
+                        "content": s["content"],
+                        "scheduledAt": s["scheduled_at"].isoformat() if s["scheduled_at"] else None,
+                        "repeat": s["repeat"],
+                        "enabled": s["enabled"],
+                    }
+                    for s in scheduled
+                ],
             },
             "moderation": {
                 "config": _first_role("config"),
@@ -789,6 +803,41 @@ class MyBot(commands.Bot):
                 # Return the freshly-persisted payload so the dashboard re-syncs its
                 # form state (otherwise the Save button stays enabled and edits look
                 # like they didn't apply).
+                return await self._get_feature_payload(guild_id, feature)
+
+            # Scheduled / recurring announcements live in the scheduled_messages
+            # table (many per guild); replace the set like reaction roles.
+            if feature == "scheduled-messages":
+                items = options.get("items")
+                if isinstance(items, list):
+                    if len(items) > 50:
+                        return {"error": "Too many scheduled messages (max 50)."}
+                    rows = []
+                    for it in items:
+                        ch = it.get("channelId")
+                        content = (it.get("content") or "").strip()[:2000]
+                        sched = it.get("scheduledAt")
+                        repeat = it.get("repeat") or "none"
+                        enabled = bool(it.get("enabled", True))
+                        if not (ch and content and sched):
+                            continue
+                        if repeat not in ("none", "daily", "weekly"):
+                            repeat = "none"
+                        try:
+                            channel_id = _validate_discord_id(ch)
+                            scheduled_at = datetime.datetime.fromisoformat(str(sched).replace("Z", "+00:00"))
+                        except (ValueError, TypeError):
+                            return {"error": "Invalid scheduled message (check the channel and time)."}
+                        if scheduled_at.tzinfo is None:
+                            scheduled_at = scheduled_at.replace(tzinfo=datetime.timezone.utc)
+                        rows.append({
+                            "channel_id": channel_id,
+                            "content": content,
+                            "scheduled_at": scheduled_at,
+                            "repeat": repeat,
+                            "enabled": enabled,
+                        })
+                    await self.db.replace_scheduled_messages(guild_id, rows)
                 return await self._get_feature_payload(guild_id, feature)
 
             # Settings keys that map to BIGINT columns in Postgres and need int conversion

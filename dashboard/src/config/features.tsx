@@ -9,6 +9,7 @@ import {
   MdTrendingUp,
   MdGppGood,
   MdConfirmationNumber,
+  MdSchedule,
 } from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
@@ -20,6 +21,7 @@ import { useFilterFeature } from './feature-forms/FilterFeature';
 import { useLevelsFeature } from './feature-forms/LevelsFeature';
 import { useAutomodFeature } from './feature-forms/AutomodFeature';
 import { useTicketsFeature } from './feature-forms/TicketsFeature';
+import { useScheduledMessagesFeature } from './feature-forms/ScheduledMessagesFeature';
 
 // Ordered feature categories, used to group the feature grid and the sidebar.
 export const featureCategories: { id: string; label: string }[] = [
@@ -55,6 +57,13 @@ export const features: FeaturesConfig = {
     icon: <Icon as={MdTrendingUp} />,
     category: 'engagement',
     useRender: useLevelsFeature,
+  },
+  'scheduled-messages': {
+    name: 'Scheduled Messages',
+    description: 'Post one-off or recurring announcements at a set time',
+    icon: <Icon as={MdSchedule} />,
+    category: 'engagement',
+    useRender: useScheduledMessagesFeature,
   },
   'moderation': {
     name: 'Moderator Roles',
