@@ -4,6 +4,7 @@ import { IdFeature } from '@/utils/common';
 import { IoOpen, IoOptions } from 'react-icons/io5';
 import { useEnableFeatureMutation } from '@/api/hooks';
 import { guild as view } from '@/config/translations/guild';
+import { useFeatureMeta } from '@/config/feature-meta';
 import Router from 'next/router';
 
 export function FeatureItem({
@@ -17,6 +18,7 @@ export function FeatureItem({
 }) {
   const t = view.useTranslations();
   const mutation = useEnableFeatureMutation();
+  const { name, description } = useFeatureMeta().feature(feature.id, feature.name, feature.description);
 
   return (
     <Card variant="primary">
@@ -37,7 +39,7 @@ export function FeatureItem({
         <Box flex={1}>
           <Flex align="center" gap={2} wrap="wrap">
             <Text fontSize={{ base: '16px', md: 'lg' }} fontWeight="600">
-              {feature.name}
+              {name}
             </Text>
             <Badge
               colorScheme={enabled ? 'green' : 'gray'}
@@ -49,7 +51,7 @@ export function FeatureItem({
             </Badge>
           </Flex>
           <Text fontSize={{ base: 'sm', md: 'md' }} color="TextSecondary">
-            {feature.description}
+            {description}
           </Text>
         </Box>
       </CardBody>

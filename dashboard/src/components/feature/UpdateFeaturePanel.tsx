@@ -27,6 +27,7 @@ import {
 } from '@/api/hooks';
 import { Params } from '@/pages/guilds/[guild]/features/[feature]';
 import { feature as view } from '@/config/translations/feature';
+import { useFeatureMeta } from '@/config/feature-meta';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges';
@@ -40,6 +41,7 @@ export function UpdateFeaturePanel({
 }) {
   const t = view.useTranslations();
   const { guild, feature: featureId } = useRouter().query as Params;
+  const { name, description } = useFeatureMeta().feature(featureId, config.name, config.description);
   const mutation = useUpdateFeatureMutation();
   const enableMutation = useEnableFeatureMutation();
   const guildQuery = useGuildInfoQuery(guild);
@@ -97,7 +99,7 @@ export function UpdateFeaturePanel({
         </BreadcrumbItem>
         <BreadcrumbItem isCurrentPage>
           <BreadcrumbLink fontWeight="600" color="TextPrimary">
-            {config.name}
+            {name}
           </BreadcrumbLink>
         </BreadcrumbItem>
       </Breadcrumb>
@@ -105,9 +107,9 @@ export function UpdateFeaturePanel({
       <Flex direction={{ base: 'column', md: 'row' }} mx={{ '3sm': 5 }} justify="space-between" gap={3}>
         <Box>
           <Heading fontSize="2xl" fontWeight="600">
-            {config.name}
+            {name}
           </Heading>
-          <Text color="TextSecondary">{config.description}</Text>
+          <Text color="TextSecondary">{description}</Text>
         </Box>
         <Flex align="center" gap={3} mt={{ base: 2, md: 0 }}>
           <Text fontWeight="600" color={enabled ? 'green.400' : 'TextSecondary'}>
@@ -116,7 +118,7 @@ export function UpdateFeaturePanel({
           <Switch
             variant="main"
             size="lg"
-            aria-label={`${enabled ? 'Disable' : 'Enable'} ${config.name}`}
+            aria-label={`${enabled ? 'Disable' : 'Enable'} ${name}`}
             isChecked={enabled}
             isDisabled={enableMutation.isLoading || guildQuery.isLoading}
             onChange={(e) => onSwitch(e.target.checked)}
@@ -194,9 +196,9 @@ export function UpdateFeaturePanel({
       >
         <AlertDialogOverlay>
           <AlertDialogContent bg="CardBackground" mx={4}>
-            <AlertDialogHeader>Disable {config.name}?</AlertDialogHeader>
+            <AlertDialogHeader>Disable {name}?</AlertDialogHeader>
             <AlertDialogBody>
-              This stops {config.name} working across the server. Your settings are kept, so you can
+              This stops {name} working across the server. Your settings are kept, so you can
               re-enable it any time.
             </AlertDialogBody>
             <AlertDialogFooter>
