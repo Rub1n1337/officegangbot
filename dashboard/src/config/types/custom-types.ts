@@ -119,6 +119,24 @@ export type CustomFeatures = {
   'automod': AutomodFeature;
   'tickets': TicketsFeature;
   'scheduled-messages': ScheduledMessagesFeature;
+  'reaction-menus': ReactionMenusFeature;
+};
+
+export type ReactionMenuItemConfig = {
+  emoji: string;
+  roleId?: string | null;
+};
+
+export type ReactionMenuConfig = {
+  id?: number | null;
+  channelId?: string | null;
+  title: string;
+  description: string;
+  items: ReactionMenuItemConfig[];
+};
+
+export type ReactionMenusFeature = {
+  menus: ReactionMenuConfig[];
 };
 
 export type ScheduledMessageItem = {

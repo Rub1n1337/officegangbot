@@ -656,3 +656,80 @@ class DatabaseManager:
                 bool(block_invites), bool(block_links), list(allowed_domains), guild_id,
             )
         self._automod_cache.pop(guild_id, None)
+
+    # --- Role menus --------------------------------------------------------
+
+    async def get_reaction_menus(self, guild_id: int) -> List[Dict[str, Any]]:
+        """Returns the guild's role menus, each with its emoji->role items
+        (resolved from reaction_roles where source='menu')."""
+        async with self.pool.acquire() as conn:
+            menus = await conn.fetch(
+                "SELECT id, channel_id, message_id, title, description "
+                "FROM reaction_menus WHERE guild_id = $1 ORDER BY id",
+                guild_id,
+            )
+            items = await conn.fetch(
+                "SELECT message_id, emoji, role_id FROM reaction_roles "
+                "WHERE guild_id = $1 AND source = 'menu'",
+                guild_id,
+            )
+        by_msg: Dict[int, List[Dict[str, Any]]] = {}
+        for it in items:
+            by_msg.setdefault(it["message_id"], []).append(
+                {"emoji": it["emoji"], "role_id": it["role_id"]}
+            )
+        result = []
+        for m in menus:
+            md = dict(m)
+            md["items"] = by_msg.get(m["message_id"], []) if m["message_id"] else []
+            result.append(md)
+        return result
+
+    async def create_reaction_menu(self, guild_id: int, channel_id: int, title: str, description: str) -> int:
+        """Inserts a role menu (message not posted yet) and returns its id."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "INSERT INTO reaction_menus (guild_id, channel_id, title, description) "
+                "VALUES ($1, $2, $3, $4) RETURNING id",
+                guild_id, int(channel_id), str(title)[:256], str(description),
+            )
+        return row["id"]
+
+    async def update_reaction_menu(self, menu_id: int, channel_id: int, title: str, description: str, message_id) -> None:
+        """Updates a role menu's channel/title/description and posted message id."""
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE reaction_menus SET channel_id = $1, title = $2, description = $3, message_id = $4 WHERE id = $5",
+                int(channel_id), str(title)[:256], str(description),
+                int(message_id) if message_id else None, menu_id,
+            )
+
+    async def delete_reaction_menu(self, menu_id: int) -> None:
+        async with self.pool.acquire() as conn:
+            await conn.execute("DELETE FROM reaction_menus WHERE id = $1", menu_id)
+
+    async def replace_message_reaction_roles(self, guild_id: int, message_id: int, source: str, rows: List[Dict[str, Any]]) -> None:
+        """Replaces the reaction roles on a single message (used by role menus,
+        which have many messages per guild — unlike replace_reaction_roles, which
+        clears a whole source)."""
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM reaction_roles WHERE guild_id = $1 AND message_id = $2 AND source = $3",
+                    guild_id, int(message_id), source,
+                )
+                for r in rows:
+                    await conn.execute(
+                        """
+                        INSERT INTO reaction_roles
+                            (guild_id, channel_id, message_id, emoji, role_id, source)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        ON CONFLICT (guild_id, message_id, emoji) DO UPDATE
+                            SET role_id = EXCLUDED.role_id,
+                                channel_id = EXCLUDED.channel_id,
+                                source = EXCLUDED.source
+                        """,
+                        guild_id, int(r["channel_id"]), int(r["message_id"]),
+                        str(r["emoji"]), int(r["role_id"]), source,
+                    )

@@ -8,6 +8,7 @@ from core.logger import logger
 SOURCE_FEATURE = {
     "reaction-role": "reaction-role",
     "rules": "rules",
+    "menu": "reaction-menus",
 }
 
 
