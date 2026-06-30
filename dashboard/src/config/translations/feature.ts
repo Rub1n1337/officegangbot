@@ -17,6 +17,21 @@ export const feature = createI18n(provider, {
       discard: 'Discard',
     },
   },
+  ru: {
+    unsaved: 'Сохранить изменения',
+    error: {
+      'not enabled': 'Не включено',
+      'not enabled description': 'Включить эту функцию?',
+      'not found': 'Не найдено',
+      'not found description': 'Хм... странно, не можем это найти',
+    },
+    bn: {
+      enable: 'Включить функцию',
+      disable: 'Выключить',
+      save: 'Сохранить',
+      discard: 'Отменить',
+    },
+  },
   cn: {
     unsaved: '您有未保存的更改',
     error: {

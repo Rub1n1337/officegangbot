@@ -13,6 +13,16 @@ export const profile = createI18n(provider, {
     'dev mode': 'Developer Mode',
     'dev mode description': 'Used for debugging and testing',
   },
+  ru: {
+    logout: common.translations.ru.logout,
+    language: 'Язык',
+    'language description': 'Выберите язык',
+    settings: 'Настройки',
+    'dark mode': 'Тёмная тема',
+    'dark mode description': 'Включает тёмную тему, чтобы беречь глаза',
+    'dev mode': 'Режим разработчика',
+    'dev mode description': 'Для отладки и тестирования',
+  },
   cn: {
     logout: common.translations.cn.logout,
     language: '你的語言',

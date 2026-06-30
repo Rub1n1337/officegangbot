@@ -13,6 +13,17 @@ export const common = createI18n(provider, {
     pages: 'Pages',
     logout: 'Logout',
   },
+  ru: {
+    loading: 'Загрузка',
+    search: 'Поиск',
+    'select lang': 'Выберите язык',
+    'select role': 'Выберите роль',
+    'select channel': 'Выберите канал',
+    dashboard: 'Панель',
+    profile: 'Профиль',
+    pages: 'Страницы',
+    logout: 'Выйти',
+  },
   cn: {
     loading: '加載中',
     search: '搜索',
