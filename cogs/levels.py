@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
+from core.permissions import has_permission
 from .utils import reply, send_paginated
 from core.i18n import t
 from typing import Optional
@@ -213,7 +214,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
     @commands.hybrid_command(name="setlevelrole", description="Assign a role reward for reaching a level.")
     @app_commands.describe(level="Level required.", role="Role to assign.")
-    @commands.has_permissions(manage_roles=True)
+    @has_permission("config")
     async def setlevelrole(self, ctx: commands.Context, level: int, role: discord.Role):
         loc = await self.bot.db.get_locale(ctx.guild.id)
         if level < 1:
