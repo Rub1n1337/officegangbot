@@ -8,7 +8,15 @@ export function SidebarTrigger() {
 
   return (
     <Flex display={{ base: 'flex', [sidebarBreakpoint]: 'none' }} alignItems="center">
-      <Flex w="max-content" h="max-content" onClick={() => setOpen(true)}>
+      <Flex
+        as="button"
+        type="button"
+        aria-label="Open menu"
+        w="max-content"
+        h="max-content"
+        onClick={() => setOpen(true)}
+        cursor="pointer"
+      >
         <Icon
           as={IoMenuOutline}
           color="gray.400"
@@ -19,7 +27,6 @@ export function SidebarTrigger() {
           w="20px"
           h="20px"
           me="10px"
-          _hover={{ cursor: 'pointer' }}
         />
       </Flex>
     </Flex>
