@@ -1144,6 +1144,8 @@ class MyBot(commands.Bot):
         """Post a new role-menu embed or edit the existing one. Returns the
         message id, or None if it couldn't be posted (channel missing / no perms).
         `item_lines` is a list of (emoji, role_mention)."""
+        if not guild:
+            return None
         try:
             channel = guild.get_channel(int(channel_id)) or await guild.fetch_channel(int(channel_id))
         except Exception:

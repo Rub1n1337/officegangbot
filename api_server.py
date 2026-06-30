@@ -11,6 +11,7 @@ from urllib.parse import unquote
 from dotenv import load_dotenv
 load_dotenv()
 import time
+import asyncio
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -32,6 +33,9 @@ _reconnect_fail_streak: int = 0     # consecutive failed reconnect attempts
 _reconnect_retry_after: float = 0.0  # earliest monotonic-ish time to retry
 _RECONNECT_BASE_DELAY = 0.5
 _RECONNECT_MAX_DELAY = 30.0
+# Serialize reconnects so concurrent requests don't each spin up a new connection
+# (this process is long-lived on Railway).
+_reconnect_lock = asyncio.Lock()
 
 # Global bot instance for direct access (when embedded in bot process)
 bot_instance = None
@@ -107,38 +111,51 @@ async def _ensure_redis() -> Optional[RedisManager]:
     the connection was lost after startup.
     """
     global _redis, _redis_reconnects, _reconnect_fail_streak, _reconnect_retry_after
+    # Fast path: an existing connection that still pings. (Don't null _redis here —
+    # let the locked section decide, so we don't yank a connection another request
+    # is mid-use on.)
     if _redis is not None:
         try:
             await _redis.redis.ping()
             return _redis
         except Exception as e:
             logger.warning(f"Existing Redis connection failed ping check: {e}. Attempting reconnect.")
-            _redis = None
 
-    # Exponential backoff: during an outage, reconnecting on every request both
-    # slows each request and hammers Redis. Wait out the current backoff window.
-    if time.time() < _reconnect_retry_after:
-        return None
+    # Serialize reconnects: without this, several concurrent requests that hit a
+    # dead connection would each build a brand-new RedisManager.
+    async with _reconnect_lock:
+        # Another request may have reconnected while we waited for the lock.
+        if _redis is not None:
+            try:
+                await _redis.redis.ping()
+                return _redis
+            except Exception:
+                _redis = None
 
-    logger.warning("Redis is unavailable or connection is stale — attempting lazy reconnect...")
-    try:
-        new_redis = RedisManager()
-        await new_redis.connect()
-        _redis = new_redis
-        _redis_reconnects += 1
-        _reconnect_fail_streak = 0
-        _reconnect_retry_after = 0.0
-        logger.info(f"Redis lazy reconnect succeeded (total reconnects: {_redis_reconnects}).")
-        return _redis
-    except Exception as e:
-        _reconnect_fail_streak += 1
-        delay = min(_RECONNECT_MAX_DELAY, _RECONNECT_BASE_DELAY * (2 ** (_reconnect_fail_streak - 1)))
-        _reconnect_retry_after = time.time() + delay
-        logger.error(
-            f"Redis lazy reconnect failed (streak {_reconnect_fail_streak}, "
-            f"next retry in {delay:.1f}s): {e}"
-        )
-        return None
+        # Exponential backoff: during an outage, reconnecting on every request
+        # both slows each request and hammers Redis. Wait out the backoff window.
+        if time.time() < _reconnect_retry_after:
+            return None
+
+        logger.warning("Redis is unavailable or connection is stale — attempting lazy reconnect...")
+        try:
+            new_redis = RedisManager()
+            await new_redis.connect()
+            _redis = new_redis
+            _redis_reconnects += 1
+            _reconnect_fail_streak = 0
+            _reconnect_retry_after = 0.0
+            logger.info(f"Redis lazy reconnect succeeded (total reconnects: {_redis_reconnects}).")
+            return _redis
+        except Exception as e:
+            _reconnect_fail_streak += 1
+            delay = min(_RECONNECT_MAX_DELAY, _RECONNECT_BASE_DELAY * (2 ** (_reconnect_fail_streak - 1)))
+            _reconnect_retry_after = time.time() + delay
+            logger.error(
+                f"Redis lazy reconnect failed (streak {_reconnect_fail_streak}, "
+                f"next retry in {delay:.1f}s): {e}"
+            )
+            return None
 
 async def _rpc(action: str, **kwargs) -> Any:
     """Sends an RPC request to the bot via Redis and returns response."""
