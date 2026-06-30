@@ -1,5 +1,18 @@
 """Tests for core/content_filter.py — AutoMod invite/link detection."""
-from core.content_filter import contains_invite, first_disallowed_link
+from core.content_filter import contains_invite, first_disallowed_link, normalize_domain
+
+
+def test_normalize_domain_strips_scheme_path_and_www():
+    assert normalize_domain("https://www.YouTube.com/watch?v=1") == "youtube.com"
+    assert normalize_domain("HTTP://Example.org/") == "example.org"
+    assert normalize_domain("github.com") == "github.com"
+    assert normalize_domain("  ") == ""
+
+
+def test_normalized_allow_list_matches_real_links():
+    # An allow-list entry pasted as a full URL still permits links to that host.
+    allowed = [normalize_domain("https://github.com/anything")]
+    assert first_disallowed_link("see https://github.com/x", allowed) is None
 
 
 def test_detects_discord_gg_invite():

@@ -25,6 +25,7 @@ from core.moderation_actions import perform_moderation
 from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
 from core.permissions import role_is_assignable
+from core.content_filter import normalize_domain
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -858,7 +859,7 @@ class MyBot(commands.Bot):
                 block_invites = bool(options.get("blockInvites", False))
                 block_links = bool(options.get("blockLinks", False))
                 domains_raw = options.get("allowedDomains") or []
-                domains = sorted({str(d).strip().lower() for d in domains_raw if str(d).strip()})[:50]
+                domains = sorted({normalize_domain(str(d)) for d in domains_raw if normalize_domain(str(d))})[:50]
                 await self.db.set_automod_config(guild_id, block_invites, block_links, domains)
                 return await self._get_feature_payload(guild_id, feature)
 

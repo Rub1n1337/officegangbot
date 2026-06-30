@@ -24,8 +24,12 @@ def contains_invite(content: str) -> bool:
     return bool(INVITE_RE.search(content or ""))
 
 
-def _normalize_domain(domain: str) -> str:
+def normalize_domain(domain: str) -> str:
+    """Reduce a domain or pasted URL to a bare host: drop scheme, path and a
+    leading ``www.`` (e.g. ``https://www.YouTube.com/x`` -> ``youtube.com``)."""
     d = (domain or "").strip().lower()
+    d = re.sub(r"^https?://", "", d)
+    d = d.split("/", 1)[0]
     return d[4:] if d.startswith("www.") else d
 
 
@@ -36,10 +40,10 @@ def first_disallowed_link(content: str, allowed_domains: Iterable[str]) -> Optio
     (so ``youtube.com`` in the allow-list also permits ``www.youtube.com`` and
     ``m.youtube.com``).
     """
-    allowed = {_normalize_domain(d) for d in (allowed_domains or []) if d and d.strip()}
+    allowed = {normalize_domain(d) for d in (allowed_domains or []) if d and d.strip()}
     for match in URL_RE.finditer(content or ""):
         url = match.group(0)
-        host = _normalize_domain(urlparse(url).hostname or "")
+        host = normalize_domain(urlparse(url).hostname or "")
         if not host:
             continue
         if host in allowed or any(host.endswith("." + d) for d in allowed):
