@@ -30,6 +30,11 @@ import type {
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
 import { useToast } from '@chakra-ui/react';
 
+// Exponential backoff (1s, 2s, 4s … capped at 8s) so a query that failed while
+// the bot was restarting retries a few times and recovers on its own instead of
+// stranding the user on an error screen until they hit "Try again".
+const retryDelay = (attempt: number) => Math.min(1000 * 2 ** attempt, 8000);
+
 export const client = new QueryClient({
   defaultOptions: {
     mutations: {
@@ -37,8 +42,11 @@ export const client = new QueryClient({
     },
     queries: {
       refetchOnWindowFocus: false,
+      // Reconnecting to the network (or the bot coming back) refetches stale data.
+      refetchOnReconnect: true,
       staleTime: Infinity,
-      retry: 0,
+      retry: 1,
+      retryDelay,
     },
   },
 });
@@ -123,7 +131,10 @@ export function useGuildInfoQuery(guild: string) {
     {
       enabled: status === 'authenticated',
       refetchOnWindowFocus: true,
-      retry: false,
+      // Retry transient failures (e.g. a slow RPC / the bot restarting) with
+      // backoff so the overview recovers without a manual "Try again".
+      retry: 3,
+      retryDelay,
       staleTime: 0,
     }
   );
@@ -244,7 +255,9 @@ export function useGuildStatsQuery(guild: string) {
     staleTime: 0,
     refetchInterval: 8_000,
     refetchIntervalInBackground: false,
-    retry: false,
+    // Recover from a transient failure (slow RPC / bot restart) on its own.
+    retry: 3,
+    retryDelay,
   });
 }
 
