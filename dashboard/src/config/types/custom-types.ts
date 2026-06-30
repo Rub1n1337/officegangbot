@@ -118,6 +118,19 @@ export type CustomFeatures = {
   'levels': LevelsFeature;
   'automod': AutomodFeature;
   'tickets': TicketsFeature;
+  'scheduled-messages': ScheduledMessagesFeature;
+};
+
+export type ScheduledMessageItem = {
+  channelId?: string | null;
+  content: string;
+  scheduledAt: string; // ISO 8601 (UTC)
+  repeat: 'none' | 'daily' | 'weekly';
+  enabled: boolean;
+};
+
+export type ScheduledMessagesFeature = {
+  items: ScheduledMessageItem[];
 };
 
 export type TicketsFeature = {

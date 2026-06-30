@@ -127,6 +127,23 @@ CREATE TABLE IF NOT EXISTS dashboard_audit (
 
 CREATE INDEX IF NOT EXISTS idx_dashboard_audit_guild ON dashboard_audit(guild_id, created_at DESC);
 
+-- Scheduled / recurring announcements configured from the dashboard. The bot's
+-- Scheduled Messages cog polls this table and posts due messages.
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    channel_id BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    scheduled_at TIMESTAMPTZ NOT NULL,
+    repeat VARCHAR(10) NOT NULL DEFAULT 'none',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    last_sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages(scheduled_at) WHERE enabled;
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -161,3 +178,4 @@ ALTER TABLE level_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mod_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reaction_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dashboard_audit ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scheduled_messages ENABLE ROW LEVEL SECURITY;
