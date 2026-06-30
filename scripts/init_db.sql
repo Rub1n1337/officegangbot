@@ -144,6 +144,23 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages(scheduled_at) WHERE enabled;
 
+-- Role menus: an embed the bot posts/edits in a channel, whose emoji reactions
+-- grant roles. The emoji->role mappings live in reaction_roles (source='menu',
+-- keyed by the posted message_id); this table tracks the menu's message so it
+-- can be edited/deleted on later saves.
+CREATE TABLE IF NOT EXISTS reaction_menus (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    channel_id BIGINT NOT NULL,
+    message_id BIGINT,
+    title VARCHAR(256) NOT NULL DEFAULT 'Role Menu',
+    description TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_reaction_menus_guild ON reaction_menus(guild_id);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -183,3 +200,4 @@ ALTER TABLE mod_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reaction_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dashboard_audit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reaction_menus ENABLE ROW LEVEL SECURITY;

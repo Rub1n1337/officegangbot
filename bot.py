@@ -26,6 +26,7 @@ from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
 from core.permissions import role_is_assignable
 from core.content_filter import normalize_domain
+from core.role_menu import build_menu_body
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -232,6 +233,7 @@ class MyBot(commands.Bot):
         reaction_roles = await self.db.get_reaction_roles(guild_id)
         level_roles = await self.db.get_level_roles(guild_id)
         scheduled = await self.db.get_scheduled_messages(guild_id)
+        menus = await self.db.get_reaction_menus(guild_id)
 
         def _first_role(perm: str):
             ids = mod_roles.get(perm) or []
@@ -308,6 +310,21 @@ class MyBot(commands.Bot):
                 "blockInvites": bool(settings.get("automod_block_invites")),
                 "blockLinks": bool(settings.get("automod_block_links")),
                 "allowedDomains": list(settings.get("automod_allowed_domains") or []),
+            },
+            "reaction-menus": {
+                "menus": [
+                    {
+                        "id": m["id"],
+                        "channelId": str(m["channel_id"]),
+                        "title": m["title"],
+                        "description": m["description"],
+                        "items": [
+                            {"emoji": it["emoji"], "roleId": str(it["role_id"])}
+                            for it in m["items"]
+                        ],
+                    }
+                    for m in menus
+                ],
             },
         }
         return feature_data.get(feature, {})
@@ -863,6 +880,98 @@ class MyBot(commands.Bot):
                 await self.db.set_automod_config(guild_id, block_invites, block_links, domains)
                 return await self._get_feature_payload(guild_id, feature)
 
+            # Role menus: the bot posts/edits an embed per menu and reconciles its
+            # emoji reactions and reaction_roles (source='menu', keyed by the
+            # posted message). Many messages per guild, so each uses a per-message
+            # replace rather than the whole-source replace.
+            if feature == "reaction-menus":
+                menus_in = options.get("menus")
+                if isinstance(menus_in, list):
+                    if len(menus_in) > 25:
+                        return {"error": "Too many role menus (max 25)."}
+                    guild = self.get_guild(guild_id)
+                    if not guild:
+                        return {"error": "Guild not found"}
+                    current = await self.db.get_reaction_menus(guild_id)
+                    current_by_id = {m["id"]: m for m in current}
+                    desired_ids = set()
+                    for d in menus_in:
+                        if d.get("id"):
+                            try:
+                                desired_ids.add(int(d["id"]))
+                            except (TypeError, ValueError):
+                                pass
+                    # Delete menus that were removed in the dashboard.
+                    for m in current:
+                        if m["id"] not in desired_ids:
+                            if m["message_id"]:
+                                await self._delete_menu_message(guild, m["channel_id"], m["message_id"])
+                                await self.db.replace_message_reaction_roles(guild_id, m["message_id"], "menu", [])
+                            await self.db.delete_reaction_menu(m["id"])
+                    # Create / update the rest.
+                    for d in menus_in:
+                        ch = d.get("channelId")
+                        title = (d.get("title") or "Role Menu").strip()[:256]
+                        description = (d.get("description") or "").strip()[:2000]
+                        items_in = d.get("items") or []
+                        if not (ch and items_in):
+                            continue
+                        try:
+                            channel_id = _validate_discord_id(ch)
+                        except ValueError:
+                            return {"error": "Invalid role-menu channel id"}
+                        item_rows_partial = []
+                        for it in items_in:
+                            emoji = (it.get("emoji") or "").strip()
+                            role = it.get("roleId")
+                            if not (emoji and role):
+                                continue
+                            try:
+                                role_id = _validate_discord_id(role)
+                            except ValueError:
+                                return {"error": "Invalid role-menu role id"}
+                            item_rows_partial.append({"emoji": emoji, "role_id": role_id})
+                        if not item_rows_partial:
+                            continue
+                        bad = self._unassignable_roles(guild, [r["role_id"] for r in item_rows_partial])
+                        if bad:
+                            labels = ", ".join(label for _, label in bad)
+                            return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
+                        item_lines = []
+                        for r in item_rows_partial:
+                            role_obj = guild.get_role(r["role_id"])
+                            item_lines.append((r["emoji"], role_obj.mention if role_obj else f"<@&{r['role_id']}>"))
+
+                        menu_id = int(d["id"]) if (d.get("id") and int(d["id"]) in current_by_id) else None
+                        existing = current_by_id.get(menu_id) if menu_id else None
+                        old_message_id = existing["message_id"] if existing else None
+                        old_channel_id = existing["channel_id"] if existing else None
+                        old_items = existing["items"] if existing else []
+                        # Only edit the existing message if it's in the same channel.
+                        edit_id = old_message_id if (old_message_id and old_channel_id == channel_id) else None
+                        new_message_id = await self._render_menu(guild, channel_id, title, description, item_lines, edit_id)
+                        if new_message_id is None:
+                            return {"error": "I couldn't post the role menu — check I can see and post in that channel."}
+                        # If the menu moved channels, remove the old message + mappings.
+                        if old_message_id and old_message_id != new_message_id:
+                            await self._delete_menu_message(guild, old_channel_id, old_message_id)
+                            await self.db.replace_message_reaction_roles(guild_id, old_message_id, "menu", [])
+                        if menu_id is None:
+                            menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description)
+                        await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id)
+
+                        new_rows = [
+                            {"channel_id": channel_id, "message_id": new_message_id, "emoji": r["emoji"], "role_id": r["role_id"]}
+                            for r in item_rows_partial
+                        ]
+                        await self.db.replace_message_reaction_roles(guild_id, new_message_id, "menu", new_rows)
+                        old_rows = (
+                            [{"channel_id": old_channel_id or channel_id, "message_id": old_message_id, "emoji": it["emoji"]} for it in old_items]
+                            if old_message_id else []
+                        )
+                        await self._sync_reactions(guild_id, new_rows, old_rows)
+                return await self._get_feature_payload(guild_id, feature)
+
             # Settings keys that map to BIGINT columns in Postgres and need int conversion
             BIGINT_SETTINGS = {
                 "rules_channel_id", "rules_message_id", "welcome_channel_id",
@@ -1030,6 +1139,44 @@ class MyBot(commands.Bot):
                     await msg.add_reaction(emoji)
                 except Exception as e:
                     logger.warning(f"Could not add reaction {emoji} to message {mid}: {e}")
+
+    async def _render_menu(self, guild, channel_id: int, title: str, description: str, item_lines: list, message_id) -> Optional[int]:
+        """Post a new role-menu embed or edit the existing one. Returns the
+        message id, or None if it couldn't be posted (channel missing / no perms).
+        `item_lines` is a list of (emoji, role_mention)."""
+        try:
+            channel = guild.get_channel(int(channel_id)) or await guild.fetch_channel(int(channel_id))
+        except Exception:
+            return None
+        if not isinstance(channel, discord.TextChannel):
+            return None
+        embed = discord.Embed(
+            title=(title or "Role Menu")[:256],
+            description=build_menu_body(description, item_lines),
+            color=discord.Color.blurple(),
+        )
+        if message_id:
+            try:
+                msg = await channel.fetch_message(int(message_id))
+                await msg.edit(embed=embed)
+                return msg.id
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass  # fall through and post a fresh one
+        try:
+            msg = await channel.send(embed=embed)
+            return msg.id
+        except (discord.Forbidden, discord.HTTPException) as e:
+            logger.warning(f"Could not post role menu to channel {channel_id}: {e}")
+            return None
+
+    async def _delete_menu_message(self, guild, channel_id, message_id) -> None:
+        """Best-effort delete of a role-menu message that was removed or moved."""
+        try:
+            channel = guild.get_channel(int(channel_id)) or await guild.fetch_channel(int(channel_id))
+            msg = await channel.fetch_message(int(message_id))
+            await msg.delete()
+        except Exception as e:
+            logger.warning(f"Could not delete role-menu message {message_id}: {e}")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         """Global error handler for slash commands."""
