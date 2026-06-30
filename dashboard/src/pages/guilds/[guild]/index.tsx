@@ -7,6 +7,7 @@ import { useGuildInfoQuery } from '@/api/hooks';
 import { useRouter } from 'next/router';
 import { getFeatures } from '@/utils/common';
 import { featureCategories } from '@/config/features';
+import { useFeatureMeta } from '@/config/feature-meta';
 import { Banner } from '@/components/GuildBanner';
 import { FeatureItem } from '@/components/feature/FeatureItem';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
@@ -34,6 +35,7 @@ type FeatureFilter = 'all' | 'enabled' | 'disabled';
 
 function GuildPanel({ guild: id, info }: { guild: string; info: CustomGuildInfo }) {
   const t = view.useTranslations();
+  const meta = useFeatureMeta();
   const [filter, setFilter] = useState<FeatureFilter>('all');
 
   const all = getFeatures();
@@ -87,7 +89,7 @@ function GuildPanel({ guild: id, info }: { guild: string; info: CustomGuildInfo 
                     letterSpacing="wide"
                     color="TextSecondary"
                   >
-                    {cat.label}
+                    {meta.category(cat.id, cat.label)}
                   </Text>
                   <SimpleGrid columns={{ base: 1, md: 2, '2xl': 3 }} gap={3}>
                     {items.map((feature) => (

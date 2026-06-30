@@ -11,6 +11,7 @@ import { MdGavel } from 'react-icons/md';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
 import { guild as view } from '@/config/translations/guild';
+import { useFeatureMeta } from '@/config/feature-meta';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { Params } from '@/pages/guilds/[guild]/features/[feature]';
@@ -22,6 +23,7 @@ export function InGuildSidebar() {
   const { guild } = useGuildPreview(guildId);
 
   const t = view.useTranslations();
+  const meta = useFeatureMeta();
 
   return (
     <Flex direction="column" gap={2} p={3}>
@@ -73,11 +75,11 @@ export function InGuildSidebar() {
           if (items.length === 0) return null;
           return (
             <Fragment key={cat.id}>
-              <HSeparator>{cat.label}</HSeparator>
+              <HSeparator>{meta.category(cat.id, cat.label)}</HSeparator>
               {items.map((feature) => (
                 <SidebarItem
                   key={feature.id}
-                  name={feature.name}
+                  name={meta.feature(feature.id, feature.name, '').name}
                   icon={feature.icon}
                   active={activeId === feature.id}
                   href={`/guilds/${guildId}/features/${feature.id}`}
