@@ -6,6 +6,8 @@ import {
   MemberDetail,
   MemberSearchItem,
   ModerationData,
+  Ticket,
+  TicketDetail,
 } from '@/config/types/custom-types';
 import { AccessToken } from '@/utils/auth/server';
 import { callDefault, callReturn } from '@/utils/fetch/core';
@@ -87,6 +89,34 @@ export async function fetchModeration(session: AccessToken, guild: string): Prom
 export async function fetchAudit(session: AccessToken, guild: string): Promise<{ entries: AuditEntry[] }> {
   return await callReturn<{ entries: AuditEntry[] }>(
     `/api/guild/${guild}/audit`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
+/** The guild's support tickets (open first, then most recent). */
+export async function fetchTickets(session: AccessToken, guild: string): Promise<{ tickets: Ticket[] }> {
+  return await callReturn<{ tickets: Ticket[] }>(
+    `/api/guild/${guild}/tickets`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
+/** A single ticket's metadata plus its full transcript. */
+export async function fetchTicketTranscript(
+  session: AccessToken,
+  guild: string,
+  ticketId: number
+): Promise<TicketDetail> {
+  return await callReturn<TicketDetail>(
+    `/api/guild/${guild}/tickets/${ticketId}`,
     botRequest(session, {
       request: {
         method: 'GET',

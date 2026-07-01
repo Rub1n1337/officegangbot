@@ -4,75 +4,183 @@ from discord.ext import commands
 from discord import app_commands
 from core.logger import logger
 from core.i18n import t
+from core.tickets import build_transcript, normalize_priority, PRIORITY_LABELS
 from .utils import reply
 from typing import Optional
 import asyncio
+import io
 import re
 
 
-class CloseTicketView(discord.ui.View):
-    """View with a close button inside a ticket channel."""
+async def _can_manage_ticket(interaction: discord.Interaction) -> bool:
+    """True if the user may act on this ticket: server manage_channels, the
+    configured support role, or the ticket's opener. Replies with a no-perm
+    message and returns False otherwise."""
+    bot = interaction.client
+    guild = interaction.guild
+    user = interaction.user
+
+    if user.guild_permissions.manage_channels:
+        return True
+
+    support_role_id = await bot.db.get_guild_setting(guild.id, 'ticket_support_role_id')
+    if support_role_id:
+        role = guild.get_role(int(support_role_id))
+        if role and role in user.roles:
+            return True
+
+    ticket = await bot.db.get_open_ticket_by_channel(interaction.channel.id)
+    if ticket and int(ticket["opener_id"]) == user.id:
+        return True
+
+    loc = await bot.db.get_locale(guild.id)
+    if not interaction.response.is_done():
+        await interaction.response.send_message(t(loc, "tickets.close_no_perm"), ephemeral=True)
+    return False
+
+
+async def _capture_transcript(channel: discord.TextChannel, guild: discord.Guild) -> str:
+    """Reads the channel's message history (oldest first) into a plain-text
+    transcript. Best-effort: returns whatever could be read."""
+    entries = []
+    try:
+        async for msg in channel.history(limit=500, oldest_first=True):
+            content = msg.content or ("[embed]" if msg.embeds else "")
+            entries.append({
+                "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M"),
+                "author": f"{msg.author} ({msg.author.id})",
+                "content": content,
+                "attachments": [a.url for a in msg.attachments],
+            })
+    except discord.HTTPException:
+        pass
+    header = f"Transcript — #{channel.name} — {guild.name}"
+    return build_transcript(entries, header)
+
+
+async def _notify_opener(bot, guild, ticket, comment, transcript, loc):
+    """DMs the ticket opener that their ticket was closed, with the closing
+    comment and the transcript attached. Silently ignored if DMs are closed."""
+    opener_id = int(ticket["opener_id"])
+    user = guild.get_member(opener_id) or bot.get_user(opener_id)
+    if user is None:
+        try:
+            user = await bot.fetch_user(opener_id)
+        except discord.HTTPException:
+            return
+
+    embed = discord.Embed(
+        title=t(loc, "tickets.closed_dm_title"),
+        description=t(loc, "tickets.closed_dm_desc", guild=guild.name),
+        color=discord.Color.blurple(),
+    )
+    if comment:
+        embed.add_field(name=t(loc, "tickets.close_comment_field"), value=comment[:1024], inline=False)
+
+    file = None
+    if transcript:
+        file = discord.File(io.BytesIO(transcript.encode("utf-8")), filename=f"transcript-{ticket['id']}.txt")
+    try:
+        await user.send(embed=embed, file=file)
+    except discord.HTTPException:
+        pass
+
+
+async def _finalize_close(interaction: discord.Interaction, comment: Optional[str]):
+    """Shared close flow: capture transcript, persist, notify opener, delete
+    the channel. Used by the close modal."""
+    bot = interaction.client
+    guild = interaction.guild
+    channel = interaction.channel
+    loc = await bot.db.get_locale(guild.id)
+
+    await interaction.response.send_message(t(loc, "tickets.closing"), ephemeral=False)
+
+    transcript = await _capture_transcript(channel, guild)
+    ticket = await bot.db.close_ticket(
+        channel.id, interaction.user.id, str(interaction.user), comment, transcript
+    )
+    if ticket:
+        await _notify_opener(bot, guild, ticket, comment, transcript, loc)
+
+    await asyncio.sleep(3)
+    try:
+        await channel.delete(reason=f"Ticket closed by {interaction.user}")
+        logger.info(f"Ticket channel {channel.name} closed by {interaction.user}")
+    except discord.Forbidden:
+        await channel.send(t(loc, "tickets.close_no_delete_perm"))
+    except discord.NotFound:
+        pass
+
+
+class CloseTicketModal(discord.ui.Modal):
+    """Prompts the closer for an optional comment sent to the ticket owner."""
+
+    def __init__(self, loc: Optional[str] = None):
+        self._loc = loc or "en"
+        super().__init__(title=t(self._loc, "tickets.close_modal_title"), timeout=300)
+        self.comment = discord.ui.TextInput(
+            label=t(self._loc, "tickets.close_comment_label"),
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=1000,
+            placeholder=t(self._loc, "tickets.close_comment_ph"),
+        )
+        self.add_item(self.comment)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await _finalize_close(interaction, (self.comment.value or "").strip() or None)
+
+
+class TicketControlView(discord.ui.View):
+    """Persistent controls inside a ticket channel: a priority selector and a
+    close button. Only the opener, support role or admins can use them."""
 
     def __init__(self, loc: Optional[str] = None):
         super().__init__(timeout=None)
         # Persistent view registered at startup has no locale (labels there are
         # only used to re-bind handlers by custom_id). When a ticket is opened we
-        # post a fresh view with the guild's locale so the label is translated.
+        # post a fresh view with the guild's locale so labels are translated.
         if loc:
             self.close_ticket.label = t(loc, "tickets.close_button")
+            self.set_priority.placeholder = t(loc, "tickets.priority_placeholder")
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Only ticket owner, support role, or admins can close the ticket."""
+        return await _can_manage_ticket(interaction)
+
+    @discord.ui.select(
+        placeholder="Set priority…",
+        custom_id="ticket_priority",
+        min_values=1,
+        max_values=1,
+        options=[
+            discord.SelectOption(label="Low", value="low", emoji="🟢"),
+            discord.SelectOption(label="Medium", value="medium", emoji="🟡"),
+            discord.SelectOption(label="High", value="high", emoji="🟠"),
+            discord.SelectOption(label="Urgent", value="urgent", emoji="🔴"),
+        ],
+    )
+    async def set_priority(self, interaction: discord.Interaction, select: discord.ui.Select):
         bot = interaction.client
-        guild = interaction.guild
-
-        # Check admin permission
-        if interaction.user.guild_permissions.manage_channels:
-            return True
-
-        # Check support role
-        support_role_id = await bot.db.get_guild_setting(guild.id, 'ticket_support_role_id')
-
-        if support_role_id:
-            support_role = guild.get_role(int(support_role_id))
-            if support_role and support_role in interaction.user.roles:
-                return True
-
-        # Check if ticket owner (channel name ends with their sanitized name or id)
-        clean_name = re.sub(r'[^a-z0-9-]', '', interaction.user.name.lower())
-        is_owner = (
-            interaction.channel.name == f"ticket-{clean_name}-{interaction.user.id}" or
-            interaction.channel.name == f"ticket-{clean_name}"
-        )
-        if is_owner:
-            return True
-
-        loc = await bot.db.get_locale(guild.id)
-        await interaction.response.send_message(
-            t(loc, "tickets.close_no_perm"),
-            ephemeral=True
-        )
-        return False
+        loc = await bot.db.get_locale(interaction.guild.id)
+        value = normalize_priority(select.values[0])
+        ok = await bot.db.set_ticket_priority(interaction.channel.id, value)
+        if ok:
+            await interaction.response.send_message(
+                t(loc, "tickets.priority_set", priority=PRIORITY_LABELS[value], user=interaction.user.mention),
+                ephemeral=False,
+            )
+        else:
+            await interaction.response.send_message(t(loc, "tickets.priority_no_ticket"), ephemeral=True)
 
     @discord.ui.button(
         label="🔒 Close Ticket",
         style=discord.ButtonStyle.danger,
-        custom_id="close_ticket"
+        custom_id="close_ticket",
     )
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         loc = await interaction.client.db.get_locale(interaction.guild.id)
-        await interaction.response.send_message(
-            t(loc, "tickets.closing"),
-            ephemeral=False
-        )
-        await asyncio.sleep(5)
-        try:
-            await interaction.channel.delete(reason=f"Ticket closed by {interaction.user}")
-            logger.info(f"Ticket channel {interaction.channel.name} closed by {interaction.user}")
-        except discord.Forbidden:
-            await interaction.channel.send(t(loc, "tickets.close_no_delete_perm"))
-        except discord.NotFound:
-            pass
+        await interaction.response.send_modal(CloseTicketModal(loc))
 
 
 class OpenTicketView(discord.ui.View):
@@ -148,6 +256,13 @@ class OpenTicketView(discord.ui.View):
             )
             return
 
+        # Record the ticket so its priority, closer, comment and transcript can
+        # be persisted (and surfaced on the dashboard) across the channel's life.
+        try:
+            await bot.db.create_ticket(guild.id, channel.id, member.id, str(member))
+        except Exception as e:
+            logger.error(f"Failed to record ticket for {member} in {guild.name}: {e}")
+
         # Send ticket message
         embed = discord.Embed(
             title=t(loc, "tickets.channel_title"),
@@ -159,7 +274,7 @@ class OpenTicketView(discord.ui.View):
         await channel.send(
             content=f"{member.mention}" + (f" | {support_role.mention}" if support_role else ""),
             embed=embed,
-            view=CloseTicketView(loc)
+            view=TicketControlView(loc)
         )
 
         await interaction.response.send_message(
@@ -178,7 +293,7 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         # Register persistent views (default labels; only used to re-bind handlers
         # by custom_id after a restart — displayed labels come from posted views).
         bot.add_view(OpenTicketView())
-        bot.add_view(CloseTicketView())
+        bot.add_view(TicketControlView())
 
     @commands.hybrid_command(name="ticket_setup", description="Send the ticket panel to a channel.")
     @app_commands.describe(
