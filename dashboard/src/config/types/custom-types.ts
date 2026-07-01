@@ -156,6 +156,35 @@ export type TicketsFeature = {
   category?: string | null;
 };
 
+export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type Ticket = {
+  id: number;
+  channelId: string;
+  openerId: string;
+  openerName: string | null;
+  priority: TicketPriority;
+  status: 'open' | 'closed';
+  openedAt: string | null;
+  closedAt: string | null;
+  closedById: string | null;
+  closedByName: string | null;
+  closeComment: string | null;
+  hasTranscript: boolean;
+};
+
+export type TicketDetail = {
+  id: number;
+  openerName: string | null;
+  priority: TicketPriority;
+  status: 'open' | 'closed';
+  openedAt: string | null;
+  closedAt: string | null;
+  closedByName: string | null;
+  closeComment: string | null;
+  transcript: string | null;
+};
+
 export type AutomodFeature = {
   blockInvites: boolean;
   blockLinks: boolean;

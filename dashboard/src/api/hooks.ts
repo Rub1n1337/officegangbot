@@ -13,6 +13,8 @@ import {
   fetchGuildStats,
   fetchMemberDetail,
   fetchModeration,
+  fetchTickets,
+  fetchTicketTranscript,
   getFeature,
   moderateMember,
   searchMembers,
@@ -26,6 +28,8 @@ import type {
   MemberDetail,
   MemberSearchItem,
   ModerationData,
+  Ticket,
+  TicketDetail,
 } from '@/config/types/custom-types';
 import { useAccessToken, useSession } from '@/utils/auth/hooks';
 import { useToast } from '@chakra-ui/react';
@@ -371,6 +375,36 @@ export function useAuditQuery(guild: string) {
     {
       enabled: status === 'authenticated',
       staleTime: 20_000,
+      retry: 2,
+      retryDelay,
+    }
+  );
+}
+
+export function useTicketsQuery(guild: string) {
+  const { status, session } = useSession();
+
+  return useQuery<Ticket[]>(
+    ['tickets', guild],
+    async () => (await fetchTickets(session!!, guild)).tickets,
+    {
+      enabled: status === 'authenticated',
+      staleTime: 20_000,
+      retry: 2,
+      retryDelay,
+    }
+  );
+}
+
+export function useTicketTranscriptQuery(guild: string, ticketId: number | null) {
+  const { status, session } = useSession();
+
+  return useQuery<TicketDetail>(
+    ['ticket', guild, ticketId],
+    async () => fetchTicketTranscript(session!!, guild, ticketId as number),
+    {
+      enabled: status === 'authenticated' && ticketId !== null,
+      staleTime: 60_000,
       retry: 2,
       retryDelay,
     }

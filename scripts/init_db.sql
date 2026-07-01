@@ -161,6 +161,31 @@ CREATE TABLE IF NOT EXISTS reaction_menus (
 
 CREATE INDEX IF NOT EXISTS idx_reaction_menus_guild ON reaction_menus(guild_id);
 
+-- Tickets: one row per support ticket. Created when a member opens a ticket,
+-- carries a priority while open, and is finalized on close with the closer, an
+-- optional comment and a captured transcript of the channel's messages. Kept
+-- after the channel is deleted so the dashboard can show closed-ticket history.
+CREATE TABLE IF NOT EXISTS tickets (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    channel_id BIGINT NOT NULL,
+    opener_id BIGINT NOT NULL,
+    opener_name TEXT,
+    priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+    status VARCHAR(10) NOT NULL DEFAULT 'open',
+    opened_at TIMESTAMPTZ DEFAULT NOW(),
+    closed_at TIMESTAMPTZ,
+    closed_by_id BIGINT,
+    closed_by_name TEXT,
+    close_comment TEXT,
+    transcript TEXT,
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_guild ON tickets(guild_id, status);
+-- At most one open ticket record per channel.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_open_channel ON tickets(channel_id) WHERE status = 'open';
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -206,3 +231,4 @@ ALTER TABLE reaction_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dashboard_audit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reaction_menus ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;

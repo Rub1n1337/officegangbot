@@ -425,6 +425,7 @@ class MyBot(commands.Bot):
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale",
             "search_members", "get_member", "moderate_member", "get_audit",
+            "get_tickets", "get_ticket_transcript",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -636,6 +637,52 @@ class MyBot(commands.Bot):
                     }
                     for e in entries
                 ]
+            }
+
+        if action == "get_tickets":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            rows = await self.db.get_tickets(guild_id, 200)
+            return {
+                "tickets": [
+                    {
+                        "id": r["id"],
+                        "channelId": str(r["channel_id"]),
+                        "openerId": str(r["opener_id"]),
+                        "openerName": r["opener_name"],
+                        "priority": r["priority"],
+                        "status": r["status"],
+                        "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
+                        "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
+                        "closedById": str(r["closed_by_id"]) if r["closed_by_id"] else None,
+                        "closedByName": r["closed_by_name"],
+                        "closeComment": r["close_comment"],
+                        "hasTranscript": bool(r["has_transcript"]),
+                    }
+                    for r in rows
+                ]
+            }
+
+        if action == "get_ticket_transcript":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            try:
+                ticket_id = int(payload.get("ticket_id"))
+            except (TypeError, ValueError):
+                return {"error": "Invalid ticket id"}
+            row = await self.db.get_ticket_transcript(guild_id, ticket_id)
+            if not row:
+                return {"error": "Ticket not found"}
+            return {
+                "id": row["id"],
+                "openerName": row["opener_name"],
+                "priority": row["priority"],
+                "status": row["status"],
+                "openedAt": row["opened_at"].isoformat() if row["opened_at"] else None,
+                "closedAt": row["closed_at"].isoformat() if row["closed_at"] else None,
+                "closedByName": row["closed_by_name"],
+                "closeComment": row["close_comment"],
+                "transcript": row["transcript"],
             }
 
         if action == "delete_warning":

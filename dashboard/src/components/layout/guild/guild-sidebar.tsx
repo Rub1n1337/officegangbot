@@ -7,7 +7,7 @@ import { getFeatures } from '@/utils/common';
 import { featureCategories } from '@/config/features';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 import { IoStatsChart, IoSearch, IoPeople } from 'react-icons/io5';
-import { MdGavel, MdHistory } from 'react-icons/md';
+import { MdGavel, MdHistory, MdConfirmationNumber } from 'react-icons/md';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
 import { guild as view } from '@/config/translations/guild';
@@ -69,6 +69,12 @@ export function InGuildSidebar() {
           active={router.route === `/guilds/[guild]/members`}
           icon={<Icon as={IoPeople} />}
           name="Members"
+        />
+        <SidebarItem
+          href={`/guilds/${guildId}/tickets`}
+          active={router.route === `/guilds/[guild]/tickets`}
+          icon={<Icon as={MdConfirmationNumber} />}
+          name="Tickets"
         />
         <SidebarItem
           href={`/guilds/${guildId}/audit`}

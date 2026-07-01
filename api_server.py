@@ -303,6 +303,20 @@ async def get_audit(request: Request, guild_id: int):
     data = await _rpc("get_audit", guild_id=guild_id)
     return data
 
+@app.get("/api/guild/{guild_id}/tickets", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_tickets(request: Request, guild_id: int):
+    """Returns the guild's tickets (open first, then most recent)."""
+    data = await _rpc("get_tickets", guild_id=guild_id)
+    return data
+
+@app.get("/api/guild/{guild_id}/tickets/{ticket_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_ticket_transcript(request: Request, guild_id: int, ticket_id: int):
+    """Returns a single ticket's metadata and full transcript."""
+    data = await _rpc("get_ticket_transcript", guild_id=guild_id, ticket_id=ticket_id)
+    return data
+
 @app.delete("/api/guild/{guild_id}/warnings/{warning_id}", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def delete_warning(request: Request, guild_id: int, warning_id: int):
