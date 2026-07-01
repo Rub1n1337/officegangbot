@@ -8,13 +8,18 @@ import {
   Flex,
   Icon,
   Input,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
   Switch,
   Tag,
   TagCloseButton,
   TagLabel,
   Text,
 } from '@chakra-ui/react';
-import { MdShield, MdAlternateEmail, MdLink, MdGroupAdd } from 'react-icons/md';
+import { MdShield, MdAlternateEmail, MdLink, MdGroupAdd, MdTimer, MdCampaign } from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
 import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
@@ -23,6 +28,10 @@ const schema = z.object({
   blockInvites: z.boolean(),
   blockLinks: z.boolean(),
   allowedDomains: z.array(z.string()),
+  blockMassMentions: z.boolean(),
+  spamCount: z.number().int().min(3).max(20),
+  spamWindow: z.number().int().min(1).max(30),
+  mentionLimit: z.number().int().min(3).max(30),
 });
 
 type Input = z.infer<typeof schema>;
@@ -85,20 +94,6 @@ function DomainsInput({ value, onChange }: { value: string[]; onChange: (next: s
   );
 }
 
-function InfoRule({ icon, title, description }: { icon: typeof MdShield; title: string; description: string }) {
-  return (
-    <Flex bg="CardBackground" rounded="2xl" p={4} gap={3} align="flex-start" borderWidth="1px" borderColor="CardBorder">
-      <Flex flexShrink={0} align="center" justify="center" boxSize="40px" rounded="xl" bg="brandAlpha.100" color="brand.500" _dark={{ color: 'brand.200' }}>
-        <Icon as={icon} fontSize="xl" />
-      </Flex>
-      <Box>
-        <Text fontWeight="600">{title}</Text>
-        <Text fontSize="sm" color="TextSecondary">{description}</Text>
-      </Box>
-    </Flex>
-  );
-}
-
 function ToggleRule({
   icon,
   title,
@@ -126,6 +121,50 @@ function ToggleRule({
   );
 }
 
+function NumberRule({
+  icon,
+  title,
+  description,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  icon: typeof MdShield;
+  title: string;
+  description: string;
+  value: number;
+  onChange: (next: number) => void;
+  min: number;
+  max: number;
+}) {
+  return (
+    <Flex bg="CardBackground" rounded="2xl" p={4} gap={3} align="center" borderWidth="1px" borderColor="CardBorder">
+      <Flex flexShrink={0} align="center" justify="center" boxSize="40px" rounded="xl" bg="brandAlpha.100" color="brand.500" _dark={{ color: 'brand.200' }}>
+        <Icon as={icon} fontSize="xl" />
+      </Flex>
+      <Box flex={1} minW={0}>
+        <Text fontWeight="600">{title}</Text>
+        <Text fontSize="sm" color="TextSecondary">{description}</Text>
+      </Box>
+      <NumberInput
+        value={value}
+        min={min}
+        max={max}
+        onChange={(_, num) => onChange(Number.isNaN(num) ? value : num)}
+        w="90px"
+        flexShrink={0}
+      >
+        <NumberInputField />
+        <NumberInputStepper>
+          <NumberIncrementStepper />
+          <NumberDecrementStepper />
+        </NumberInputStepper>
+      </NumberInput>
+    </Flex>
+  );
+}
+
 export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit) => {
   const { reset, handleSubmit, control, formState, watch, setValue } = useForm<Input>({
     resolver: zodResolver(schema),
@@ -134,6 +173,10 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
       blockInvites: data.blockInvites ?? false,
       blockLinks: data.blockLinks ?? false,
       allowedDomains: (data.allowedDomains ?? []).slice().sort(),
+      blockMassMentions: data.blockMassMentions ?? false,
+      spamCount: data.spamCount ?? 5,
+      spamWindow: data.spamWindow ?? 3,
+      mentionLimit: data.mentionLimit ?? 5,
     },
   });
 
@@ -167,15 +210,47 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             render={({ field }) => <DomainsInput value={field.value ?? []} onChange={field.onChange} />}
           />
         )}
+        <ToggleRule
+          icon={MdCampaign}
+          title="Block @everyone / @here"
+          description="Delete messages that mention @everyone or @here."
+          checked={watch('blockMassMentions')}
+          onChange={(v) => setValue('blockMassMentions', v, { shouldDirty: true })}
+        />
 
         <Divider my={1} />
 
-        <Text fontWeight="600">Always-on rules</Text>
+        <Text fontWeight="600">Anti-spam &amp; mentions</Text>
         <Text fontSize="sm" color="TextSecondary">
-          These anti-raid rules run whenever AutoMod is enabled and can&apos;t be turned off individually.
+          These limits run whenever AutoMod is enabled. Tune the thresholds to fit your server.
         </Text>
-        <InfoRule icon={MdShield} title="Anti-spam" description="5+ messages in 3 seconds → 10-minute timeout." />
-        <InfoRule icon={MdAlternateEmail} title="Anti-mention-spam" description="5+ user/role mentions in a message → deleted." />
+        <NumberRule
+          icon={MdShield}
+          title="Spam message threshold"
+          description="Messages within the window that trigger a 10-minute timeout."
+          value={watch('spamCount')}
+          onChange={(v) => setValue('spamCount', v, { shouldDirty: true })}
+          min={3}
+          max={20}
+        />
+        <NumberRule
+          icon={MdTimer}
+          title="Spam window (seconds)"
+          description="Time window the spam threshold is measured over."
+          value={watch('spamWindow')}
+          onChange={(v) => setValue('spamWindow', v, { shouldDirty: true })}
+          min={1}
+          max={30}
+        />
+        <NumberRule
+          icon={MdAlternateEmail}
+          title="Mention limit"
+          description="Delete a message with more than this many user/role mentions."
+          value={watch('mentionLimit')}
+          onChange={(v) => setValue('mentionLimit', v, { shouldDirty: true })}
+          min={3}
+          max={30}
+        />
 
         <Text fontSize="sm" color="TextSecondary">
           Members with “Manage Messages” bypass all AutoMod rules. Actions are recorded in your
@@ -189,12 +264,20 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
           blockInvites: e.blockInvites,
           blockLinks: e.blockLinks,
           allowedDomains: e.allowedDomains,
+          blockMassMentions: e.blockMassMentions,
+          spamCount: e.spamCount,
+          spamWindow: e.spamWindow,
+          mentionLimit: e.mentionLimit,
         })
       );
       reset({
         blockInvites: result?.blockInvites ?? false,
         blockLinks: result?.blockLinks ?? false,
         allowedDomains: (result?.allowedDomains ?? []).slice().sort(),
+        blockMassMentions: result?.blockMassMentions ?? false,
+        spamCount: result?.spamCount ?? 5,
+        spamWindow: result?.spamWindow ?? 3,
+        mentionLimit: result?.mentionLimit ?? 5,
       });
     }),
     canSave: formState.isDirty,

@@ -113,9 +113,27 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 )
                 return
 
+        # --- Mass mentions (@everyone / @here) ---
+        if config["block_mass_mentions"] and message.mention_everyone:
+            try:
+                await message.delete()
+                await message.channel.send(
+                    t(loc, "automod.mass_mention_blocked", mention=message.author.mention),
+                    delete_after=5
+                )
+                await self._log_automod(
+                    message.guild,
+                    f"**Mass mention** (@everyone/@here) by {message.author.mention} "
+                    f"(`{user_id}`) — message deleted."
+                )
+            except discord.Forbidden:
+                pass
+            return
+
         # --- Anti-mention spam ---
+        mention_limit = config["mention_limit"]
         total_mentions = len(message.mentions) + len(message.role_mentions)
-        if total_mentions > 5:
+        if total_mentions > mention_limit:
             try:
                 await message.delete()
                 await message.channel.send(
@@ -131,10 +149,12 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 pass
             return
 
-        # --- Anti-spam (5 messages in 3 seconds) ---
+        # --- Anti-spam (configurable: N messages within a time window) ---
+        spam_count = config["spam_count"]
+        spam_window = config["spam_window"]
         if self.bot.redis:
-            msg_count = await self.bot.redis.log_message(guild_id, user_id)
-            if msg_count >= 5:
+            msg_count = await self.bot.redis.log_message(guild_id, user_id, spam_window)
+            if msg_count >= spam_count:
                 await self.bot.redis.clear_message_log(guild_id, user_id)
                 try:
                     await message.channel.send(
@@ -146,7 +166,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self._log_automod(
                     message.guild,
                     f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                    f"Sent 5+ messages in 3 seconds. Auto-timeout for **10 minutes**."
+                    f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
                 )
                 await self._apply_timeout(message.author, "AutoMod: spam detection")
         else:
@@ -154,8 +174,8 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             guild_log = self._message_log.setdefault(guild_id, {})
             user_log = guild_log.setdefault(user_id, [])
 
-            # Keep only messages from the last 3 seconds
-            user_log[:] = [t for t in user_log if now - t < 3]
+            # Keep only messages from within the configured window
+            user_log[:] = [t for t in user_log if now - t < spam_window]
             user_log.append(now)
 
             # Drop empty per-user/per-guild entries so the fallback dict doesn't
@@ -165,7 +185,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             if not guild_log:
                 self._message_log.pop(guild_id, None)
 
-            if len(user_log) >= 5:
+            if len(user_log) >= spam_count:
                 user_log.clear()
                 try:
                     await message.channel.send(
@@ -178,7 +198,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self._log_automod(
                     message.guild,
                     f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                    f"Sent 5+ messages in 3 seconds. Auto-timeout for **10 minutes**."
+                    f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
                 )
                 await self._apply_timeout(message.author, "AutoMod: spam detection")
 

@@ -24,7 +24,8 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
     'ticket_support_role_id', 'ticket_category_id', 'enabled_features',
     'locale', 'automod_block_invites', 'automod_block_links',
-    'automod_allowed_domains',
+    'automod_allowed_domains', 'automod_spam_count', 'automod_spam_window',
+    'automod_mention_limit', 'automod_block_mass_mentions',
 })
 
 
@@ -634,7 +635,9 @@ class DatabaseManager:
             return cached
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT automod_block_invites, automod_block_links, automod_allowed_domains "
+                "SELECT automod_block_invites, automod_block_links, automod_allowed_domains, "
+                "automod_spam_count, automod_spam_window, automod_mention_limit, "
+                "automod_block_mass_mentions "
                 "FROM guilds WHERE guild_id = $1",
                 guild_id,
             )
@@ -642,18 +645,36 @@ class DatabaseManager:
             "block_invites": bool(row["automod_block_invites"]) if row else False,
             "block_links": bool(row["automod_block_links"]) if row else False,
             "allowed_domains": list(row["automod_allowed_domains"]) if row and row["automod_allowed_domains"] else [],
+            "spam_count": int(row["automod_spam_count"]) if row and row["automod_spam_count"] else 5,
+            "spam_window": int(row["automod_spam_window"]) if row and row["automod_spam_window"] else 3,
+            "mention_limit": int(row["automod_mention_limit"]) if row and row["automod_mention_limit"] else 5,
+            "block_mass_mentions": bool(row["automod_block_mass_mentions"]) if row else False,
         }
         self._automod_cache[guild_id] = config
         return config
 
-    async def set_automod_config(self, guild_id: int, block_invites: bool, block_links: bool, allowed_domains: List[str]) -> None:
-        """Persists the AutoMod content-filter config and invalidates the cache."""
+    async def set_automod_config(
+        self,
+        guild_id: int,
+        block_invites: bool,
+        block_links: bool,
+        allowed_domains: List[str],
+        spam_count: int = 5,
+        spam_window: int = 3,
+        mention_limit: int = 5,
+        block_mass_mentions: bool = False,
+    ) -> None:
+        """Persists the AutoMod content-filter/anti-spam config and invalidates the cache."""
         await self.ensure_guild(guild_id)
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE guilds SET automod_block_invites = $1, automod_block_links = $2, "
-                "automod_allowed_domains = $3, updated_at = NOW() WHERE guild_id = $4",
-                bool(block_invites), bool(block_links), list(allowed_domains), guild_id,
+                "automod_allowed_domains = $3, automod_spam_count = $4, automod_spam_window = $5, "
+                "automod_mention_limit = $6, automod_block_mass_mentions = $7, updated_at = NOW() "
+                "WHERE guild_id = $8",
+                bool(block_invites), bool(block_links), list(allowed_domains),
+                int(spam_count), int(spam_window), int(mention_limit),
+                bool(block_mass_mentions), guild_id,
             )
         self._automod_cache.pop(guild_id, None)
 

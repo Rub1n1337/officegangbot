@@ -202,6 +202,16 @@ class MyBot(commands.Bot):
     def _snowflake_or_none(value) -> Optional[str]:
         return str(value) if value else None
 
+    @staticmethod
+    def _clamp_int(value, default: int, lo: int, hi: int) -> int:
+        """Coerce a dashboard-supplied value to an int within [lo, hi], falling
+        back to `default` when it is missing or unparseable."""
+        try:
+            n = int(value)
+        except (TypeError, ValueError):
+            return default
+        return max(lo, min(hi, n))
+
     def _unassignable_roles(self, guild, role_ids):
         """Of the given role ids, return [(id, label)] for roles the bot cannot
         grant: unknown/deleted, managed, or at/above the bot's top role. Used to
@@ -310,6 +320,10 @@ class MyBot(commands.Bot):
                 "blockInvites": bool(settings.get("automod_block_invites")),
                 "blockLinks": bool(settings.get("automod_block_links")),
                 "allowedDomains": list(settings.get("automod_allowed_domains") or []),
+                "blockMassMentions": bool(settings.get("automod_block_mass_mentions")),
+                "spamCount": int(settings.get("automod_spam_count") or 5),
+                "spamWindow": int(settings.get("automod_spam_window") or 3),
+                "mentionLimit": int(settings.get("automod_mention_limit") or 5),
             },
             "reaction-menus": {
                 "menus": [
@@ -877,7 +891,14 @@ class MyBot(commands.Bot):
                 block_links = bool(options.get("blockLinks", False))
                 domains_raw = options.get("allowedDomains") or []
                 domains = sorted({normalize_domain(str(d)) for d in domains_raw if normalize_domain(str(d))})[:50]
-                await self.db.set_automod_config(guild_id, block_invites, block_links, domains)
+                block_mass_mentions = bool(options.get("blockMassMentions", False))
+                spam_count = self._clamp_int(options.get("spamCount"), 5, 3, 20)
+                spam_window = self._clamp_int(options.get("spamWindow"), 3, 1, 30)
+                mention_limit = self._clamp_int(options.get("mentionLimit"), 5, 3, 30)
+                await self.db.set_automod_config(
+                    guild_id, block_invites, block_links, domains,
+                    spam_count, spam_window, mention_limit, block_mass_mentions,
+                )
                 return await self._get_feature_payload(guild_id, feature)
 
             # Role menus: the bot posts/edits an embed per menu and reconciles its
