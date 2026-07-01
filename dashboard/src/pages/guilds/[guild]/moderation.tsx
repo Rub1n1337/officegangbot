@@ -23,25 +23,13 @@ import {
   useAuditQuery,
 } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
+import { timeAgo, describeAudit, isModerationAction } from '@/utils/audit';
 import type {
   AuditEntry,
   ModerationLeaderItem,
   ModerationPunishment,
   ModerationWarning,
 } from '@/config/types/custom-types';
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return '';
-  const d = Date.parse(iso);
-  if (Number.isNaN(d)) return '';
-  const s = Math.max(0, Math.floor((Date.now() - d) / 1000));
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 function expiresIn(iso: string | null): string {
   if (!iso) return '';
@@ -285,30 +273,11 @@ function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
   );
 }
 
-const AUDIT_LABEL: Record<string, (e: AuditEntry) => string> = {
-  warn: () => 'warned a member',
-  mute: () => 'muted a member',
-  unmute: () => 'removed a timeout',
-  kick: () => 'kicked a member',
-  ban: () => 'banned a member',
-  enable_feature: (e) => `enabled ${e.target ?? 'a feature'}`,
-  disable_feature: (e) => `disabled ${e.target ?? 'a feature'}`,
-  update_feature: (e) => `updated ${e.target ?? 'a feature'} settings`,
-  set_locale: (e) => `set the bot language to ${e.detail ?? ''}`.trim(),
-  delete_warning: () => 'deleted a warning',
-};
-
-function describeAudit(e: AuditEntry): string {
-  const f = AUDIT_LABEL[e.action];
-  return f ? f(e) : e.action;
-}
-
 const INITIAL_AUDIT = 10;
 
 function AuditActivity({ rows }: { rows: AuditEntry[] }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? rows : rows.slice(0, INITIAL_AUDIT);
-  const isModeration = (a: string) => ['warn', 'mute', 'unmute', 'kick', 'ban'].includes(a);
 
   return (
     <Section
@@ -340,7 +309,7 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
                   </Text>{' '}
                   {describeAudit(e)}
                 </Text>
-                {isModeration(e.action) && e.detail && (
+                {isModerationAction(e.action) && e.detail && (
                   <Text fontSize="xs" color="TextSecondary" noOfLines={1}>
                     {e.detail}
                   </Text>
