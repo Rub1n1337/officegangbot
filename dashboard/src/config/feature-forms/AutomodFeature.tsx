@@ -1,25 +1,39 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import {
   Box,
+  Button,
   Divider,
   Flex,
   Icon,
+  IconButton,
   Input,
   NumberInput,
   NumberInputField,
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
+  Select,
   Switch,
   Tag,
   TagCloseButton,
   TagLabel,
   Text,
 } from '@chakra-ui/react';
-import { MdShield, MdAlternateEmail, MdLink, MdGroupAdd, MdTimer, MdCampaign } from 'react-icons/md';
+import {
+  MdShield,
+  MdAlternateEmail,
+  MdLink,
+  MdGroupAdd,
+  MdTimer,
+  MdCampaign,
+  MdGavel,
+  MdAdd,
+  MdDelete,
+  MdRule,
+} from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
 import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
@@ -32,6 +46,20 @@ const schema = z.object({
   spamCount: z.number().int().min(3).max(20),
   spamWindow: z.number().int().min(1).max(30),
   mentionLimit: z.number().int().min(3).max(30),
+  strikesEnabled: z.boolean(),
+  strikeExpiryHours: z.number().int().min(0).max(720),
+  strikeMuteAt: z.number().int().min(0).max(50),
+  strikeKickAt: z.number().int().min(0).max(50),
+  strikeBanAt: z.number().int().min(0).max(50),
+  rules: z
+    .array(
+      z.object({
+        pattern: z.string().max(200),
+        action: z.enum(['delete', 'strike']),
+        enabled: z.boolean(),
+      })
+    )
+    .max(25),
 });
 
 type Input = z.infer<typeof schema>;
@@ -165,22 +193,38 @@ function NumberRule({
   );
 }
 
+function defaultsFrom(data: Partial<AutomodFeature>): Input {
+  return {
+    blockInvites: data.blockInvites ?? false,
+    blockLinks: data.blockLinks ?? false,
+    allowedDomains: (data.allowedDomains ?? []).slice().sort(),
+    blockMassMentions: data.blockMassMentions ?? false,
+    spamCount: data.spamCount ?? 5,
+    spamWindow: data.spamWindow ?? 3,
+    mentionLimit: data.mentionLimit ?? 5,
+    strikesEnabled: data.strikesEnabled ?? false,
+    strikeExpiryHours: data.strikeExpiryHours ?? 24,
+    strikeMuteAt: data.strikeMuteAt ?? 0,
+    strikeKickAt: data.strikeKickAt ?? 0,
+    strikeBanAt: data.strikeBanAt ?? 0,
+    rules: (data.rules ?? []).map((r) => ({
+      pattern: r.pattern ?? '',
+      action: r.action === 'strike' ? 'strike' : 'delete',
+      enabled: r.enabled ?? true,
+    })),
+  };
+}
+
 export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit) => {
-  const { reset, handleSubmit, control, formState, watch, setValue } = useForm<Input>({
+  const { reset, handleSubmit, control, formState, watch, setValue, register } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
-    defaultValues: {
-      blockInvites: data.blockInvites ?? false,
-      blockLinks: data.blockLinks ?? false,
-      allowedDomains: (data.allowedDomains ?? []).slice().sort(),
-      blockMassMentions: data.blockMassMentions ?? false,
-      spamCount: data.spamCount ?? 5,
-      spamWindow: data.spamWindow ?? 3,
-      mentionLimit: data.mentionLimit ?? 5,
-    },
+    defaultValues: defaultsFrom(data),
   });
 
+  const { fields, append, remove } = useFieldArray({ control, name: 'rules' });
   const blockLinks = watch('blockLinks');
+  const strikesEnabled = watch('strikesEnabled');
 
   return {
     component: (
@@ -252,6 +296,133 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
           max={30}
         />
 
+        <Divider my={1} />
+
+        <Text fontWeight="600">Strike system</Text>
+        <ToggleRule
+          icon={MdGavel}
+          title="Enable strikes"
+          description="Every AutoMod violation adds a strike; crossing a threshold escalates the punishment."
+          checked={strikesEnabled}
+          onChange={(v) => setValue('strikesEnabled', v, { shouldDirty: true })}
+        />
+        {strikesEnabled && (
+          <>
+            <NumberRule
+              icon={MdTimer}
+              title="Strike expiry (hours)"
+              description="Strikes older than this stop counting. 0 = never expire."
+              value={watch('strikeExpiryHours')}
+              onChange={(v) => setValue('strikeExpiryHours', v, { shouldDirty: true })}
+              min={0}
+              max={720}
+            />
+            <NumberRule
+              icon={MdShield}
+              title="Mute at (strikes)"
+              description="Timeout the member for 10 minutes at this many strikes. 0 = off."
+              value={watch('strikeMuteAt')}
+              onChange={(v) => setValue('strikeMuteAt', v, { shouldDirty: true })}
+              min={0}
+              max={50}
+            />
+            <NumberRule
+              icon={MdGroupAdd}
+              title="Kick at (strikes)"
+              description="Kick the member at this many strikes. 0 = off."
+              value={watch('strikeKickAt')}
+              onChange={(v) => setValue('strikeKickAt', v, { shouldDirty: true })}
+              min={0}
+              max={50}
+            />
+            <NumberRule
+              icon={MdGavel}
+              title="Ban at (strikes)"
+              description="Ban the member at this many strikes. 0 = off."
+              value={watch('strikeBanAt')}
+              onChange={(v) => setValue('strikeBanAt', v, { shouldDirty: true })}
+              min={0}
+              max={50}
+            />
+          </>
+        )}
+
+        <Divider my={1} />
+
+        <Flex align="center" justify="space-between" gap={2}>
+          <Box>
+            <Text fontWeight="600">Custom filters (regex)</Text>
+            <Text fontSize="sm" color="TextSecondary">
+              Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on).
+              Up to 25 rules.
+            </Text>
+          </Box>
+          <Button
+            size="sm"
+            leftIcon={<Icon as={MdAdd} />}
+            onClick={() => append({ pattern: '', action: 'delete', enabled: true })}
+            isDisabled={fields.length >= 25}
+            flexShrink={0}
+          >
+            Add rule
+          </Button>
+        </Flex>
+        {fields.length === 0 ? (
+          <Flex
+            bg="CardBackground"
+            rounded="2xl"
+            p={4}
+            gap={3}
+            align="center"
+            borderWidth="1px"
+            borderColor="CardBorder"
+            color="TextSecondary"
+          >
+            <Icon as={MdRule} fontSize="xl" />
+            <Text fontSize="sm">No custom filters yet.</Text>
+          </Flex>
+        ) : (
+          fields.map((f, i) => (
+            <Flex
+              key={f.id}
+              bg="CardBackground"
+              rounded="2xl"
+              p={3}
+              gap={2}
+              align="center"
+              borderWidth="1px"
+              borderColor="CardBorder"
+              wrap="wrap"
+            >
+              <Switch
+                isChecked={watch(`rules.${i}.enabled`)}
+                onChange={(e) => setValue(`rules.${i}.enabled`, e.target.checked, { shouldDirty: true })}
+                flexShrink={0}
+              />
+              <Input
+                variant="main"
+                flex={1}
+                minW="180px"
+                placeholder="regex pattern, e.g. free\s*nitro"
+                {...register(`rules.${i}.pattern`)}
+              />
+              <Select variant="main" w="130px" flexShrink={0} {...register(`rules.${i}.action`)}>
+                <option value="delete">Delete</option>
+                <option value="strike">Strike</option>
+              </Select>
+              <IconButton
+                aria-label="Remove rule"
+                icon={<MdDelete />}
+                size="sm"
+                variant="ghost"
+                colorScheme="red"
+                onClick={() => remove(i)}
+                flexShrink={0}
+              />
+            </Flex>
+          ))
+        )}
+
         <Text fontSize="sm" color="TextSecondary">
           Members with “Manage Messages” bypass all AutoMod rules. Actions are recorded in your
           punishment log when the Logging feature is enabled.
@@ -268,17 +439,16 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
           spamCount: e.spamCount,
           spamWindow: e.spamWindow,
           mentionLimit: e.mentionLimit,
+          strikesEnabled: e.strikesEnabled,
+          strikeExpiryHours: e.strikeExpiryHours,
+          strikeMuteAt: e.strikeMuteAt,
+          strikeKickAt: e.strikeKickAt,
+          strikeBanAt: e.strikeBanAt,
+          // Drop blank patterns client-side; the server also sanitizes.
+          rules: e.rules.filter((r) => r.pattern.trim().length > 0),
         })
       );
-      reset({
-        blockInvites: result?.blockInvites ?? false,
-        blockLinks: result?.blockLinks ?? false,
-        allowedDomains: (result?.allowedDomains ?? []).slice().sort(),
-        blockMassMentions: result?.blockMassMentions ?? false,
-        spamCount: result?.spamCount ?? 5,
-        spamWindow: result?.spamWindow ?? 3,
-        mentionLimit: result?.mentionLimit ?? 5,
-      });
+      reset(defaultsFrom((result ?? {}) as Partial<AutomodFeature>));
     }),
     canSave: formState.isDirty,
     reset: () => reset(control._defaultValues),

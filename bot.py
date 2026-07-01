@@ -26,6 +26,7 @@ from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
 from core.permissions import role_is_assignable
 from core.content_filter import normalize_domain
+from core.automod_rules import sanitize_rules
 from core.role_menu import build_menu_body
 from api_server import app as fastapi_app, set_bot_instance
 
@@ -244,6 +245,7 @@ class MyBot(commands.Bot):
         level_roles = await self.db.get_level_roles(guild_id)
         scheduled = await self.db.get_scheduled_messages(guild_id)
         menus = await self.db.get_reaction_menus(guild_id)
+        automod_rules = (await self.db.get_automod_config(guild_id)).get("rules", [])
 
         def _first_role(perm: str):
             ids = mod_roles.get(perm) or []
@@ -324,6 +326,15 @@ class MyBot(commands.Bot):
                 "spamCount": int(settings.get("automod_spam_count") or 5),
                 "spamWindow": int(settings.get("automod_spam_window") or 3),
                 "mentionLimit": int(settings.get("automod_mention_limit") or 5),
+                "strikesEnabled": bool(settings.get("automod_strikes_enabled")),
+                "strikeExpiryHours": int(settings.get("automod_strike_expiry_hours") or 24),
+                "strikeMuteAt": int(settings.get("automod_strike_mute_at") or 0),
+                "strikeKickAt": int(settings.get("automod_strike_kick_at") or 0),
+                "strikeBanAt": int(settings.get("automod_strike_ban_at") or 0),
+                "rules": [
+                    {"pattern": r["pattern"], "action": r["action"], "enabled": bool(r["enabled"])}
+                    for r in automod_rules
+                ],
             },
             "reaction-menus": {
                 "menus": [
@@ -946,6 +957,22 @@ class MyBot(commands.Bot):
                     guild_id, block_invites, block_links, domains,
                     spam_count, spam_window, mention_limit, block_mass_mentions,
                 )
+
+                # Strike escalation config (0 = that tier disabled).
+                strikes_enabled = bool(options.get("strikesEnabled", False))
+                strike_expiry = self._clamp_int(options.get("strikeExpiryHours"), 24, 0, 720)
+                strike_mute = self._clamp_int(options.get("strikeMuteAt"), 3, 0, 50)
+                strike_kick = self._clamp_int(options.get("strikeKickAt"), 0, 0, 50)
+                strike_ban = self._clamp_int(options.get("strikeBanAt"), 0, 0, 50)
+                await self.db.set_automod_strikes(
+                    guild_id, strikes_enabled, strike_expiry, strike_mute, strike_kick, strike_ban,
+                )
+
+                # Custom regex rules: validated/capped server-side before persisting.
+                rules_raw = options.get("rules")
+                if isinstance(rules_raw, list):
+                    await self.db.replace_automod_rules(guild_id, sanitize_rules(rules_raw))
+
                 return await self._get_feature_payload(guild_id, feature)
 
             # Role menus: the bot posts/edits an embed per menu and reconciles its

@@ -185,6 +185,12 @@ export type TicketDetail = {
   transcript: string | null;
 };
 
+export type AutomodRule = {
+  pattern: string;
+  action: 'delete' | 'strike';
+  enabled: boolean;
+};
+
 export type AutomodFeature = {
   blockInvites: boolean;
   blockLinks: boolean;
@@ -193,6 +199,12 @@ export type AutomodFeature = {
   spamCount: number;
   spamWindow: number;
   mentionLimit: number;
+  strikesEnabled: boolean;
+  strikeExpiryHours: number;
+  strikeMuteAt: number;
+  strikeKickAt: number;
+  strikeBanAt: number;
+  rules: AutomodRule[];
 };
 
 export type WelcomeMessageFeature = {

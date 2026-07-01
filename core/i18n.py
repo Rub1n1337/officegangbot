@@ -208,6 +208,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "automod.invite_blocked": "⚠️ {mention} Invite links aren't allowed here.",
         "automod.link_blocked": "⚠️ {mention} Links aren't allowed here.",
         "automod.mass_mention_blocked": "⚠️ {mention} @everyone / @here mentions aren't allowed here.",
+        "automod.rule_blocked": "⚠️ {mention} Your message matched a filtered pattern and was removed.",
         # --- help ---
         "help.title": "Bot Help Desk",
         "help.desc": "All commands are available as **Slash Commands** (`/`).\nPick a category from the menu below, or use `/help <command>` for details on a single command.",
@@ -460,6 +461,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "automod.invite_blocked": "⚠️ {mention} Ссылки-приглашения здесь запрещены.",
         "automod.link_blocked": "⚠️ {mention} Ссылки здесь запрещены.",
         "automod.mass_mention_blocked": "⚠️ {mention} Упоминания @everyone / @here здесь запрещены.",
+        "automod.rule_blocked": "⚠️ {mention} Сообщение попало под фильтр и было удалено.",
         # --- help ---
         "help.title": "Справочник команд",
         "help.desc": "Все команды доступны как **слэш-команды** (`/`).\nВыберите категорию в меню ниже или используйте `/help <команда>` для подробностей по конкретной команде.",
