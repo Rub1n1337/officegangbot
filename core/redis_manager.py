@@ -182,20 +182,21 @@ class RedisManager:
     # AutoMod message log
     # -------------------------
 
-    async def log_message(self, guild_id: int, user_id: int) -> int:
+    async def log_message(self, guild_id: int, user_id: int, window: int = 3) -> int:
         """
         Records a message timestamp for spam detection.
-        Returns count of messages in the last 3 seconds.
+        Returns count of messages in the last `window` seconds.
         Uses Redis sorted set with timestamp as score.
         """
         try:
+            window = max(1, int(window))
             key = f"msg_log:{guild_id}:{user_id}"
             now = asyncio.get_event_loop().time()
             pipe = self.redis.pipeline()
-            pipe.zremrangebyscore(key, 0, now - 3)   # remove entries older than 3s
-            pipe.zadd(key, {str(uuid.uuid4()): now})  # add current message
-            pipe.zcard(key)                            # count messages in window
-            pipe.expire(key, 10)                       # auto-cleanup after 10s
+            pipe.zremrangebyscore(key, 0, now - window)  # remove entries older than the window
+            pipe.zadd(key, {str(uuid.uuid4()): now})     # add current message
+            pipe.zcard(key)                               # count messages in window
+            pipe.expire(key, window + 7)                  # auto-cleanup shortly after window
             results = await pipe.execute()
             return results[2]  # zcard result
         except Exception as e:

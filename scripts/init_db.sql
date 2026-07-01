@@ -169,6 +169,11 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS locale VARCHAR(5) DEFAULT 'en';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_invites BOOLEAN DEFAULT FALSE;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_links BOOLEAN DEFAULT FALSE;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_allowed_domains TEXT[] DEFAULT '{}';
+-- AutoMod anti-spam / mention thresholds (configurable from the dashboard).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_spam_count INTEGER DEFAULT 5;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_spam_window INTEGER DEFAULT 3;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_mention_limit INTEGER DEFAULT 5;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_mass_mentions BOOLEAN DEFAULT FALSE;
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')

@@ -160,6 +160,10 @@ export type AutomodFeature = {
   blockInvites: boolean;
   blockLinks: boolean;
   allowedDomains: string[];
+  blockMassMentions: boolean;
+  spamCount: number;
+  spamWindow: number;
+  mentionLimit: number;
 };
 
 export type WelcomeMessageFeature = {
