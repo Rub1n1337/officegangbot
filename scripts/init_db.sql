@@ -223,6 +223,33 @@ CREATE TABLE IF NOT EXISTS temp_roles (
 
 CREATE INDEX IF NOT EXISTS idx_temp_roles_expiry ON temp_roles(expires_at);
 
+-- AutoMod strikes: one row per recorded violation; the count within the guild's
+-- decay window drives escalation.
+CREATE TABLE IF NOT EXISTS automod_strikes (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_automod_strikes ON automod_strikes(guild_id, user_id, created_at);
+
+-- AutoMod custom rules: per-guild regex patterns that delete a message (and
+-- optionally add a strike) when they match.
+CREATE TABLE IF NOT EXISTS automod_rules (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    pattern TEXT NOT NULL,
+    action VARCHAR(10) NOT NULL DEFAULT 'delete',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_automod_rules_guild ON automod_rules(guild_id);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -236,6 +263,13 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_spam_count INTEGER DEFAULT 5
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_spam_window INTEGER DEFAULT 3;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_mention_limit INTEGER DEFAULT 5;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_mass_mentions BOOLEAN DEFAULT FALSE;
+-- AutoMod strike escalation: each violation records a strike; at the configured
+-- thresholds the member is muted / kicked / banned (0 = that tier disabled).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strikes_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_expiry_hours INTEGER DEFAULT 24;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_mute_at INTEGER DEFAULT 3;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_kick_at INTEGER DEFAULT 5;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_ban_at INTEGER DEFAULT 0;
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')
@@ -271,3 +305,5 @@ ALTER TABLE reaction_menus ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mod_cases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE temp_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automod_strikes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automod_rules ENABLE ROW LEVEL SECURITY;

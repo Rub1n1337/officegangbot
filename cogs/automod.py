@@ -4,18 +4,79 @@ from discord.ext import commands
 from core.logger import logger
 from core.i18n import t
 from core.content_filter import contains_invite, first_disallowed_link
+from core.automod_rules import compile_rules, first_match
 import datetime
 
 class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
     """
-    Basic auto-moderation:
-    - Anti-spam: timeouts users sending 5+ messages in 3 seconds for 10 minutes.
-    - Anti-mention-spam: deletes messages with 5+ user/role mentions.
+    Auto-moderation:
+    - Content filter (invites / links), configurable anti-spam and mention limits.
+    - Custom regex rules and a strike-escalation system (mute/kick/ban).
     """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._message_log: dict = {} # Fallback if Redis unavailable
+        # Cache of compiled regex rules per guild, keyed by a signature of the
+        # rule list so it recompiles only when the rules actually change.
+        self._rules_cache: dict = {}
+
+    def _get_compiled_rules(self, guild_id: int, rules: list):
+        """Returns compiled [(regex, action)] for a guild, recompiling only when
+        the rule set changes."""
+        signature = tuple((r["pattern"], r["action"], r["enabled"]) for r in rules)
+        cached = self._rules_cache.get(guild_id)
+        if cached and cached[0] == signature:
+            return cached[1]
+        compiled = compile_rules(rules)
+        self._rules_cache[guild_id] = (signature, compiled)
+        return compiled
+
+    async def _register_strike(self, message: discord.Message, reason: str):
+        """If strikes are enabled, record one and escalate (mute/kick/ban) once
+        the active strike count crosses the configured thresholds."""
+        config = await self.bot.db.get_automod_config(message.guild.id)
+        if not config.get("strikes_enabled"):
+            return
+        member = message.author
+        guild = message.guild
+        try:
+            count = await self.bot.db.add_strike(
+                guild.id, member.id, reason, config.get("strike_expiry_hours", 24)
+            )
+        except Exception as e:
+            logger.error(f"AutoMod: failed to record strike: {e}")
+            return
+
+        ban_at = config.get("strike_ban_at", 0)
+        kick_at = config.get("strike_kick_at", 0)
+        mute_at = config.get("strike_mute_at", 0)
+        action = None
+        if ban_at and count >= ban_at:
+            action = "ban"
+        elif kick_at and count >= kick_at:
+            action = "kick"
+        elif mute_at and count >= mute_at:
+            action = "mute"
+
+        escalated = None
+        try:
+            if action == "ban":
+                await guild.ban(member, reason=f"AutoMod: {count} strikes")
+                escalated = "banned"
+            elif action == "kick":
+                await member.kick(reason=f"AutoMod: {count} strikes")
+                escalated = "kicked"
+            elif action == "mute":
+                await member.timeout(datetime.timedelta(minutes=10), reason=f"AutoMod: {count} strikes")
+                escalated = "muted 10m"
+        except (discord.Forbidden, discord.HTTPException) as e:
+            logger.warning(f"AutoMod: could not escalate ({action}) on {member} in {guild.name}: {e}")
+
+        desc = f"**Strike {count}** for {member.mention} (`{member.id}`) — {reason}"
+        if escalated:
+            desc += f" → **{escalated}**"
+        await self._log_automod(guild, desc)
 
     async def _apply_timeout(self, member: discord.Member, reason: str):
         """Applies native Discord timeout (10 minutes)."""
@@ -103,6 +164,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 message, loc, "automod.invite_blocked",
                 f"**Invite link** by {message.author.mention} (`{user_id}`) — message deleted.",
             )
+            await self._register_strike(message, "invite link")
             return
         if config["block_links"]:
             bad = first_disallowed_link(message.content, config["allowed_domains"])
@@ -111,6 +173,20 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                     message, loc, "automod.link_blocked",
                     f"**Disallowed link** by {message.author.mention} (`{user_id}`) — message deleted.",
                 )
+                await self._register_strike(message, "disallowed link")
+                return
+
+        # --- Custom regex rules ---
+        rules = config.get("rules") or []
+        if rules:
+            matched = first_match(self._get_compiled_rules(guild_id, rules), message.content)
+            if matched:
+                await self._block_message(
+                    message, loc, "automod.rule_blocked",
+                    f"**Custom filter** matched a message by {message.author.mention} (`{user_id}`) — deleted.",
+                )
+                if matched == "strike":
+                    await self._register_strike(message, "custom filter match")
                 return
 
         # --- Mass mentions (@everyone / @here) ---
@@ -128,6 +204,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 )
             except discord.Forbidden:
                 pass
+            await self._register_strike(message, "mass mention")
             return
 
         # --- Anti-mention spam ---
@@ -147,6 +224,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 )
             except discord.Forbidden:
                 pass
+            await self._register_strike(message, "mention spam")
             return
 
         # --- Anti-spam (configurable: N messages within a time window) ---
@@ -169,6 +247,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                     f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
                 )
                 await self._apply_timeout(message.author, "AutoMod: spam detection")
+                await self._register_strike(message, "spam")
         else:
             # Fallback to in-memory if Redis unavailable
             guild_log = self._message_log.setdefault(guild_id, {})
@@ -201,6 +280,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                     f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
                 )
                 await self._apply_timeout(message.author, "AutoMod: spam detection")
+                await self._register_strike(message, "spam")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoModCog(bot))
