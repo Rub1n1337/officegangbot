@@ -186,6 +186,43 @@ CREATE INDEX IF NOT EXISTS idx_tickets_guild ON tickets(guild_id, status);
 -- At most one open ticket record per channel.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_open_channel ON tickets(channel_id) WHERE status = 'open';
 
+-- Moderation cases: every moderation action gets a per-guild sequential case
+-- number for reference (/case <n>). Allocation is serialized per guild with an
+-- advisory lock in add_mod_case; the UNIQUE constraint is the backstop.
+CREATE TABLE IF NOT EXISTS mod_cases (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    case_number INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    target_id BIGINT,
+    target_name TEXT,
+    moderator_id BIGINT,
+    moderator_name TEXT,
+    reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (guild_id, case_number),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mod_cases_guild ON mod_cases(guild_id, case_number DESC);
+CREATE INDEX IF NOT EXISTS idx_mod_cases_target ON mod_cases(guild_id, target_id);
+
+-- Temporary roles: a role granted to a member until expires_at, then removed by
+-- the timed_events expiry loop.
+CREATE TABLE IF NOT EXISTS temp_roles (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    moderator_id BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (guild_id, user_id, role_id),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_temp_roles_expiry ON temp_roles(expires_at);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -232,3 +269,5 @@ ALTER TABLE dashboard_audit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reaction_menus ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mod_cases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE temp_roles ENABLE ROW LEVEL SECURITY;

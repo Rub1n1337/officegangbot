@@ -134,6 +134,17 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         if not self.bot.db:
             return
 
+        # Record a numbered case for every action, independent of whether the
+        # logging channel is configured, so /case <n> always has a record.
+        case_number = None
+        try:
+            case_number = await self.bot.db.add_mod_case(
+                ctx.guild.id, action, getattr(target, "id", None), str(target),
+                ctx.author.id, str(ctx.author), reason,
+            )
+        except Exception as e:
+            logger.error(f"Failed to record mod case for {action}: {e}")
+
         # Check if logging feature is enabled
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
         if "logging" not in enabled_features:
@@ -148,7 +159,8 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
             return
 
         timestamp = discord.utils.utcnow()
-        embed = discord.Embed(title=f"{action}", color=discord.Color.orange(), timestamp=timestamp)
+        title = f"{action}" + (f" · Case #{case_number}" if case_number is not None else "")
+        embed = discord.Embed(title=title, color=discord.Color.orange(), timestamp=timestamp)
         embed.add_field(name="Target", value=f"{target.mention} (`{target.id}`)", inline=False)
         embed.add_field(name="Moderator", value=f"{ctx.author.mention} (`{ctx.author.id}`)", inline=False)
         embed.add_field(name="Reason", value=f"```{reason}```", inline=False)
