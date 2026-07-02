@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { SimpleGrid } from '@chakra-ui/react';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
+import { useFormText } from '@/config/translations/form-text';
 import type { LoggingFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -16,6 +17,7 @@ const schema = z.object({
 type Input = z.infer<typeof schema>;
 
 export const useLoggingFeature: UseFormRender<LoggingFeature> = (data: LoggingFeature, onSubmit: (data: string) => Promise<any>) => {
+  const ft = useFormText();
   const { reset, handleSubmit, formState, control } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -32,29 +34,29 @@ export const useLoggingFeature: UseFormRender<LoggingFeature> = (data: LoggingFe
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
         <ChannelSelectForm
           control={{
-            label: 'Punishment Log Channel',
-            description: 'Bans, kicks, mutes, warns and filtered messages',
+            label: ft('Punishment Log Channel'),
+            description: ft('Bans, kicks, mutes, warns and filtered messages'),
           }}
           controller={{ control, name: 'logChannel' }}
         />
         <ChannelSelectForm
           control={{
-            label: 'Command Usage Log Channel',
-            description: 'Logs every bot command that is run',
+            label: ft('Command Usage Log Channel'),
+            description: ft('Logs every bot command that is run'),
           }}
           controller={{ control, name: 'usageChannel' }}
         />
         <ChannelSelectForm
           control={{
-            label: 'Message Log Channel',
-            description: 'Edited and deleted messages',
+            label: ft('Message Log Channel'),
+            description: ft('Edited and deleted messages'),
           }}
           controller={{ control, name: 'messagesChannel' }}
         />
         <ChannelSelectForm
           control={{
-            label: 'Leave Log Channel',
-            description: 'Notifications when a member leaves',
+            label: ft('Leave Log Channel'),
+            description: ft('Notifications when a member leaves'),
           }}
           controller={{ control, name: 'leaveChannel' }}
         />

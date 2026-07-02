@@ -35,6 +35,7 @@ import {
   MdRule,
 } from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
+import { useFormText } from '@/config/translations/form-text';
 import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -81,6 +82,7 @@ function normalizeDomains(raw: string): string[] {
 }
 
 function DomainsInput({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const ft = useFormText();
   const [input, setInput] = useState('');
   const add = (raw: string) => {
     onChange(Array.from(new Set([...value, ...normalizeDomains(raw)])).sort());
@@ -103,7 +105,7 @@ function DomainsInput({ value, onChange }: { value: string[]; onChange: (next: s
       <Input
         variant="main"
         value={input}
-        placeholder="e.g. youtube.com — press Enter to add"
+        placeholder={ft('e.g. youtube.com — press Enter to add')}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ',') {
@@ -216,6 +218,7 @@ function defaultsFrom(data: Partial<AutomodFeature>): Input {
 }
 
 export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit) => {
+  const ft = useFormText();
   const { reset, handleSubmit, control, formState, watch, setValue, register } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -229,26 +232,26 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
   return {
     component: (
       <Flex direction="column" gap={3}>
-        <Text fontWeight="600">Content filter</Text>
+        <Text fontWeight="600">{ft('Content filter')}</Text>
         <ToggleRule
           icon={MdGroupAdd}
-          title="Block invite links"
-          description="Delete messages containing Discord invite links (discord.gg/…)."
+          title={ft('Block invite links')}
+          description={ft('Delete messages containing Discord invite links (discord.gg/…).')}
           checked={watch('blockInvites')}
           onChange={(v) => setValue('blockInvites', v, { shouldDirty: true })}
         />
         <ToggleRule
           icon={MdLink}
-          title="Block external links"
-          description="Delete messages that contain links, except to the allowed domains below."
+          title={ft('Block external links')}
+          description={ft('Delete messages that contain links, except to the allowed domains below.')}
           checked={blockLinks}
           onChange={(v) => setValue('blockLinks', v, { shouldDirty: true })}
         />
         {blockLinks && (
           <FormCardController
             control={{
-              label: 'Allowed domains',
-              description: 'Links to these domains (and their subdomains) are allowed.',
+              label: ft('Allowed domains'),
+              description: ft('Links to these domains (and their subdomains) are allowed.'),
             }}
             controller={{ control, name: 'allowedDomains' }}
             render={({ field }) => <DomainsInput value={field.value ?? []} onChange={field.onChange} />}
@@ -256,22 +259,22 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
         )}
         <ToggleRule
           icon={MdCampaign}
-          title="Block @everyone / @here"
-          description="Delete messages that mention @everyone or @here."
+          title={ft('Block @everyone / @here')}
+          description={ft('Delete messages that mention @everyone or @here.')}
           checked={watch('blockMassMentions')}
           onChange={(v) => setValue('blockMassMentions', v, { shouldDirty: true })}
         />
 
         <Divider my={1} />
 
-        <Text fontWeight="600">Anti-spam &amp; mentions</Text>
+        <Text fontWeight="600">{ft('Anti-spam & mentions')}</Text>
         <Text fontSize="sm" color="TextSecondary">
-          These limits run whenever AutoMod is enabled. Tune the thresholds to fit your server.
+          {ft('These limits run whenever AutoMod is enabled. Tune the thresholds to fit your server.')}
         </Text>
         <NumberRule
           icon={MdShield}
-          title="Spam message threshold"
-          description="Messages within the window that trigger a 10-minute timeout."
+          title={ft('Spam message threshold')}
+          description={ft('Messages within the window that trigger a 10-minute timeout.')}
           value={watch('spamCount')}
           onChange={(v) => setValue('spamCount', v, { shouldDirty: true })}
           min={3}
@@ -279,8 +282,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
         />
         <NumberRule
           icon={MdTimer}
-          title="Spam window (seconds)"
-          description="Time window the spam threshold is measured over."
+          title={ft('Spam window (seconds)')}
+          description={ft('Time window the spam threshold is measured over.')}
           value={watch('spamWindow')}
           onChange={(v) => setValue('spamWindow', v, { shouldDirty: true })}
           min={1}
@@ -288,8 +291,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
         />
         <NumberRule
           icon={MdAlternateEmail}
-          title="Mention limit"
-          description="Delete a message with more than this many user/role mentions."
+          title={ft('Mention limit')}
+          description={ft('Delete a message with more than this many user/role mentions.')}
           value={watch('mentionLimit')}
           onChange={(v) => setValue('mentionLimit', v, { shouldDirty: true })}
           min={3}
@@ -298,11 +301,11 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
 
         <Divider my={1} />
 
-        <Text fontWeight="600">Strike system</Text>
+        <Text fontWeight="600">{ft('Strike system')}</Text>
         <ToggleRule
           icon={MdGavel}
-          title="Enable strikes"
-          description="Every AutoMod violation adds a strike; crossing a threshold escalates the punishment."
+          title={ft('Enable strikes')}
+          description={ft('Every AutoMod violation adds a strike; crossing a threshold escalates the punishment.')}
           checked={strikesEnabled}
           onChange={(v) => setValue('strikesEnabled', v, { shouldDirty: true })}
         />
@@ -310,8 +313,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
           <>
             <NumberRule
               icon={MdTimer}
-              title="Strike expiry (hours)"
-              description="Strikes older than this stop counting. 0 = never expire."
+              title={ft('Strike expiry (hours)')}
+              description={ft('Strikes older than this stop counting. 0 = never expire.')}
               value={watch('strikeExpiryHours')}
               onChange={(v) => setValue('strikeExpiryHours', v, { shouldDirty: true })}
               min={0}
@@ -319,8 +322,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             />
             <NumberRule
               icon={MdShield}
-              title="Mute at (strikes)"
-              description="Timeout the member for 10 minutes at this many strikes. 0 = off."
+              title={ft('Mute at (strikes)')}
+              description={ft('Timeout the member for 10 minutes at this many strikes. 0 = off.')}
               value={watch('strikeMuteAt')}
               onChange={(v) => setValue('strikeMuteAt', v, { shouldDirty: true })}
               min={0}
@@ -328,8 +331,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             />
             <NumberRule
               icon={MdGroupAdd}
-              title="Kick at (strikes)"
-              description="Kick the member at this many strikes. 0 = off."
+              title={ft('Kick at (strikes)')}
+              description={ft('Kick the member at this many strikes. 0 = off.')}
               value={watch('strikeKickAt')}
               onChange={(v) => setValue('strikeKickAt', v, { shouldDirty: true })}
               min={0}
@@ -337,8 +340,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             />
             <NumberRule
               icon={MdGavel}
-              title="Ban at (strikes)"
-              description="Ban the member at this many strikes. 0 = off."
+              title={ft('Ban at (strikes)')}
+              description={ft('Ban the member at this many strikes. 0 = off.')}
               value={watch('strikeBanAt')}
               onChange={(v) => setValue('strikeBanAt', v, { shouldDirty: true })}
               min={0}
@@ -351,10 +354,11 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
 
         <Flex align="center" justify="space-between" gap={2}>
           <Box>
-            <Text fontWeight="600">Custom filters (regex)</Text>
+            <Text fontWeight="600">{ft('Custom filters (regex)')}</Text>
             <Text fontSize="sm" color="TextSecondary">
-              Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on).
-              Up to 25 rules.
+              {ft(
+                'Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on). Up to 25 rules.'
+              )}
             </Text>
           </Box>
           <Button
@@ -364,7 +368,7 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             isDisabled={fields.length >= 25}
             flexShrink={0}
           >
-            Add rule
+            {ft('Add rule')}
           </Button>
         </Flex>
         {fields.length === 0 ? (
@@ -379,7 +383,7 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             color="TextSecondary"
           >
             <Icon as={MdRule} fontSize="xl" />
-            <Text fontSize="sm">No custom filters yet.</Text>
+            <Text fontSize="sm">{ft('No custom filters yet.')}</Text>
           </Flex>
         ) : (
           fields.map((f, i) => (
@@ -403,12 +407,12 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
                 variant="main"
                 flex={1}
                 minW="180px"
-                placeholder="regex pattern, e.g. free\s*nitro"
+                placeholder={ft('regex pattern, e.g. free\\s*nitro')}
                 {...register(`rules.${i}.pattern`)}
               />
               <Select variant="main" w="130px" flexShrink={0} {...register(`rules.${i}.action`)}>
-                <option value="delete">Delete</option>
-                <option value="strike">Strike</option>
+                <option value="delete">{ft('Delete')}</option>
+                <option value="strike">{ft('Strike')}</option>
               </Select>
               <IconButton
                 aria-label="Remove rule"
@@ -424,8 +428,9 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
         )}
 
         <Text fontSize="sm" color="TextSecondary">
-          Members with “Manage Messages” bypass all AutoMod rules. Actions are recorded in your
-          punishment log when the Logging feature is enabled.
+          {ft(
+            'Members with “Manage Messages” bypass all AutoMod rules. Actions are recorded in your punishment log when the Logging feature is enabled.'
+          )}
         </Text>
       </Flex>
     ),

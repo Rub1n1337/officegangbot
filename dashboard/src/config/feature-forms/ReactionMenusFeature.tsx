@@ -8,6 +8,7 @@ import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
 import { TextAreaForm } from '@/components/forms/TextAreaForm';
 import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
+import { useFormText } from '@/config/translations/form-text';
 import type { ReactionMenusFeature, ReactionMenuConfig } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -40,16 +41,17 @@ function toFormMenus(menus: ReactionMenuConfig[] | undefined) {
 
 // The emoji->role rows for a single menu (nested field array).
 function MenuRoles({ control, menuIndex }: { control: Control<Input>; menuIndex: number }) {
+  const ft = useFormText();
   const { fields, append, remove } = useFieldArray({ control, name: `menus.${menuIndex}.items` });
   return (
     <Box>
       <Text fontSize="sm" fontWeight="600" mb={2}>
-        Roles
+        {ft('Roles')}
       </Text>
       <Flex direction="column" gap={2}>
         {fields.length === 0 && (
           <Text fontSize="sm" color="TextSecondary">
-            No roles yet. Add an emoji → role pair below.
+            {ft('No roles yet. Add an emoji → role pair below.')}
           </Text>
         )}
         {fields.map((field, i) => (
@@ -86,13 +88,14 @@ function MenuRoles({ control, menuIndex }: { control: Control<Input>; menuIndex:
         mt={2}
         onClick={() => append({ emoji: '✅', roleId: undefined as unknown as string })}
       >
-        Add role
+        {ft('Add role')}
       </Button>
     </Box>
   );
 }
 
 export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (data, onSubmit) => {
+  const ft = useFormText();
   const { register, reset, handleSubmit, formState, control } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -106,7 +109,7 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
       <Flex direction="column" gap={3}>
         {fields.length === 0 && (
           <Text color="TextSecondary">
-            No role menus yet. Add one and the bot will post an embed members can react to for roles.
+            {ft('No role menus yet. Add one and the bot will post an embed members can react to for roles.')}
           </Text>
         )}
         {fields.map((field, index) => (
@@ -130,27 +133,27 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
             </Flex>
             <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
               <ChannelSelectForm
-                control={{ label: 'Channel', description: 'Where the menu message is posted' }}
+                control={{ label: ft('Channel'), description: ft('Where the menu message is posted') }}
                 controller={{ control, name: `menus.${index}.channelId` }}
               />
               <InputForm
                 control={{
-                  label: 'Title',
-                  description: 'Heading of the menu embed',
+                  label: ft('Title'),
+                  description: ft('Heading of the menu embed'),
                   error: formState.errors.menus?.[index]?.title?.message,
                 }}
-                placeholder="Pick your roles"
+                placeholder={ft('Pick your roles')}
                 {...register(`menus.${index}.title`)}
               />
             </SimpleGrid>
             <Box mt={3}>
               <TextAreaForm
                 control={{
-                  label: 'Description',
-                  description: 'Shown above the role list (optional).',
+                  label: ft('Description'),
+                  description: ft('Shown above the role list (optional).'),
                   error: formState.errors.menus?.[index]?.description?.message,
                 }}
-                placeholder="React below to choose your roles."
+                placeholder={ft('React below to choose your roles.')}
                 {...register(`menus.${index}.description`)}
               />
             </Box>
@@ -166,7 +169,7 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
             append({ id: null, channelId: undefined, title: 'Role Menu', description: '', items: [] })
           }
         >
-          Add menu
+          {ft('Add menu')}
         </Button>
       </Flex>
     ),

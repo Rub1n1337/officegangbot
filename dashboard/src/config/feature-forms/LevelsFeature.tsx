@@ -18,6 +18,7 @@ import { MdAdd, MdDelete, MdMic, MdBolt } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
+import { useFormText } from '@/config/translations/form-text';
 import type { LevelsFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -69,6 +70,7 @@ function defaultsFrom(data: Partial<LevelsFeature>): Input {
 }
 
 export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) => {
+  const ft = useFormText();
   const { register, reset, handleSubmit, formState, control, watch, setValue } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -95,10 +97,10 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
         <Box bg="CardBackground" rounded="2xl" p={4}>
           <Flex justify="space-between" align="center" mb={2}>
             <Text fontWeight="600" fontSize="sm">
-              How <Text as="span" color="Brand">/rank</Text> looks to members
+              {ft('How')} <Text as="span" color="Brand">/rank</Text> {ft('looks to members')}
             </Text>
             <Badge colorScheme="purple" rounded="md">
-              Season {season}
+              {ft('Season')} {season}
             </Badge>
           </Flex>
           <Progress value={62} size="sm" rounded="full" colorScheme="purple" />
@@ -109,9 +111,10 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
 
         <ChannelSelectForm
           control={{
-            label: 'Level-up announcement channel',
-            description:
-              'Where to post when a member levels up. Leave unset to announce in the channel they were chatting in.',
+            label: ft('Level-up announcement channel'),
+            description: ft(
+              'Where to post when a member levels up. Leave unset to announce in the channel they were chatting in.'
+            ),
           }}
           controller={{ control, name: 'channel' }}
         />
@@ -141,9 +144,9 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
             <Icon as={MdMic} fontSize="xl" />
           </Flex>
           <Box flex={1} minW={0}>
-            <Text fontWeight="600">Voice XP</Text>
+            <Text fontWeight="600">{ft('Voice XP')}</Text>
             <Text fontSize="sm" color="TextSecondary">
-              Award XP every minute to members active in a voice channel (not alone, not deafened).
+              {ft('Award XP every minute to members active in a voice channel (not alone, not deafened).')}
             </Text>
           </Box>
           <Switch
@@ -155,8 +158,8 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
         {voiceEnabled && (
           <InputForm
             control={{
-              label: 'Voice XP per minute',
-              description: 'Base XP granted each minute in voice (before multipliers).',
+              label: ft('Voice XP per minute'),
+              description: ft('Base XP granted each minute in voice (before multipliers).'),
               error: formState.errors.voiceXpPerMin?.message,
             }}
             type="number"
@@ -173,17 +176,17 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
         <Box>
           <Flex align="center" gap={2}>
             <Icon as={MdBolt} color="Brand" />
-            <Text fontWeight="600">XP multipliers</Text>
+            <Text fontWeight="600">{ft('XP multipliers')}</Text>
           </Flex>
           <Text fontSize="sm" color="TextSecondary">
-            A member&apos;s XP is multiplied by the global value times their best role multiplier.
+            {ft("A member's XP is multiplied by the global value times their best role multiplier.")}
           </Text>
         </Box>
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
           <InputForm
             control={{
-              label: 'Global multiplier',
-              description: 'Applies to all XP (e.g. 2 for a double-XP weekend). 0.1–10.',
+              label: ft('Global multiplier'),
+              description: ft('Applies to all XP (e.g. 2 for a double-XP weekend). 0.1–10.'),
               error: formState.errors.xpMultiplier?.message,
             }}
             type="number"
@@ -195,8 +198,8 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
           />
           <InputForm
             control={{
-              label: 'Prestige level',
-              description: 'Members can /prestige at this level. 0 disables prestige.',
+              label: ft('Prestige level'),
+              description: ft('Members can /prestige at this level. 0 disables prestige.'),
               error: formState.errors.prestigeLevel?.message,
             }}
             type="number"
@@ -210,7 +213,7 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
         <Box>
           <Flex justify="space-between" align="center">
             <Text fontWeight="600" fontSize="sm">
-              Per-role multipliers
+              {ft('Per-role multipliers')}
             </Text>
             <Button
               size="sm"
@@ -219,11 +222,11 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
               onClick={() => appendMult({ roleId: undefined as unknown as string, multiplier: 2 })}
               isDisabled={multFields.length >= 50}
             >
-              Add role
+              {ft('Add role')}
             </Button>
           </Flex>
           <Text fontSize="sm" color="TextSecondary">
-            Give boosters or supporters bonus XP.
+            {ft('Give boosters or supporters bonus XP.')}
           </Text>
         </Box>
         <Flex direction="column" gap={3}>
@@ -248,13 +251,13 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
               </Flex>
               <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
                 <RoleSelectForm
-                  control={{ label: 'Role', description: 'Members with this role' }}
+                  control={{ label: ft('Role'), description: ft('Members with this role') }}
                   controller={{ control, name: `roleMultipliers.${index}.roleId` }}
                 />
                 <InputForm
                   control={{
-                    label: 'Multiplier',
-                    description: '0.1–10 (e.g. 2 = double XP)',
+                    label: ft('Multiplier'),
+                    description: ft('0.1–10 (e.g. 2 = double XP)'),
                     error: formState.errors.roleMultipliers?.[index]?.multiplier?.message,
                   }}
                   type="number"
@@ -272,15 +275,15 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
         <Divider />
 
         <Box>
-          <Text fontWeight="600">Role rewards</Text>
+          <Text fontWeight="600">{ft('Role rewards')}</Text>
           <Text fontSize="sm" color="TextSecondary">
-            Automatically grant a role when a member reaches a level.
+            {ft('Automatically grant a role when a member reaches a level.')}
           </Text>
         </Box>
 
         <Flex direction="column" gap={3}>
           {rewardFields.length === 0 && (
-            <Text color="TextSecondary">No role rewards yet. Add one below.</Text>
+            <Text color="TextSecondary">{ft('No role rewards yet. Add one below.')}</Text>
           )}
           {rewardFields.map((field, index) => (
             <Box
@@ -305,8 +308,8 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
               <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
                 <InputForm
                   control={{
-                    label: 'Level',
-                    description: 'Reach this level to earn the role',
+                    label: ft('Level'),
+                    description: ft('Reach this level to earn the role'),
                     error: formState.errors.rewards?.[index]?.level?.message,
                   }}
                   type="number"
@@ -316,8 +319,8 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
                 />
                 <RoleSelectForm
                   control={{
-                    label: 'Role',
-                    description: 'Role to grant at this level',
+                    label: ft('Role'),
+                    description: ft('Role to grant at this level'),
                   }}
                   controller={{ control, name: `rewards.${index}.roleId` }}
                 />
@@ -330,14 +333,14 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
             alignSelf="flex-start"
             onClick={() => appendReward({ level: 1, roleId: undefined as unknown as string })}
           >
-            Add reward
+            {ft('Add reward')}
           </Button>
         </Flex>
 
         <Text fontSize="sm" color="TextSecondary">
-          End the current season with <Text as="span" color="Brand">/season_reset</Text> — standings
-          are archived (see <Text as="span" color="Brand">/seasons</Text>) and everyone&apos;s XP
-          resets, keeping prestige.
+          {ft('End the current season with')} <Text as="span" color="Brand">/season_reset</Text>{' '}
+          {ft('— standings are archived (see')} <Text as="span" color="Brand">/seasons</Text>{' '}
+          {ft(") and everyone's XP resets, keeping prestige.")}
         </Text>
       </Flex>
     ),

@@ -31,16 +31,18 @@ import { useRouter } from 'next/router';
 import { useGuildRolesQuery } from '@/api/hooks';
 import { toRGB } from '@/utils/common';
 import type { Role } from '@/api/bot';
+import { useFormText } from '@/config/translations/form-text';
 import type { ReactionRoleFeature, ReactionRoleItem } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
 // A small "React [emoji] → get @Role" line so admins can sanity-check each rule.
 function RolePill({ roleId, roles }: { roleId?: string; roles: Role[] }) {
+  const ft = useFormText();
   const role = roleId ? roles.find((r) => r.id === roleId) : undefined;
   if (!role) {
     return (
       <Text as="span" color="TextSecondary">
-        a role
+        {ft('a role')}
       </Text>
     );
   }
@@ -78,6 +80,7 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
   data: ReactionRoleFeature,
   onSubmit: (data: string) => Promise<any>
 ) => {
+  const ft = useFormText();
   const { register, reset, handleSubmit, formState, control, watch } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -101,7 +104,7 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
       <Flex direction="column" gap={3}>
         {fields.length === 0 && (
           <Text color="TextSecondary">
-            No reaction roles yet. Add one to grant a role when a member reacts to a message.
+            {ft('No reaction roles yet. Add one to grant a role when a member reacts to a message.')}
           </Text>
         )}
         {fields.map((field, index) => (
@@ -129,13 +132,13 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
             </Flex>
             <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
               <ChannelSelectForm
-                control={{ label: 'Channel', description: 'Channel containing the message' }}
+                control={{ label: ft('Channel'), description: ft('Channel containing the message') }}
                 controller={{ control, name: `items.${index}.channelId` }}
               />
               <InputForm
                 control={{
-                  label: 'Message ID',
-                  description: 'Developer Mode → right-click the message → Copy Message ID.',
+                  label: ft('Message ID'),
+                  description: ft('Developer Mode → right-click the message → Copy Message ID.'),
                   error: formState.errors.items?.[index]?.messageId?.message,
                 }}
                 placeholder="123456789012345678"
@@ -143,21 +146,21 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
               />
               <EmojiPickerInput
                 control={{
-                  label: 'Emoji',
-                  description: 'Emoji members react with',
+                  label: ft('Emoji'),
+                  description: ft('Emoji members react with'),
                 }}
                 controller={{ control, name: `items.${index}.emoji` }}
                 placeholder="✅"
               />
               <RoleSelectForm
-                control={{ label: 'Role', description: 'Role to grant on reaction' }}
+                control={{ label: ft('Role'), description: ft('Role to grant on reaction') }}
                 controller={{ control, name: `items.${index}.roleId` }}
               />
             </SimpleGrid>
             <Flex mt={3} align="center" gap={2} fontSize="sm" color="TextSecondary" wrap="wrap">
-              <Text>Preview: React</Text>
+              <Text>{ft('Preview: React')}</Text>
               <EmojiPreview emoji={watch(`items.${index}.emoji`)} />
-              <Text>→ get</Text>
+              <Text>{ft('→ get')}</Text>
               <RolePill roleId={watch(`items.${index}.roleId`)} roles={roles} />
             </Flex>
           </Box>
@@ -168,7 +171,7 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
           alignSelf="flex-start"
           onClick={() => append({ channelId: undefined, messageId: '', emoji: '✅', roleId: undefined })}
         >
-          Add reaction role
+          {ft('Add reaction role')}
         </Button>
       </Flex>
     ),

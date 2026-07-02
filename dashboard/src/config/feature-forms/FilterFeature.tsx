@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { useState } from 'react';
 import { Box, Flex, Input, SimpleGrid, Tag, TagCloseButton, TagLabel, Text } from '@chakra-ui/react';
 import { FormCardController } from '@/components/forms/Form';
+import { useFormText } from '@/config/translations/form-text';
 import type { FilterFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -25,6 +26,7 @@ function normalize(raw: string): string[] {
 // Tag/chip input: type a word and press Enter (or comma) to add it as a removable
 // chip. Backspace on an empty field removes the last word.
 function WordTagsInput({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const ft = useFormText();
   const [input, setInput] = useState('');
 
   const add = (raw: string) => {
@@ -49,7 +51,7 @@ function WordTagsInput({ value, onChange }: { value: string[]; onChange: (next: 
       <Input
         variant="main"
         value={input}
-        placeholder="Type a word and press Enter"
+        placeholder={ft('Type a word and press Enter')}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ',') {
@@ -72,6 +74,7 @@ export const useFilterFeature: UseFormRender<FilterFeature> = (
   data: FilterFeature,
   onSubmit: (data: string) => Promise<any>
 ) => {
+  const ft = useFormText();
   const { reset, handleSubmit, control, formState } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -85,9 +88,8 @@ export const useFilterFeature: UseFormRender<FilterFeature> = (
       <SimpleGrid columns={1} gap={3}>
         <FormCardController
           control={{
-            label: 'Filtered Words',
-            description:
-              'Words to automatically delete. Case-insensitive; duplicates are removed.',
+            label: ft('Filtered Words'),
+            description: ft('Words to automatically delete. Case-insensitive; duplicates are removed.'),
           }}
           controller={{ control, name: 'words' }}
           render={({ field }) => (
