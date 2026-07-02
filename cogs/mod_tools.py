@@ -74,6 +74,10 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.CommandNotFound):
             return
+        if isinstance(error, commands.CommandOnCooldown):
+            return await reply(
+                ctx, f"⏳ Slow down — try again in {error.retry_after:.0f}s.", ephemeral=True
+            )
         if isinstance(error, commands.BotMissingPermissions):
             perms = ', '.join(error.missing_permissions)
             return await reply(ctx, f"❌ I'm missing permissions: {perms}", ephemeral=True)
@@ -231,6 +235,7 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
     @commands.hybrid_command(name="massban", description="Ban multiple users by ID/mention (max 20).")
     @app_commands.describe(users="User IDs or mentions, space/comma separated.", reason="Reason for the bans.")
     @commands.bot_has_permissions(ban_members=True)
+    @commands.cooldown(1, 30, commands.BucketType.guild)
     @has_permission("ban")
     async def massban(self, ctx: commands.Context, users: str, *, reason: str = "Mass ban"):
         ids = parse_id_list(users, limit=MAX_BULK)
@@ -268,6 +273,7 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
         users="User IDs or mentions, space/comma separated.",
     )
     @commands.bot_has_permissions(manage_roles=True)
+    @commands.cooldown(1, 30, commands.BucketType.guild)
     @has_permission("config")
     async def massrole(
         self, ctx: commands.Context, action: Literal["add", "remove"], role: discord.Role, users: str

@@ -9,6 +9,21 @@ export const config = {
 
 const botApiUrl = process.env.BOT_API_URL ?? 'http://localhost:8000';
 
+// In production the proxy forwards the X-API-Key and X-Actor-* headers to the
+// bot API, so that hop must be TLS. Warn loudly if it's plain http to a non-local
+// host (a misconfigured BOT_API_URL) — those secrets would otherwise travel in
+// the clear.
+if (
+  process.env.NODE_ENV === 'production' &&
+  botApiUrl.startsWith('http://') &&
+  !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(botApiUrl)
+) {
+  console.error(
+    `[bot-proxy] BOT_API_URL is plain http (${botApiUrl}) in production — the API ` +
+      `key and actor headers are sent unencrypted. Use an https:// URL.`
+  );
+}
+
 const ADMINISTRATOR = BigInt(1 << 3); // Discord ADMINISTRATOR permission flag
 
 // Short-lived cache of a user's admin guild ids, keyed by access token, to

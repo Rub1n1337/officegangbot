@@ -81,10 +81,27 @@ async def shutdown():
     if _redis:
         await _redis.close()
 
+def _is_production() -> bool:
+    """True when running on Railway (or an explicit ENVIRONMENT=production)."""
+    env = (os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT_NAME") or "").lower()
+    return env == "production" or bool(os.getenv("RAILWAY_ENVIRONMENT_NAME"))
+
+
 def _dashboard_origins() -> list[str]:
-    raw = os.getenv("DASHBOARD_URL", "http://localhost:3000")
+    raw = os.getenv("DASHBOARD_URL", "").strip()
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return origins or ["http://localhost:3000"]
+    if origins:
+        return origins
+    # No DASHBOARD_URL configured. In production, don't silently allow localhost —
+    # deny cross-origin entirely (the API is still reachable via the server-side
+    # proxy, which uses X-API-Key, not CORS). Locally, keep the dev default.
+    if _is_production():
+        logger.error(
+            "DASHBOARD_URL is not set in production — refusing to allow any CORS "
+            "origin. Set DASHBOARD_URL to the dashboard's URL."
+        )
+        return []
+    return ["http://localhost:3000"]
 
 
 # Allow the configured dashboard origin only.
