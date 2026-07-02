@@ -218,9 +218,20 @@ export type LevelRewardItem = {
   roleId?: string | null;
 };
 
+export type LevelMultiplierItem = {
+  roleId?: string | null;
+  multiplier: number;
+};
+
 export type LevelsFeature = {
   channel?: string | null;
   rewards: LevelRewardItem[];
+  voiceXpEnabled: boolean;
+  voiceXpPerMin: number;
+  xpMultiplier: number;
+  prestigeLevel: number;
+  season: number;
+  roleMultipliers: LevelMultiplierItem[];
 };
 
 export type RulesFeature = {

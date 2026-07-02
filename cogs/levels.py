@@ -4,9 +4,12 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
+from core.leveling import effective_multiplier, apply_multiplier, can_prestige
 from .utils import reply, send_paginated
+from .mod_tools import ConfirmView
 from core.i18n import t
 from typing import Optional
+import json
 import random
 import datetime
 import asyncio
@@ -62,6 +65,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         # Fallback cooldown tracking if Redis unavailable
         self._xp_cooldowns: dict = {}
         self.flush_xp_cache.start()
+        self.award_voice_xp.start()
 
     async def _get_user_data(self, guild_id: int, user_id: int) -> dict:
         """Returns XP data from Redis cache, falling back to PostgreSQL."""
@@ -75,7 +79,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         if self.bot.db:
             data = await self.bot.db.get_user_xp(guild_id, user_id)
         else:
-            data = {'xp': 0, 'level': 0, 'display_name': None}
+            data = {'xp': 0, 'level': 0, 'display_name': None, 'prestige': 0}
 
         # Populate Redis cache
         if self.bot.redis and data:
@@ -138,46 +142,97 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                 return
             guild_cooldowns[user_id] = now
 
-        # Award XP with lock to prevent race conditions
-        xp_gain = random.randint(15, 25)
+        # Award XP (base per-message roll, then multipliers applied in _grant_xp).
+        await self._grant_xp(message.guild, message.author, random.randint(15, 25),
+                             notify_channel=message.channel)
+
+    async def _grant_xp(self, guild: discord.Guild, member: discord.Member,
+                        base_amount: int, notify_channel=None):
+        """Awards XP to a member (message or voice), applying the guild's global
+        and per-role multipliers, then handles level-up announcement and role
+        rewards. `notify_channel` is the fallback announce channel when no
+        level-up channel is configured (message channel for chat; None for voice)."""
+        if base_amount <= 0:
+            return
+        guild_id = guild.id
+        lc = await self.bot.db.get_levels_config(guild_id)
+        role_mults = [lc["role_multipliers"][r.id] for r in member.roles if r.id in lc["role_multipliers"]]
+        mult = effective_multiplier(lc["xp_multiplier"], role_mults)
+        xp_gain = apply_multiplier(base_amount, mult)
+        if xp_gain <= 0:
+            return
+
         async with self._xp_lock:
-            user_data = await self._get_user_data(guild_id, user_id)
+            user_data = await self._get_user_data(guild_id, member.id)
             old_level = user_data['level']
             user_data['xp'] += xp_gain
             new_level = get_level_from_xp(user_data['xp'])
             user_data['level'] = new_level
-            # Save username for leaderboard display even after user leaves
-            user_data['display_name'] = message.author.display_name
-            self._save_user_data(guild_id, user_id, user_data)
-            # Update Redis cache immediately
+            # Save username for leaderboard display even after the user leaves.
+            user_data['display_name'] = member.display_name
+            self._save_user_data(guild_id, member.id, user_data)
             if self.bot.redis:
-                await self.bot.redis.set_xp_data(guild_id, user_id, user_data)
+                await self.bot.redis.set_xp_data(guild_id, member.id, user_data)
 
-        # Level up notification
         if new_level > old_level:
-            level_up_channel_id = await self.bot.db.get_guild_setting(
-                guild_id, 'level_up_channel_id'
-            )
-            channel = (
-                message.guild.get_channel(int(level_up_channel_id))
-                if level_up_channel_id
-                else message.channel
-            )
-            if channel:
-                loc = await self.bot.db.get_locale(guild_id)
-                embed = discord.Embed(
-                    title=t(loc, "levelup.title"),
-                    description=t(loc, "levelup.desc", mention=message.author.mention, level=new_level),
-                    color=discord.Color.gold()
-                )
-                embed.set_thumbnail(url=message.author.display_avatar.url)
-                try:
-                    await channel.send(embed=embed)
-                except discord.Forbidden:
-                    pass
+            await self._announce_level_up(guild, member, new_level, notify_channel)
+            await self._check_role_rewards(member, new_level)
 
-            # Check and assign role rewards
-            await self._check_role_rewards(message.author, new_level)
+    async def _announce_level_up(self, guild: discord.Guild, member: discord.Member,
+                                 new_level: int, fallback_channel=None):
+        """Posts the level-up embed to the configured level-up channel, or the
+        fallback channel (the message's channel) when none is set."""
+        level_up_channel_id = await self.bot.db.get_guild_setting(guild.id, 'level_up_channel_id')
+        channel = guild.get_channel(int(level_up_channel_id)) if level_up_channel_id else fallback_channel
+        if not channel:
+            return
+        loc = await self.bot.db.get_locale(guild.id)
+        embed = discord.Embed(
+            title=t(loc, "levelup.title"),
+            description=t(loc, "levelup.desc", mention=member.mention, level=new_level),
+            color=discord.Color.gold()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        try:
+            await channel.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
+    @tasks.loop(seconds=60)
+    async def award_voice_xp(self):
+        """Awards voice XP once a minute to members actively in a voice channel
+        (not alone, not deafened, not in the AFK channel)."""
+        try:
+            if not self.bot.db:
+                return
+            for guild in list(self.bot.guilds):
+                try:
+                    enabled = await self.bot.db.get_enabled_features(guild.id)
+                    if "levels" not in enabled:
+                        continue
+                    lc = await self.bot.db.get_levels_config(guild.id)
+                    if not lc["voice_xp_enabled"] or lc["voice_xp_per_min"] <= 0:
+                        continue
+                    afk_id = guild.afk_channel.id if guild.afk_channel else None
+                    for vc in guild.voice_channels:
+                        if vc.id == afk_id:
+                            continue
+                        humans = [m for m in vc.members if not m.bot]
+                        if len(humans) < 2:  # no XP for sitting alone
+                            continue
+                        for m in humans:
+                            vs = m.voice
+                            if vs is None or vs.self_deaf or vs.deaf:
+                                continue
+                            await self._grant_xp(guild, m, lc["voice_xp_per_min"], notify_channel=None)
+                except Exception as e:
+                    logger.error(f"Voice XP for guild {guild.id} failed: {e}")
+        except Exception as e:
+            logger.error(f"award_voice_xp crashed: {e}", exc_info=True)
+
+    @award_voice_xp.before_loop
+    async def before_voice_xp(self):
+        await self.bot.wait_until_ready()
 
     @commands.hybrid_command(name="rank", description="Shows the rank and XP of a member.")
     @app_commands.describe(member="Member to check. Defaults to yourself.")
@@ -198,9 +253,12 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             title=t(loc, "rank.title", member=member.display_name),
             color=discord.Color.gold()
         )
+        prestige = user_data.get('prestige', 0)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name=t(loc, "rank.level"), value=f"**{level}**", inline=True)
         embed.add_field(name=t(loc, "rank.total_xp"), value=f"**{total_xp}** XP", inline=True)
+        if prestige:
+            embed.add_field(name=t(loc, "rank.prestige"), value="⭐ " * min(prestige, 5) + f"**{prestige}**", inline=True)
         embed.add_field(
             name=t(loc, "rank.progress"),
             value=f"{progress_bar}\n`{xp_so_far} / {xp_needed} XP`",
@@ -241,6 +299,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         per_page = 10
         total_pages = (len(rows) + per_page - 1) // per_page
         pages = []
+        season = (await self.bot.db.get_levels_config(ctx.guild.id))["season"]
 
         for page in range(total_pages):
             chunk = rows[page * per_page:(page + 1) * per_page]
@@ -249,13 +308,16 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                 rank = page * per_page + offset
                 member = ctx.guild.get_member(row['user_id'])
                 name = member.display_name if member else (row.get('display_name') or f"User {row['user_id']}")
+                prestige = row.get('prestige', 0)
+                if prestige:
+                    name = "⭐" * min(prestige, 5) + " " + name
                 medal = medals[rank] if rank < 3 else f"`#{rank + 1}`"
                 description += t(
                     loc, "leaderboard.row",
                     medal=medal, name=name, level=row['level'], xp=row['xp'],
                 ) + "\n"
             embed = discord.Embed(
-                title=t(loc, "leaderboard.title"),
+                title=t(loc, "leaderboard.title") + f" · {t(loc, 'leaderboard.season', season=season)}",
                 description=description,
                 color=discord.Color.gold(),
             )
@@ -266,6 +328,86 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             pages.append(embed)
 
         await send_paginated(ctx, pages)
+
+    @commands.hybrid_command(name="prestige", description="Prestige at the level cap: reset to level 0 for a prestige star.")
+    async def prestige(self, ctx: commands.Context):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+        lc = await self.bot.db.get_levels_config(ctx.guild.id)
+        data = await self._get_user_data(ctx.guild.id, ctx.author.id)
+        if not can_prestige(data['level'], lc['prestige_level']):
+            return await reply(ctx, t(loc, "prestige.too_low", level=lc['prestige_level']), ephemeral=True)
+
+        # Clear any buffered XP for this user before the DB reset so a pending
+        # flush can't restore the old total, then drop the Redis cache.
+        async with self._xp_lock:
+            buf = self._write_buffer.get(ctx.guild.id)
+            if buf:
+                buf.pop(str(ctx.author.id), None)
+        new_prestige = await self.bot.db.prestige_user(ctx.guild.id, ctx.author.id)
+        if self.bot.redis:
+            await self.bot.redis.delete_xp_data(ctx.guild.id, ctx.author.id)
+
+        embed = discord.Embed(
+            title=t(loc, "prestige.title"),
+            description=t(loc, "prestige.success", mention=ctx.author.mention, prestige=new_prestige),
+            color=discord.Color.purple(),
+        )
+        embed.set_thumbnail(url=ctx.author.display_avatar.url)
+        await reply(ctx, embed=embed)
+
+    @commands.hybrid_command(name="season_reset", description="End the current XP season: archive standings and reset everyone's XP.")
+    @has_permission("config")
+    async def season_reset(self, ctx: commands.Context):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+        view = ConfirmView(ctx.author.id)
+        await reply(ctx, t(loc, "season.confirm"), view=view, ephemeral=True)
+        await view.wait()
+        if not view.value:
+            return
+
+        standings = await self.bot.db.get_leaderboard(ctx.guild.id, limit=10)
+        standings_json = json.dumps([
+            {
+                "user_id": str(r['user_id']),
+                "name": r.get('display_name') or f"User {r['user_id']}",
+                "level": r['level'],
+                "xp": r['xp'],
+                "prestige": r.get('prestige', 0),
+            }
+            for r in standings
+        ])
+        # Drop buffered/cached XP for the guild so the reset actually sticks.
+        async with self._xp_lock:
+            self._write_buffer.pop(ctx.guild.id, None)
+            self._dirty_guilds.discard(ctx.guild.id)
+        new_season = await self.bot.db.reset_season(ctx.guild.id, standings_json)
+        if self.bot.redis:
+            await self.bot.redis.clear_guild_xp(ctx.guild.id)
+
+        await reply(ctx, t(loc, "season.reset_done", season=new_season), ephemeral=False)
+
+    @commands.hybrid_command(name="seasons", description="Show winners of past XP seasons.")
+    async def seasons(self, ctx: commands.Context):
+        loc = await self.bot.db.get_locale(ctx.guild.id)
+        rows = await self.bot.db.get_seasons(ctx.guild.id, limit=10)
+        if not rows:
+            return await reply(ctx, t(loc, "seasons.empty"), ephemeral=True)
+
+        medals = ["🥇", "🥈", "🥉"]
+        embed = discord.Embed(title=t(loc, "seasons.title"), color=discord.Color.gold())
+        for s in rows:
+            standings = s['standings']
+            if isinstance(standings, str):
+                try:
+                    standings = json.loads(standings)
+                except (ValueError, TypeError):
+                    standings = []
+            top = standings[:3] if isinstance(standings, list) else []
+            value = " · ".join(
+                f"{medals[i]} {w.get('name', '?')} (Lvl {w.get('level', 0)})" for i, w in enumerate(top)
+            ) or "—"
+            embed.add_field(name=t(loc, "seasons.season", season=s['season_number']), value=value, inline=False)
+        await reply(ctx, embed=embed)
 
 
 
@@ -327,6 +469,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
 
     def cog_unload(self):
         self.flush_xp_cache.cancel()
+        self.award_voice_xp.cancel()
         # Best-effort final flush on a graceful unload so buffered XP isn't lost
         # on a normal restart. Skipped if the pool is already closing/closed.
         pool = getattr(self.bot.db, "_pool", None) if self.bot.db else None
