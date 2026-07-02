@@ -43,14 +43,25 @@ export const client = new QueryClient({
   defaultOptions: {
     mutations: {
       retry: 0,
+      // Always attempt the request instead of pausing when React Query's
+      // onlineManager thinks we're offline (see queries.networkMode below).
+      networkMode: 'always',
     },
     queries: {
       refetchOnWindowFocus: false,
       // Reconnecting to the network (or the bot coming back) refetches stale data.
       refetchOnReconnect: true,
       staleTime: Infinity,
-      retry: 1,
+      retry: 2,
       retryDelay,
+      // Default 'online' mode pauses a query's retry (fetchStatus 'paused') when
+      // the onlineManager reports offline. On this always-online app that flag can
+      // fall out of sync (esp. after a transient 502 during the page-load burst),
+      // leaving the query stuck in 'loading'/'paused' forever — the feature form
+      // then shows its skeleton indefinitely with no error. 'always' never pauses:
+      // a failed request retries and then either succeeds or surfaces the error
+      // panel (with a Try again button) instead of hanging.
+      networkMode: 'always',
     },
   },
 });
