@@ -27,44 +27,79 @@ function pruneCache(cache: Map<string, { expires: number }>) {
   });
 }
 
+// In-flight Discord calls, so a burst of concurrent proxy requests (a page load
+// fires several /api/bot/* at once) shares ONE call instead of each hammering
+// Discord before the cache warms — that thundering herd got rate-limited (429),
+// getAdminGuildIds returned null, and the request 502'd (which then left the
+// dashboard query stuck loading).
+const adminGuildInflight = new Map<string, Promise<Set<string> | null>>();
+
 async function getAdminGuildIds(accessToken: string): Promise<Set<string> | null> {
   const cached = adminGuildCache.get(accessToken);
   if (cached && cached.expires > Date.now()) return cached.ids;
 
-  const resp = await fetch('https://discord.com/api/v10/users/@me/guilds', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!resp.ok) return null;
+  const existing = adminGuildInflight.get(accessToken);
+  if (existing) return existing;
 
-  const guilds = (await resp.json()) as Array<{ id: string; permissions: string }>;
-  const ids = new Set(
-    guilds
-      .filter((g) => (BigInt(g.permissions) & ADMINISTRATOR) !== BigInt(0))
-      .map((g) => g.id)
-  );
-  pruneCache(adminGuildCache);
-  adminGuildCache.set(accessToken, { ids, expires: Date.now() + CACHE_TTL_MS });
-  return ids;
+  const request = (async (): Promise<Set<string> | null> => {
+    try {
+      const resp = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      // On a transient Discord failure (e.g. 429), fall back to the last-known
+      // (now-expired) value if we have one, rather than returning null and 502-ing.
+      // Admin membership rarely changes, so a minute-stale answer is safe here.
+      if (!resp.ok) return adminGuildCache.get(accessToken)?.ids ?? null;
+
+      const guilds = (await resp.json()) as Array<{ id: string; permissions: string }>;
+      const ids = new Set(
+        guilds
+          .filter((g) => (BigInt(g.permissions) & ADMINISTRATOR) !== BigInt(0))
+          .map((g) => g.id)
+      );
+      pruneCache(adminGuildCache);
+      adminGuildCache.set(accessToken, { ids, expires: Date.now() + CACHE_TTL_MS });
+      return ids;
+    } finally {
+      adminGuildInflight.delete(accessToken);
+    }
+  })();
+
+  adminGuildInflight.set(accessToken, request);
+  return request;
 }
 
 // Short-lived cache of the caller's Discord identity, so mutating requests can
 // be attributed in the bot's audit trail without a Discord call each time.
 type Actor = { id: string; name: string };
 const actorCache = new Map<string, { actor: Actor; expires: number }>();
+const actorInflight = new Map<string, Promise<Actor | null>>();
 
 async function getActor(accessToken: string): Promise<Actor | null> {
   const cached = actorCache.get(accessToken);
   if (cached && cached.expires > Date.now()) return cached.actor;
 
-  const resp = await fetch('https://discord.com/api/v10/users/@me', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!resp.ok) return null;
-  const u = (await resp.json()) as { id: string; username: string; global_name?: string | null };
-  const actor: Actor = { id: u.id, name: u.global_name?.trim() || u.username };
-  pruneCache(actorCache);
-  actorCache.set(accessToken, { actor, expires: Date.now() + CACHE_TTL_MS });
-  return actor;
+  const existing = actorInflight.get(accessToken);
+  if (existing) return existing;
+
+  const request = (async (): Promise<Actor | null> => {
+    try {
+      const resp = await fetch('https://discord.com/api/v10/users/@me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!resp.ok) return null;
+      const u = (await resp.json()) as { id: string; username: string; global_name?: string | null };
+      const actor: Actor = { id: u.id, name: u.global_name?.trim() || u.username };
+      pruneCache(actorCache);
+      actorCache.set(accessToken, { actor, expires: Date.now() + CACHE_TTL_MS });
+      return actor;
+    } finally {
+      actorInflight.delete(accessToken);
+    }
+  })();
+
+  actorInflight.set(accessToken, request);
+  return request;
 }
 
 // The guild id, if this is a guild-scoped path (/guilds/{id}/... or /api/guild/{id}).
