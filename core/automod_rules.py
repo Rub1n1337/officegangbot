@@ -20,8 +20,72 @@ def normalize_action(action: Optional[str]) -> str:
     return a if a in VALID_ACTIONS else "delete"
 
 
+def _group_spans(pattern: str) -> List[Tuple[int, int]]:
+    """(open, close) index pairs of every '(...)' group, honouring escaped
+    parens. Innermost groups come first (they close first)."""
+    stack: List[int] = []
+    spans: List[Tuple[int, int]] = []
+    i, n = 0, len(pattern)
+    while i < n:
+        c = pattern[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "(":
+            stack.append(i)
+        elif c == ")" and stack:
+            spans.append((stack.pop(), i))
+        i += 1
+    return spans
+
+
+def _has_unbounded_quantifier(s: str) -> bool:
+    """True if s contains an unescaped +, *, or {n,}/{n,m} quantifier."""
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c in "+*":
+            return True
+        if c == "{":
+            j = s.find("}", i)
+            if j != -1 and "," in s[i + 1 : j]:
+                return True
+        i += 1
+    return False
+
+
+def _quantifier_at(pattern: str, idx: int) -> bool:
+    """True if pattern[idx:] begins a repetition quantifier (+, *, or {n,})."""
+    if idx >= len(pattern):
+        return False
+    c = pattern[idx]
+    if c in "+*":
+        return True
+    if c == "{":
+        j = pattern.find("}", idx)
+        return j != -1 and "," in pattern[idx + 1 : j]
+    return False
+
+
+def has_redos_risk(pattern: str) -> bool:
+    """Heuristic flag for catastrophic-backtracking risk: a quantified group whose
+    contents also contain an unbounded quantifier — e.g. (a+)+, (\\w*)*, (.+){2,}.
+    These can hang the shared event loop on a crafted message. This is a defensive
+    filter over admin-authored patterns, not a formal guarantee."""
+    if not pattern:
+        return False
+    for start, end in _group_spans(pattern):
+        inner = pattern[start + 1 : end]
+        if _has_unbounded_quantifier(inner) and _quantifier_at(pattern, end + 1):
+            return True
+    return False
+
+
 def validate_pattern(pattern: str) -> Optional[str]:
-    """Returns None if the pattern is a usable regex, else a short error reason."""
+    """Returns None if the pattern is a usable, safe regex, else a short reason."""
     if not pattern or not pattern.strip():
         return "empty pattern"
     if len(pattern) > MAX_PATTERN_LEN:
@@ -30,6 +94,8 @@ def validate_pattern(pattern: str) -> Optional[str]:
         re.compile(pattern)
     except re.error as e:
         return f"invalid regex: {e}"
+    if has_redos_risk(pattern):
+        return "unsafe pattern: nested quantifiers can cause catastrophic backtracking"
     return None
 
 
@@ -60,14 +126,22 @@ def sanitize_rules(rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def compile_rules(rules: List[Dict[str, Any]]) -> List[Tuple[Any, str]]:
     """Compiles the enabled rules into [(regex, action)] (case-insensitive).
-    Invalid patterns are skipped rather than raising."""
+    Invalid patterns are skipped rather than raising. Patterns flagged as ReDoS
+    risks are also skipped, so even a risky pattern stored before validation
+    existed can never actually run against messages."""
     compiled: List[Tuple[Any, str]] = []
     for r in rules or []:
         if not r.get("enabled", True):
             continue
         try:
-            compiled.append((re.compile(str(r["pattern"]), re.IGNORECASE), normalize_action(r.get("action"))))
-        except (re.error, KeyError, TypeError):
+            pattern = str(r["pattern"])
+        except (KeyError, TypeError):
+            continue
+        if has_redos_risk(pattern):
+            continue
+        try:
+            compiled.append((re.compile(pattern, re.IGNORECASE), normalize_action(r.get("action"))))
+        except re.error:
             continue
     return compiled
 

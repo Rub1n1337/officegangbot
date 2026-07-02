@@ -5,9 +5,53 @@ from core.automod_rules import (
     sanitize_rules,
     compile_rules,
     first_match,
+    has_redos_risk,
     MAX_RULES,
     MAX_PATTERN_LEN,
 )
+
+
+# --- ReDoS heuristic --------------------------------------------------------
+
+def test_redos_flags_nested_quantifiers():
+    for p in ["(a+)+", "(a*)*", "(a+)*", "(a*)+", r"(\w+)+", "(.+)+$", "([a-z]+)*", "(ab+)+"]:
+        assert has_redos_risk(p) is True, p
+
+
+def test_redos_flags_braced_outer_quantifier():
+    assert has_redos_risk("(a+){2,}") is True
+    assert has_redos_risk(r"(\d*){3,10}") is True
+
+
+def test_redos_allows_safe_patterns():
+    for p in ["free\\s*nitro", "discord\\.gg/\\w+", "(abc)+", "a+b+", "(foo|bar)", "[a-z]+", "x{2,5}"]:
+        assert has_redos_risk(p) is False, p
+
+
+def test_redos_ignores_escaped_parens():
+    # Literal parens, not a group — safe.
+    assert has_redos_risk(r"\(a+\)+") is False
+
+
+def test_validate_rejects_redos():
+    assert "unsafe" in validate_pattern("(a+)+")
+    assert validate_pattern("free\\s*nitro") is None
+
+
+def test_sanitize_drops_redos_pattern():
+    out = sanitize_rules([{"pattern": "(a+)+"}, {"pattern": "safe\\d+"}])
+    assert [r["pattern"] for r in out] == ["safe\\d+"]
+
+
+def test_compile_skips_stored_redos_pattern():
+    # Even if a risky pattern was somehow persisted, it must not compile/run.
+    compiled = compile_rules([
+        {"pattern": "(a+)+", "action": "delete", "enabled": True},
+        {"pattern": "scam", "action": "delete", "enabled": True},
+    ])
+    assert len(compiled) == 1
+    assert first_match(compiled, "this is a scam") == "delete"
+    assert first_match(compiled, "aaaaaaaaaaaaaaaaaaaaX") is None  # risky rule never runs
 
 
 def test_normalize_action():
