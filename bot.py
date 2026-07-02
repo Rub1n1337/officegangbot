@@ -29,6 +29,7 @@ from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
+from core.observability import init_sentry
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -1342,6 +1343,7 @@ class MyBot(commands.Bot):
                 await interaction.followup.send("🐞 An unexpected error occurred.", ephemeral=True)
 
 async def main():
+    init_sentry()  # no-op unless SENTRY_DSN is set
     bot = MyBot()
     set_bot_instance(bot) # Share bot instance with FastAPI app
     

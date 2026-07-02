@@ -17,6 +17,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from core.logger import logger
 from core.redis_manager import RedisManager
+from core.observability import init_sentry, metrics, alerts
 
 
 # Store bot start time globally
@@ -65,6 +66,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def startup():
     """Initialize Redis connection on API server startup."""
     global _redis
+    init_sentry()  # idempotent; no-op unless SENTRY_DSN is set
     _redis = RedisManager()
     try:
         await _redis.connect()
@@ -157,9 +159,24 @@ async def _ensure_redis() -> Optional[RedisManager]:
             )
             return None
 
+# Hold references to fire-and-forget alert tasks so they aren't GC'd mid-send.
+_alert_tasks: set = set()
+
+
+def _fire_alert(key: str, title: str, description: str, level: str = "warning") -> None:
+    """Fire-and-forget an alert from request context (never blocks the request)."""
+    try:
+        task = asyncio.create_task(alerts.alert(key, title, description, level))
+        _alert_tasks.add(task)
+        task.add_done_callback(_alert_tasks.discard)
+    except RuntimeError:
+        pass  # no running loop (shouldn't happen in request context)
+
+
 async def _rpc(action: str, **kwargs) -> Any:
     """Sends an RPC request to the bot via Redis and returns response."""
-    global _redis_last_ok
+    global _redis_last_ok, _redis
+    start = time.perf_counter()
     redis = await _ensure_redis()
     if not redis:
         elapsed = time.time() - _redis_last_ok if _redis_last_ok else None
@@ -168,6 +185,12 @@ async def _rpc(action: str, **kwargs) -> Any:
             f"Last successful RPC: {f'{elapsed:.1f}s ago' if elapsed else 'never'}. "
             f"_redis object is None after reconnect attempt. Current _redis state: {redis}"
         )
+        metrics.record(action, (time.perf_counter() - start) * 1000, ok=False)
+        _fire_alert(
+            "redis_unavailable", "🔴 Redis unavailable",
+            f"The API could not reach Redis for RPC `{action}` — dashboard requests are failing with 503.",
+            "error",
+        )
         raise HTTPException(status_code=503, detail="Redis not available")
     try:
         envelope = await redis.rpc_request("bot:rpc", {"action": action, **kwargs})
@@ -175,9 +198,25 @@ async def _rpc(action: str, **kwargs) -> Any:
         logger.error(f"Redis rpc_request raised exception for action='{action}': {e}", exc_info=True)
         # Mark redis as potentially broken so next call will attempt reconnect
         _redis = None
+        metrics.record(action, (time.perf_counter() - start) * 1000, ok=False)
+        _fire_alert(
+            "redis_error", "🔴 Redis error during RPC",
+            f"`{action}` failed with a Redis connection error: `{e}`",
+            "error",
+        )
         raise HTTPException(status_code=503, detail="Redis connection error during RPC")
     if envelope is None:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        metrics.record(action, elapsed_ms, ok=False)
+        _fire_alert(
+            "rpc_timeout", "🟠 Bot RPC timeout",
+            f"`{action}` got no response within the BLPOP window ({elapsed_ms:.0f}ms) — "
+            f"the bot may be offline, restarting or overloaded.",
+        )
         raise HTTPException(status_code=504, detail="Bot RPC timeout — bot may be offline")
+    # Infra worked from here on — domain errors below (e.g. "Guild not found")
+    # still count as successful RPCs for latency/error metrics.
+    metrics.record(action, (time.perf_counter() - start) * 1000, ok=True)
     if isinstance(envelope, dict) and "error" in envelope and "data" not in envelope:
         # Logical errors from the bot handler (e.g. "Guild not found") arrive as a
         # bare {"error": ...} envelope. Map "not found" to 404 so the dashboard can
@@ -244,6 +283,19 @@ async def health_check():
         }
     except Exception:
         return {"status": "starting", "bot": False, "redis_reconnects": _redis_reconnects}
+
+
+@app.get("/metrics", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_metrics(request: Request):
+    """RPC latency/error metrics for ops: per-action count/errors/avg/p95 plus
+    process-level totals. API-key gated (contains action names, not user data)."""
+    return {
+        "uptime_s": int(time.time() - BOT_START_TIME),
+        "redis_reconnects": _redis_reconnects,
+        "alerts_enabled": alerts.enabled,
+        "rpc": metrics.snapshot(),
+    }
 
 
 @app.get("/api/stats", dependencies=[Depends(verify_api_key)])
