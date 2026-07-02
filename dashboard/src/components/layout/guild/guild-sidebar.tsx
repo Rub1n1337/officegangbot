@@ -62,25 +62,25 @@ export function InGuildSidebar() {
           href={`/guilds/${guildId}/moderation`}
           active={router.route === `/guilds/[guild]/moderation`}
           icon={<Icon as={MdGavel} />}
-          name="Moderation"
+          name={t.bn.moderation}
         />
         <SidebarItem
           href={`/guilds/${guildId}/members`}
           active={router.route === `/guilds/[guild]/members`}
           icon={<Icon as={IoPeople} />}
-          name="Members"
+          name={t.bn.members}
         />
         <SidebarItem
           href={`/guilds/${guildId}/tickets`}
           active={router.route === `/guilds/[guild]/tickets`}
           icon={<Icon as={MdConfirmationNumber} />}
-          name="Tickets"
+          name={t.bn.tickets}
         />
         <SidebarItem
           href={`/guilds/${guildId}/audit`}
           active={router.route === `/guilds/[guild]/audit`}
           icon={<Icon as={MdHistory} />}
-          name="Audit log"
+          name={t.bn.audit}
         />
         {featureCategories.map((cat) => {
           const items = getFeatures().filter((f) => f.category === cat.id);

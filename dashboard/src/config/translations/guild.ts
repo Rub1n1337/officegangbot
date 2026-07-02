@@ -18,6 +18,10 @@ export const guild = createI18n(provider, {
       'config feature': 'Config',
       invite: 'Invite bot',
       settings: 'Overview',
+      moderation: 'Moderation',
+      members: 'Members',
+      tickets: 'Tickets',
+      audit: 'Audit log',
     },
   },
   ru: {
@@ -36,6 +40,10 @@ export const guild = createI18n(provider, {
       'config feature': 'Настроить',
       invite: 'Пригласить бота',
       settings: 'Обзор',
+      moderation: 'Модерация',
+      members: 'Участники',
+      tickets: 'Тикеты',
+      audit: 'Журнал',
     },
   },
   cn: {
@@ -54,6 +62,10 @@ export const guild = createI18n(provider, {
       'config feature': '配置',
       invite: '邀請機器人',
       settings: '概覽',
+      moderation: '管理',
+      members: '成員',
+      tickets: '工單',
+      audit: '審計日誌',
     },
   },
 });

@@ -8,6 +8,7 @@ import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { SwitchFieldForm } from '@/components/forms/SwitchField';
 import { RulesPreview } from '@/components/feature/RulesPreview';
+import { useFormText } from '@/config/translations/form-text';
 import type { RulesFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -25,6 +26,7 @@ const schema = z.object({
 type Input = z.infer<typeof schema>;
 
 export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature, onSubmit: (data: string) => Promise<any>) => {
+  const ft = useFormText();
   const { register, reset, handleSubmit, formState, control, watch } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -46,19 +48,19 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
       <SimpleGrid columns={1} gap={3}>
         <ChannelSelectForm
           control={{
-            label: 'Rules Channel',
-            description: 'Select the channel where rules will be posted',
+            label: ft('Rules Channel'),
+            description: ft('Select the channel where rules will be posted'),
           }}
           controller={{ control, name: 'channel' }}
         />
         <Box>
           <TextAreaForm
             control={{
-              label: 'Rules Message',
-              description: 'Enter the server rules. A scrollbar appears when the text is longer than the box.',
+              label: ft('Rules Message'),
+              description: ft('Enter the server rules. A scrollbar appears when the text is longer than the box.'),
               error: formState.errors.message?.message,
             }}
-            placeholder="Be respectful..."
+            placeholder={ft('Be respectful...')}
             h="260px"
             resize="vertical"
             overflowY="auto"
@@ -73,8 +75,8 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
         <Divider my={1} />
         <SwitchFieldForm
           control={{
-            label: 'Reaction Role',
-            description: 'Add a reaction to the rules message that grants a role when clicked',
+            label: ft('Reaction Role'),
+            description: ft('Add a reaction to the rules message that grants a role when clicked'),
           }}
           controller={{ control, name: 'reactionEnabled' }}
         />
@@ -82,16 +84,16 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
           <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
             <EmojiPickerInput
               control={{
-                label: 'Reaction Emoji',
-                description: 'Emoji members react with to accept the rules',
+                label: ft('Reaction Emoji'),
+                description: ft('Emoji members react with to accept the rules'),
               }}
               controller={{ control, name: 'reactionEmoji' }}
               placeholder="✅"
             />
             <RoleSelectForm
               control={{
-                label: 'Reaction Role',
-                description: 'Role granted when a member reacts',
+                label: ft('Reaction Role'),
+                description: ft('Role granted when a member reacts'),
               }}
               controller={{ control, name: 'reactionRole' }}
             />

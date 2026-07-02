@@ -17,6 +17,7 @@ import { MdAdd, MdDelete } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { InputForm } from '@/components/forms/InputForm';
 import { TextAreaForm } from '@/components/forms/TextAreaForm';
+import { useFormText } from '@/config/translations/form-text';
 import type { ScheduledMessagesFeature, ScheduledMessageItem } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -59,6 +60,7 @@ function toFormItems(items: ScheduledMessageItem[] | undefined) {
 }
 
 export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature> = (data, onSubmit) => {
+  const ft = useFormText();
   const { register, reset, handleSubmit, formState, control, watch, setValue } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -72,8 +74,9 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
       <Flex direction="column" gap={3}>
         {fields.length === 0 && (
           <Text color="TextSecondary">
-            No scheduled messages yet. Add one to post an announcement at a set time (optionally
-            repeating daily or weekly).
+            {ft(
+              'No scheduled messages yet. Add one to post an announcement at a set time (optionally repeating daily or weekly).'
+            )}
           </Text>
         )}
         {fields.map((field, index) => (
@@ -97,7 +100,7 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
                     }
                   />
                   <Text fontSize="sm" color="TextSecondary">
-                    {watch(`items.${index}.enabled`) ? 'Active' : 'Paused'}
+                    {watch(`items.${index}.enabled`) ? ft('Active') : ft('Paused')}
                   </Text>
                 </Flex>
               </Flex>
@@ -111,13 +114,13 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
             </Flex>
             <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
               <ChannelSelectForm
-                control={{ label: 'Channel', description: 'Where to post the message' }}
+                control={{ label: ft('Channel'), description: ft('Where to post the message') }}
                 controller={{ control, name: `items.${index}.channelId` }}
               />
               <InputForm
                 control={{
-                  label: 'Date & time (your local time)',
-                  description: 'When to first post it',
+                  label: ft('Date & time (your local time)'),
+                  description: ft('When to first post it'),
                   error: formState.errors.items?.[index]?.scheduledAt?.message,
                 }}
                 type="datetime-local"
@@ -127,23 +130,23 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
             <Box mt={3}>
               <TextAreaForm
                 control={{
-                  label: 'Message',
-                  description: 'Up to 2000 characters.',
+                  label: ft('Message'),
+                  description: ft('Up to 2000 characters.'),
                   error: formState.errors.items?.[index]?.content?.message,
                 }}
-                placeholder="📢 Weekly reminder: read the rules and have a great week!"
+                placeholder={ft('📢 Weekly reminder: read the rules and have a great week!')}
                 {...register(`items.${index}.content`)}
               />
             </Box>
             <Box mt={3} maxW={{ base: 'full', lg: '220px' }}>
               <FormControl>
                 <FormLabel fontSize="sm" mb={1}>
-                  Repeat
+                  {ft('Repeat')}
                 </FormLabel>
                 <Select {...register(`items.${index}.repeat`)}>
-                  <option value="none">Once</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
+                  <option value="none">{ft('Once')}</option>
+                  <option value="daily">{ft('Daily')}</option>
+                  <option value="weekly">{ft('Weekly')}</option>
                 </Select>
               </FormControl>
             </Box>
@@ -157,7 +160,7 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
             append({ channelId: undefined, content: '', scheduledAt: '', repeat: 'none', enabled: true })
           }
         >
-          Add scheduled message
+          {ft('Add scheduled message')}
         </Button>
       </Flex>
     ),

@@ -9,6 +9,7 @@ import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { WelcomePreview } from '@/components/feature/WelcomePreview';
 import { useGuildPreview } from '@/api/hooks';
+import { useFormText } from '@/config/translations/form-text';
 
 const schema = z.object({
   message: z.string().min(1),
@@ -19,6 +20,7 @@ const schema = z.object({
 type Input = z.infer<typeof schema>;
 
 export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (data, onSubmit) => {
+  const ft = useFormText();
   const { register, reset, handleSubmit, formState, control, watch } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -39,24 +41,24 @@ export const useWelcomeMessageFeature: UseFormRender<WelcomeMessageFeature> = (d
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
           <ChannelSelectForm
             control={{
-              label: 'Channel',
-              description: 'Where to send the welcome message',
+              label: ft('Channel'),
+              description: ft('Where to send the welcome message'),
             }}
             controller={{ control, name: 'channel' }}
           />
           <TextAreaForm
             control={{
-              label: 'Message',
-              description: 'The welcome message. Use {user.mention} to mention the new member and {server.name} for the server name.',
+              label: ft('Message'),
+              description: ft('The welcome message. Use {user.mention} to mention the new member and {server.name} for the server name.'),
               error: formState.errors.message?.message,
             }}
-            placeholder="Welcome {user.mention} to {server.name}! We're glad to have you."
+            placeholder={ft("Welcome {user.mention} to {server.name}! We're glad to have you.")}
             {...register('message')}
           />
           <RoleSelectForm
             control={{
-              label: 'Auto-role (optional)',
-              description: 'Automatically given to every member when they join.',
+              label: ft('Auto-role (optional)'),
+              description: ft('Automatically given to every member when they join.'),
             }}
             controller={{ control, name: 'autorole' }}
           />

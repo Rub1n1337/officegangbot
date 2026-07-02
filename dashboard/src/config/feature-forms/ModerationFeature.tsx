@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Flex, SimpleGrid, Text } from '@chakra-ui/react';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
+import { useFormText } from '@/config/translations/form-text';
 import type { ModerationFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -30,6 +31,7 @@ export const useModerationFeature: UseFormRender<ModerationFeature> = (
   data: ModerationFeature,
   onSubmit: (data: string) => Promise<any>
 ) => {
+  const ft = useFormText();
   const { reset, handleSubmit, formState, control } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -47,15 +49,15 @@ export const useModerationFeature: UseFormRender<ModerationFeature> = (
     component: (
       <Flex direction="column" gap={3}>
         <Text fontSize="sm" color="TextSecondary">
-          Grant roles access to each moderation command. Server administrators always have full access.
+          {ft('Grant roles access to each moderation command. Server administrators always have full access.')}
         </Text>
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
         {PERMISSIONS.map((perm) => (
           <RoleSelectForm
             key={perm.name}
             control={{
-              label: perm.label,
-              description: perm.description,
+              label: ft(perm.label),
+              description: ft(perm.description),
             }}
             controller={{ control, name: perm.name }}
           />

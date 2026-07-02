@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { CategorySelectForm } from '@/components/forms/CategorySelect';
+import { useFormText } from '@/config/translations/form-text';
 import type { TicketsFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -15,6 +16,7 @@ const schema = z.object({
 type Input = z.infer<typeof schema>;
 
 export const useTicketsFeature: UseFormRender<TicketsFeature> = (data, onSubmit) => {
+  const ft = useFormText();
   const { reset, handleSubmit, formState, control } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
@@ -30,15 +32,15 @@ export const useTicketsFeature: UseFormRender<TicketsFeature> = (data, onSubmit)
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
           <RoleSelectForm
             control={{
-              label: 'Support role',
-              description: 'Role that can see and respond to ticket channels',
+              label: ft('Support role'),
+              description: ft('Role that can see and respond to ticket channels'),
             }}
             controller={{ control, name: 'supportRole' }}
           />
           <CategorySelectForm
             control={{
-              label: 'Ticket category',
-              description: 'New ticket channels are created under this category',
+              label: ft('Ticket category'),
+              description: ft('New ticket channels are created under this category'),
             }}
             controller={{ control, name: 'category' }}
           />
