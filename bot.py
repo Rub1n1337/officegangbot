@@ -240,14 +240,23 @@ class MyBot(commands.Bot):
     async def _get_feature_payload(self, guild_id: int, feature: str) -> dict:
         if not self.db:
             return {"error": "Database unavailable"}
-        settings = await self.db.get_all_guild_settings(guild_id)
-        mod_roles = await self.db.get_mod_roles(guild_id)
-        reaction_roles = await self.db.get_reaction_roles(guild_id)
-        level_roles = await self.db.get_level_roles(guild_id)
-        levels_config = await self.db.get_levels_config(guild_id)
-        scheduled = await self.db.get_scheduled_messages(guild_id)
-        menus = await self.db.get_reaction_menus(guild_id)
-        automod_rules = (await self.db.get_automod_config(guild_id)).get("rules", [])
+        # These reads are independent, so run them concurrently (the pool has 10
+        # connections) instead of ~8 sequential round-trips — this is the biggest
+        # driver of get_feature latency.
+        (
+            settings, mod_roles, reaction_roles, level_roles, levels_config,
+            scheduled, menus, automod_cfg,
+        ) = await asyncio.gather(
+            self.db.get_all_guild_settings(guild_id),
+            self.db.get_mod_roles(guild_id),
+            self.db.get_reaction_roles(guild_id),
+            self.db.get_level_roles(guild_id),
+            self.db.get_levels_config(guild_id),
+            self.db.get_scheduled_messages(guild_id),
+            self.db.get_reaction_menus(guild_id),
+            self.db.get_automod_config(guild_id),
+        )
+        automod_rules = automod_cfg.get("rules", [])
 
         def _first_role(perm: str):
             ids = mod_roles.get(perm) or []

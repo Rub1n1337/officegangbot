@@ -241,7 +241,7 @@ class RedisManager:
     # RPC via Redis Streams
     # -------------------------
 
-    async def rpc_request(self, channel: str, payload: dict, timeout: float = 8.0) -> Optional[dict]:
+    async def rpc_request(self, channel: str, payload: dict, timeout: float = 12.0) -> Optional[dict]:
         """
         Sends an RPC request via a Redis Stream and waits for the response with a
         blocking pop (BLPOP) rather than a GET poll loop — the bot RPUSHes the
@@ -283,9 +283,37 @@ class RedisManager:
         Starts a Stream consumer that polls for RPC requests.
         Uses XREAD with short blocking intervals instead of Pub/Sub listen(),
         making it resilient to Upstash connection drops.
+
+        Each request is dispatched to its own task (bounded by a semaphore) so a
+        single slow handler can't block every other request queued behind it —
+        which otherwise cascades into BLPOP timeouts on the API side.
         """
         logger.info(f"Redis Stream RPC listener started on channel '{channel}'")
         last_id = "$"  # Start from new messages only
+        sem = asyncio.Semaphore(12)  # cap concurrent handlers (DB pool max is 10)
+        inflight: set = set()
+
+        async def handle_one(payload: dict):
+            request_id = payload.get("request_id")
+            response_key = payload.get("response_key")
+            if not request_id or not response_key:
+                return
+            async with sem:
+                try:
+                    response = await handler(payload)
+                    # Push the response onto a short-lived list that the caller is
+                    # BLPOP-ing, so it's delivered immediately.
+                    encoded = json.dumps(response, default=_json_default)
+                    await self.redis.rpush(response_key, encoded)
+                    await self.redis.expire(response_key, 15)
+                except Exception as e:
+                    logger.error(f"RPC handler error: {e}", exc_info=True)
+
+        def spawn(payload: dict):
+            # Keep a reference until done so the task isn't GC'd mid-flight.
+            task = asyncio.create_task(handle_one(payload))
+            inflight.add(task)
+            task.add_done_callback(inflight.discard)
 
         async def listen():
             nonlocal last_id
@@ -303,20 +331,10 @@ class RedisManager:
                             last_id = message_id
                             try:
                                 payload = json.loads(fields.get("data", "{}"))
-                                request_id = payload.get("request_id")
-                                response_key = payload.get("response_key")
-
-                                if not request_id or not response_key:
-                                    continue
-
-                                response = await handler(payload)
-                                # Push the response onto a short-lived list that the
-                                # caller is BLPOP-ing, so it's delivered immediately.
-                                encoded = json.dumps(response, default=_json_default)
-                                await self.redis.rpush(response_key, encoded)
-                                await self.redis.expire(response_key, 15)
                             except Exception as e:
-                                logger.error(f"RPC handler error: {e}", exc_info=True)
+                                logger.error(f"RPC payload decode error: {e}")
+                                continue
+                            spawn(payload)
 
                 except Exception as e:
                     logger.warning(f"Stream read error (reconnecting): {e}")
