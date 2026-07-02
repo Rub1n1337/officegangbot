@@ -1,5 +1,5 @@
 import { CustomFeatures, CustomGuildInfo } from '../config/types';
-import { QueryClient, useMutation, useQuery } from '@tanstack/react-query';
+import { QueryClient, onlineManager, useMutation, useQuery } from '@tanstack/react-query';
 import { UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
 import {
   deleteWarning,
@@ -65,6 +65,31 @@ export const client = new QueryClient({
     },
   },
 });
+
+// React Query can still leave a query stuck in fetchStatus:'paused' after a
+// transient failure when its online detection is out of sync (this app is always
+// online, but navigator.onLine / the online manager can read false-offline in
+// some proxied/embedded contexts). A paused query never resolves, so the feature
+// form hangs on its skeleton forever — even networkMode:'always' didn't reliably
+// prevent it in practice. Force the online manager to always-online, and as a
+// safety net reset any query that still ends up paused so it refetches (verified
+// to recover a stuck feature query) instead of hanging.
+if (typeof window !== 'undefined') {
+  onlineManager.setEventListener(() => () => {});
+  onlineManager.setOnline(true);
+
+  const resumeGuard = new WeakSet<object>();
+  client.getQueryCache().subscribe((event) => {
+    const query = event?.query;
+    if (!query || query.state.fetchStatus !== 'paused' || query.getObserversCount() === 0) return;
+    // Guard so a genuinely-failing request retries at most every few seconds
+    // rather than looping tightly.
+    if (resumeGuard.has(query)) return;
+    resumeGuard.add(query);
+    setTimeout(() => resumeGuard.delete(query), 4000);
+    void client.resetQueries({ queryKey: query.queryKey, exact: true });
+  });
+}
 
 export const Keys = {
   login: ['login'],
