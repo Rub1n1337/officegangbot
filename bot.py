@@ -27,6 +27,7 @@ from core.reaction_sync import plan_reaction_changes
 from core.permissions import role_is_assignable
 from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules
+from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from api_server import app as fastapi_app, set_bot_instance
 
@@ -243,6 +244,7 @@ class MyBot(commands.Bot):
         mod_roles = await self.db.get_mod_roles(guild_id)
         reaction_roles = await self.db.get_reaction_roles(guild_id)
         level_roles = await self.db.get_level_roles(guild_id)
+        levels_config = await self.db.get_levels_config(guild_id)
         scheduled = await self.db.get_scheduled_messages(guild_id)
         menus = await self.db.get_reaction_menus(guild_id)
         automod_rules = (await self.db.get_automod_config(guild_id)).get("rules", [])
@@ -312,6 +314,15 @@ class MyBot(commands.Bot):
                 "rewards": [
                     {"level": lvl, "roleId": str(rid)}
                     for lvl, rid in sorted(level_roles.items())
+                ],
+                "voiceXpEnabled": bool(levels_config["voice_xp_enabled"]),
+                "voiceXpPerMin": int(levels_config["voice_xp_per_min"]),
+                "xpMultiplier": float(levels_config["xp_multiplier"]),
+                "prestigeLevel": int(levels_config["prestige_level"]),
+                "season": int(levels_config["season"]),
+                "roleMultipliers": [
+                    {"roleId": str(rid), "multiplier": float(m)}
+                    for rid, m in levels_config["role_multipliers"].items()
                 ],
             },
             "tickets": {
@@ -852,6 +863,36 @@ class MyBot(commands.Bot):
                             await self.db.remove_level_role(guild_id, lvl)
                     for lvl, role_id in desired.items():
                         await self.db.set_level_role(guild_id, lvl, role_id)
+
+                # Voice XP / global multiplier / prestige threshold live in guilds
+                # columns; the season counter is managed by /season_reset, not here.
+                voice_enabled = bool(options.get("voiceXpEnabled", False))
+                voice_per_min = self._clamp_int(options.get("voiceXpPerMin"), 5, 0, 100)
+                xp_multiplier = sanitize_multiplier(options.get("xpMultiplier"), 1.0)
+                prestige_level = self._clamp_int(options.get("prestigeLevel"), 100, 0, 1000)
+                await self.db.set_levels_config(
+                    guild_id, voice_enabled, voice_per_min, xp_multiplier, prestige_level,
+                )
+
+                # Per-role XP multipliers: validate ids and clamp each multiplier.
+                role_mults_raw = options.get("roleMultipliers")
+                if isinstance(role_mults_raw, list):
+                    seen: set[int] = set()
+                    role_mults = []
+                    for r in role_mults_raw[:50]:
+                        rid = r.get("roleId")
+                        if not rid:
+                            continue
+                        try:
+                            role_id = _validate_discord_id(rid)
+                        except ValueError:
+                            continue
+                        if role_id in seen:
+                            continue
+                        seen.add(role_id)
+                        role_mults.append({"role_id": role_id, "multiplier": sanitize_multiplier(r.get("multiplier"), 1.0)})
+                    await self.db.replace_level_multiplier_roles(guild_id, role_mults)
+
                 return await self._get_feature_payload(guild_id, feature)
 
             # Filter word list is a TEXT[] column and feeds a cached compiled

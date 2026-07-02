@@ -140,6 +140,20 @@ class RedisManager:
         """Caches XP data for a user. TTL: 10 minutes."""
         await self.set(f"xp:{guild_id}:{user_id}", data, ttl=600)
 
+    async def delete_xp_data(self, guild_id: int, user_id: int) -> None:
+        """Drops a single user's cached XP (used after a prestige reset)."""
+        await self.delete(f"xp:{guild_id}:{user_id}")
+
+    async def clear_guild_xp(self, guild_id: int) -> None:
+        """Drops all cached XP for a guild (used after a season reset)."""
+        try:
+            pattern = f"xp:{guild_id}:*"
+            keys = [key async for key in self.redis.scan_iter(match=pattern)]
+            if keys:
+                await self.redis.delete(*keys)
+        except Exception as e:
+            logger.error(f"Redis clear_guild_xp error: {e}")
+
     async def get_dirty_xp_keys(self, guild_id: int) -> list:
         """Returns all dirty XP keys for a guild (marked for DB flush)."""
         try:

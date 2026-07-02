@@ -250,6 +250,32 @@ CREATE TABLE IF NOT EXISTS automod_rules (
 
 CREATE INDEX IF NOT EXISTS idx_automod_rules_guild ON automod_rules(guild_id);
 
+-- Levels: per-role XP multipliers. A member's effective multiplier is the
+-- global guild multiplier times the highest role multiplier they hold.
+CREATE TABLE IF NOT EXISTS level_multiplier_roles (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    multiplier NUMERIC(4,2) NOT NULL DEFAULT 1.0,
+    UNIQUE (guild_id, role_id),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_level_multiplier_roles_guild ON level_multiplier_roles(guild_id);
+
+-- Levels: archive of past seasons. /season_reset snapshots the standings here
+-- and zeroes everyone's season XP (prestige is preserved).
+CREATE TABLE IF NOT EXISTS level_seasons (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    season_number INTEGER NOT NULL,
+    ended_at TIMESTAMPTZ DEFAULT NOW(),
+    standings JSONB NOT NULL DEFAULT '[]',
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_level_seasons_guild ON level_seasons(guild_id, season_number DESC);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -270,6 +296,14 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_expiry_hours INTEGER 
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_mute_at INTEGER DEFAULT 3;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_kick_at INTEGER DEFAULT 5;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strike_ban_at INTEGER DEFAULT 0;
+-- Levels: voice XP, global multiplier, prestige threshold and season counter.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_voice_xp_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_voice_xp_per_min INTEGER DEFAULT 5;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_xp_multiplier NUMERIC(4,2) DEFAULT 1.0;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_prestige_level INTEGER DEFAULT 100;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_season INTEGER DEFAULT 1;
+-- Levels: lifetime prestige count per member (survives season/prestige resets).
+ALTER TABLE users_xp ADD COLUMN IF NOT EXISTS prestige INTEGER DEFAULT 0;
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')
@@ -307,3 +341,5 @@ ALTER TABLE mod_cases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE temp_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE automod_strikes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE automod_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE level_multiplier_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE level_seasons ENABLE ROW LEVEL SECURITY;
