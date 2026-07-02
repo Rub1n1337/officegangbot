@@ -20,6 +20,7 @@ from discord.ext import commands
 from core.logger import logger
 from core.permissions import has_permission
 from core.i18n import t
+from core.safe_format import render_template, welcome_values, is_template_valid
 from typing import Optional
 from .utils import reply
 
@@ -57,17 +58,16 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             return
 
         message_format = await self.bot.db.get_guild_setting(guild.id, "welcome_message", DEFAULT_WELCOME_MESSAGE)
+        # Safe substitution: only whitelisted {placeholders} are replaced, so an
+        # admin-authored template can't traverse object attributes (e.g. leak the
+        # bot token via {user._state.http.token}). Never use str.format() here.
         try:
-            formatted_message = message_format.format(user=member, server=guild)
+            formatted_message = render_template(message_format, welcome_values(member, guild))
             await channel.send(formatted_message)
             logger.info(f"Sent welcome message for {member} in {guild.name}.")
         except discord.Forbidden:
             logger.error(f"Missing permissions for welcome message in #{channel.name} ({guild.name}). Disabling system.")
             await self.bot.db.set_feature_enabled(guild.id, "welcome-message", False)
-        except (KeyError, AttributeError) as e:
-            logger.error(f"Invalid placeholder in welcome message for {guild.name}: {e}")
-            loc = await self.bot.db.get_locale(guild.id)
-            await channel.send(t(loc, "welcome.runtime_invalid_placeholder"))
         except Exception as e:
             logger.error(f"Failed to send welcome message in {guild.name}: {e}", exc_info=True)
 
@@ -180,11 +180,10 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
         loc = await self.bot.db.get_locale(ctx.guild.id)
         if len(message) > 1500:
             return await reply(ctx, t(loc, "welcome.msg_too_long"))
-        # Pre-validate placeholders
-        try:
-            _ = message.format(user=ctx.author, server=ctx.guild)
-        except Exception as e:
-            return await reply(ctx, t(loc, "welcome.msg_invalid_placeholder", error=e))
+        # Warn (don't format the live objects) if the template uses an unknown
+        # placeholder — it would be left as literal text rather than substituted.
+        if not is_template_valid(message):
+            return await reply(ctx, t(loc, "welcome.msg_invalid_placeholder", error="unknown placeholder"))
 
         await self.bot.db.set_guild_setting(ctx.guild.id, "welcome_message", message)
         await reply(ctx, t(loc, "welcome.msg_updated"))
