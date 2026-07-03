@@ -31,6 +31,10 @@ import { ErrorPanel } from '@/components/panel/ErrorPanel';
 import { timeAgo, formatDateTime } from '@/utils/audit';
 import type { Ticket, TicketPriority } from '@/config/types/custom-types';
 
+// Render this many rows at a time (with a "Show more") rather than mounting the
+// full list — cheap windowing without a virtualization dependency.
+const PAGE = 50;
+
 const PRIORITY: Record<TicketPriority, { label: string; color: string }> = {
   low: { label: '🟢 Low', color: 'green' },
   medium: { label: '🟡 Medium', color: 'yellow' },
@@ -124,18 +128,18 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
       bg="blackAlpha.200"
       _dark={{ bg: 'whiteAlpha.50' }}
     >
-      <Flex gap={3} minW={0} align="flex-start">
+      <Flex gap={3} flex="1" minW={0} align="flex-start">
         <PriorityBadge priority={t.priority} />
         <Box minW={0}>
           <Flex align="center" gap={2} wrap="wrap">
-            <Text fontWeight="600" isTruncated>
+            <Text fontWeight="600" isTruncated maxW="100%">
               {t.openerName ?? t.openerId}
             </Text>
-            <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="md">
+            <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="md" flexShrink={0}>
               {t.status}
             </Badge>
           </Flex>
-          <Text fontSize="xs" color="TextSecondary">
+          <Text fontSize="xs" color="TextSecondary" noOfLines={{ base: 2, sm: 1 }}>
             Opened {timeAgo(t.openedAt)}
             {t.closedAt && ` · closed ${timeAgo(t.closedAt)}`}
             {t.closedByName && ` by ${t.closedByName}`}
@@ -151,11 +155,14 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
         <Button
           size="xs"
           variant="outline"
-          leftIcon={<Icon as={MdDescription} />}
           onClick={() => onView(t.id)}
           flexShrink={0}
+          aria-label="View transcript"
         >
-          Transcript
+          <Icon as={MdDescription} />
+          <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
+            Transcript
+          </Box>
         </Button>
       )}
     </Flex>
@@ -181,6 +188,7 @@ const TicketsPage: NextPageWithLayout = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'open' | 'closed'>('all');
   const [selected, setSelected] = useState<number | null>(null);
+  const [visible, setVisible] = useState(PAGE);
   const { onClose } = useDisclosure();
 
   const rows = useMemo(() => query.data ?? [], [query.data]);
@@ -221,8 +229,8 @@ const TicketsPage: NextPageWithLayout = () => {
       <QueryStatus query={query} loading={<TicketsSkeleton />} error="Failed to load tickets.">
         <Box bg="CardBackground" rounded="2xl" p={5}>
           <Flex align="center" justify="space-between" gap={3} mb={4} wrap="wrap">
-            <Flex gap={3} wrap="wrap" flex={1}>
-              <InputGroup maxW="280px">
+            <Flex gap={3} wrap="wrap" flex={1} w={{ base: 'full', sm: 'auto' }}>
+              <InputGroup maxW={{ base: 'full', sm: '280px' }}>
                 <InputLeftElement pointerEvents="none">
                   <Icon as={MdSearch} color="TextSecondary" />
                 </InputLeftElement>
@@ -235,7 +243,7 @@ const TicketsPage: NextPageWithLayout = () => {
               </InputGroup>
               <Select
                 variant="main"
-                maxW="160px"
+                maxW={{ base: 'full', sm: '160px' }}
                 value={status}
                 onChange={(ev) => setStatus(ev.target.value as 'all' | 'open' | 'closed')}
               >
@@ -259,9 +267,20 @@ const TicketsPage: NextPageWithLayout = () => {
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
-              {filtered.map((t) => (
+              {filtered.slice(0, visible).map((t) => (
                 <TicketRow key={t.id} t={t} onView={setSelected} />
               ))}
+              {filtered.length > visible && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  alignSelf="center"
+                  mt={1}
+                  onClick={() => setVisible((v) => v + PAGE)}
+                >
+                  Show more ({filtered.length - visible})
+                </Button>
+              )}
             </Flex>
           )}
         </Box>

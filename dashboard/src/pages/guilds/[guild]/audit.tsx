@@ -29,6 +29,10 @@ import {
 } from '@/utils/audit';
 import type { AuditEntry } from '@/config/types/custom-types';
 
+// Render this many rows at a time (with a "Show more") rather than mounting the
+// full list — cheap windowing without a virtualization dependency.
+const PAGE = 50;
+
 const PERIODS: Record<string, { label: string; days: number | null }> = {
   all: { label: 'All time', days: null },
   '1': { label: 'Last 24 hours', days: 1 },
@@ -124,6 +128,7 @@ const AuditPage: NextPageWithLayout = () => {
   const [search, setSearch] = useState('');
   const [action, setAction] = useState('all');
   const [period, setPeriod] = useState('all');
+  const [visible, setVisible] = useState(PAGE);
 
   const rows = useMemo(() => query.data ?? [], [query.data]);
   // The distinct action types present, so the dropdown only offers real values.
@@ -233,9 +238,20 @@ const AuditPage: NextPageWithLayout = () => {
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
-              {filtered.map((e) => (
+              {filtered.slice(0, visible).map((e) => (
                 <AuditRow key={e.id} e={e} />
               ))}
+              {filtered.length > visible && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  alignSelf="center"
+                  mt={1}
+                  onClick={() => setVisible((v) => v + PAGE)}
+                >
+                  Show more ({filtered.length - visible})
+                </Button>
+              )}
             </Flex>
           )}
 

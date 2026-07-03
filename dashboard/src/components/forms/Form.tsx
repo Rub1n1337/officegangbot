@@ -5,6 +5,8 @@ import {
   FormLabel,
 } from '@chakra-ui/form-control';
 import { Flex, Spacer, Text } from '@chakra-ui/layout';
+import { chakra, Icon, Tooltip } from '@chakra-ui/react';
+import { MdInfoOutline } from 'react-icons/md';
 import { ReactNode } from 'react';
 import {
   Controller,
@@ -41,6 +43,10 @@ export type FormCardProps = {
   error?: string;
   label?: string | ReactNode;
   description?: string | ReactNode;
+  /** Optional extra help shown in a tooltip on an info icon next to the label —
+   * for fields that need a longer explanation than the description (e.g. how to
+   * copy a Message ID). Hover on desktop, focus/tap on mobile. */
+  tooltip?: string | ReactNode;
 
   children: ReactNode;
 };
@@ -48,6 +54,7 @@ export type FormCardProps = {
 export function FormCard({
   label,
   description,
+  tooltip,
   required,
   baseControl,
   children,
@@ -55,9 +62,35 @@ export function FormCard({
 }: FormCardProps) {
   return (
     <Form isRequired={required} isInvalid={error != null} {...baseControl}>
-      <FormLabel fontSize={{ base: '16px', md: 'lg' }} fontWeight="medium" mb={0}>
-        {label}
-      </FormLabel>
+      <Flex align="center" gap={1.5}>
+        <FormLabel fontSize={{ base: '16px', md: 'lg' }} fontWeight="medium" mb={0}>
+          {label}
+        </FormLabel>
+        {tooltip != null && (
+          <Tooltip
+            label={tooltip}
+            hasArrow
+            placement="top"
+            rounded="md"
+            fontSize="xs"
+            p={2.5}
+            maxW="280px"
+            openDelay={150}
+          >
+            <chakra.span
+              tabIndex={0}
+              display="inline-flex"
+              cursor="help"
+              color="TextSecondary"
+              aria-label="More information"
+              _hover={{ color: 'Brand' }}
+              _focusVisible={{ color: 'Brand', outline: 'none' }}
+            >
+              <Icon as={MdInfoOutline} boxSize="15px" />
+            </chakra.span>
+          </Tooltip>
+        )}
+      </Flex>
       <Text fontSize={{ base: 'sm', md: 'md' }} color="TextSecondary">
         {description}
       </Text>

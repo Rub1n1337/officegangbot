@@ -139,6 +139,9 @@ export const useReactionRoleFeature: UseFormRender<ReactionRoleFeature> = (
                 control={{
                   label: ft('Message ID'),
                   description: ft('Developer Mode → right-click the message → Copy Message ID.'),
+                  tooltip: ft(
+                    'Turn on Developer Mode in Discord (User Settings → Advanced). Then right-click (or long-press on mobile) the message and choose “Copy Message ID”. It is an 18–19 digit number.'
+                  ),
                   error: formState.errors.items?.[index]?.messageId?.message,
                 }}
                 placeholder="123456789012345678"
