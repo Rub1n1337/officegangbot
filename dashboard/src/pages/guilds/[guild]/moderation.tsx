@@ -10,7 +10,7 @@ import {
   Text,
   useToast,
 } from '@chakra-ui/react';
-import { MdDelete, MdGavel, MdTimer, MdHistory } from 'react-icons/md';
+import { MdDelete, MdGavel, MdTimer, MdHistory, MdShield } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -28,6 +28,7 @@ import type {
   AuditEntry,
   ModerationLeaderItem,
   ModerationPunishment,
+  ModerationStrikes,
   ModerationWarning,
 } from '@/config/types/custom-types';
 
@@ -42,6 +43,38 @@ function expiresIn(iso: string | null): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h left`;
   return `${Math.floor(h / 24)}d left`;
+}
+
+// When a user's oldest active strike will drop out of the decay window.
+function decayLabel(iso: string | null): string {
+  if (!iso) return 'never expires';
+  const d = Date.parse(iso);
+  if (Number.isNaN(d)) return '';
+  const s = Math.floor((d - Date.now()) / 1000);
+  if (s <= 0) return 'expiring now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `~${m}m left`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `~${h}h left`;
+  return `~${Math.floor(h / 24)}d left`;
+}
+
+// Colour a strike count by how close it is to the first enabled escalation tier.
+function strikeColor(count: number, s: ModerationStrikes): string {
+  const tiers = [s.muteAt, s.kickAt, s.banAt].filter((t) => t > 0).sort((a, b) => a - b);
+  if (tiers.length === 0) return 'gray';
+  const lowest = tiers[0];
+  if (count >= lowest) return 'red';
+  if (count >= lowest - 1) return 'orange';
+  return 'yellow';
+}
+
+function policyLabel(s: ModerationStrikes): string {
+  const parts: string[] = [];
+  if (s.muteAt > 0) parts.push(`mute at ${s.muteAt}`);
+  if (s.kickAt > 0) parts.push(`kick at ${s.kickAt}`);
+  if (s.banAt > 0) parts.push(`ban at ${s.banAt}`);
+  return parts.join(' · ');
 }
 
 function Section({
@@ -226,6 +259,72 @@ function Punishments({ rows }: { rows: ModerationPunishment[] }) {
   );
 }
 
+const INITIAL_STRIKES = 12;
+
+function Strikes({ data }: { data: ModerationStrikes }) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? data.users : data.users.slice(0, INITIAL_STRIKES);
+  const policy = policyLabel(data);
+
+  return (
+    <Section
+      icon={<Icon as={MdShield} color="Brand" />}
+      title="Active strikes"
+      count={data.users.length}
+    >
+      <Text fontSize="xs" color="TextSecondary" mb={3}>
+        {data.enabled ? 'Strikes on' : 'Strikes off'}
+        {data.expiryHours > 0 ? ` · decay after ${data.expiryHours}h` : ' · never decay'}
+        {policy && ` · ${policy}`}
+      </Text>
+      {data.users.length === 0 ? (
+        <Text fontSize="sm" color="TextSecondary">
+          No members have active strikes.
+        </Text>
+      ) : (
+        <Flex direction="column" gap={2}>
+          {shown.map((u) => (
+            <Flex
+              key={u.userId}
+              align="center"
+              justify="space-between"
+              gap={3}
+              p={3}
+              rounded="xl"
+              bg="blackAlpha.200"
+              _dark={{ bg: 'whiteAlpha.50' }}
+            >
+              <Flex align="center" gap={3} minW={0}>
+                <Badge colorScheme={strikeColor(u.count, data)} rounded="md" flexShrink={0}>
+                  {u.count} {u.count === 1 ? 'strike' : 'strikes'}
+                </Badge>
+                <Text fontWeight="600" isTruncated>
+                  {u.userName}
+                </Text>
+              </Flex>
+              <Box textAlign="right" flexShrink={0}>
+                <Text fontSize="sm" color="TextSecondary">
+                  {decayLabel(u.nextDecayAt)}
+                </Text>
+                {u.lastStrikeAt && (
+                  <Text fontSize="xs" color="TextSecondary" opacity={0.7}>
+                    last {timeAgo(u.lastStrikeAt)}
+                  </Text>
+                )}
+              </Box>
+            </Flex>
+          ))}
+          {data.users.length > INITIAL_STRIKES && (
+            <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Show less' : `Show all ${data.users.length}`}
+            </Button>
+          )}
+        </Flex>
+      )}
+    </Section>
+  );
+}
+
 function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
   const medals = ['🥇', '🥈', '🥉'];
   const [showAll, setShowAll] = useState(false);
@@ -364,6 +463,7 @@ const ModerationPage: NextPageWithLayout = () => {
           <Flex direction="column" gap={5}>
             <Warnings rows={query.data.warnings} guild={guild} />
             <Punishments rows={query.data.punishments} />
+            <Strikes data={query.data.strikes} />
             <Leaderboard rows={query.data.leaderboard} />
           </Flex>
         )}

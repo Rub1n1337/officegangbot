@@ -620,6 +620,7 @@ class MyBot(commands.Bot):
             warnings = await self.db.get_recent_warnings(guild_id, 50)
             punishments = await self.db.get_timed_punishments(guild_id)
             leaderboard = await self.db.get_leaderboard(guild_id, 25)
+            strikes = await self.db.get_active_strikes(guild_id)
             return {
                 "warnings": [
                     {
@@ -651,6 +652,23 @@ class MyBot(commands.Bot):
                     }
                     for r in leaderboard
                 ],
+                "strikes": {
+                    "enabled": strikes["enabled"],
+                    "expiryHours": strikes["expiry_hours"],
+                    "muteAt": strikes["mute_at"],
+                    "kickAt": strikes["kick_at"],
+                    "banAt": strikes["ban_at"],
+                    "users": [
+                        {
+                            "userId": str(u["user_id"]),
+                            "userName": _member_name(u["user_id"]),
+                            "count": int(u["count"]),
+                            "nextDecayAt": u["next_decay"].isoformat() if u["next_decay"] else None,
+                            "lastStrikeAt": u["last_strike"].isoformat() if u["last_strike"] else None,
+                        }
+                        for u in strikes["users"]
+                    ],
+                },
             }
 
         if action == "get_audit":
