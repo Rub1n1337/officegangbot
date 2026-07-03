@@ -4,6 +4,7 @@ import {
   Button,
   Flex,
   Heading,
+  Highlight,
   Icon,
   Input,
   InputGroup,
@@ -21,11 +22,11 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { MdConfirmationNumber, MdSearch, MdDescription } from 'react-icons/md';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useTicketsQuery, useTicketTranscriptQuery } from '@/api/hooks';
+import { useTicketsQuery, useTicketSearchQuery, useTicketTranscriptQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { ErrorPanel } from '@/components/panel/ErrorPanel';
 import { timeAgo, formatDateTime } from '@/utils/audit';
@@ -182,6 +183,92 @@ function TicketsSkeleton() {
   );
 }
 
+function TranscriptHits({
+  hits,
+  query,
+  isLoading,
+  onView,
+}: {
+  hits: Ticket[];
+  query: string;
+  isLoading: boolean;
+  onView: (id: number) => void;
+}) {
+  if (query.length < 2) return null;
+  return (
+    <Box bg="CardBackground" rounded="2xl" p={5}>
+      <Flex align="center" gap={2} mb={3}>
+        <Icon as={MdSearch} color="Brand" />
+        <Heading size="sm">Found in transcripts</Heading>
+        {hits.length > 0 && (
+          <Badge rounded="md" colorScheme="gray">
+            {hits.length}
+          </Badge>
+        )}
+      </Flex>
+      {isLoading ? (
+        <Flex justify="center" py={4}>
+          <Spinner size="sm" />
+        </Flex>
+      ) : hits.length === 0 ? (
+        <Text fontSize="sm" color="TextSecondary">
+          No transcript text matches “{query}”.
+        </Text>
+      ) : (
+        <Flex direction="column" gap={2}>
+          {hits.map((t) => (
+            <Flex
+              key={t.id}
+              align="flex-start"
+              justify="space-between"
+              gap={3}
+              p={3}
+              rounded="xl"
+              bg="blackAlpha.200"
+              _dark={{ bg: 'whiteAlpha.50' }}
+            >
+              <Flex gap={3} flex="1" minW={0} align="flex-start">
+                <PriorityBadge priority={t.priority} />
+                <Box minW={0}>
+                  <Text fontWeight="600" isTruncated maxW="100%">
+                    {t.openerName ?? t.openerId}
+                  </Text>
+                  {t.snippet && (
+                    <Text fontSize="xs" color="TextSecondary" noOfLines={2} mt={0.5}>
+                      …
+                      <Highlight
+                        query={query}
+                        styles={{ px: '0.5', bg: 'yellow.200', color: 'black', rounded: 'sm' }}
+                      >
+                        {t.snippet}
+                      </Highlight>
+                      …
+                    </Text>
+                  )}
+                </Box>
+              </Flex>
+              {t.hasTranscript && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onView(t.id)}
+                  flexShrink={0}
+                  aria-label="View transcript"
+                >
+                  <Icon as={MdDescription} />
+                  <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
+                    Transcript
+                  </Box>
+                </Button>
+              )}
+            </Flex>
+          ))}
+        </Flex>
+      )}
+    </Box>
+  );
+}
+
 const TicketsPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const query = useTicketsQuery(guild);
@@ -190,6 +277,14 @@ const TicketsPage: NextPageWithLayout = () => {
   const [selected, setSelected] = useState<number | null>(null);
   const [visible, setVisible] = useState(PAGE);
   const { onClose } = useDisclosure();
+
+  // Debounce the transcript-search request so it doesn't fire on every keystroke.
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+  const searchQuery = useTicketSearchQuery(guild, debounced);
 
   const rows = useMemo(() => query.data ?? [], [query.data]);
   const q = search.trim().toLowerCase();
@@ -208,6 +303,17 @@ const TicketsPage: NextPageWithLayout = () => {
   );
 
   const openCount = rows.filter((t) => t.status === 'open').length;
+
+  // Transcript matches that aren't already visible in the metadata list above,
+  // and only for the closed-status view (open tickets have no transcript yet).
+  const shownIds = useMemo(() => new Set(filtered.map((t) => t.id)), [filtered]);
+  const transcriptHits = useMemo(
+    () =>
+      (searchQuery.data ?? []).filter(
+        (t) => !shownIds.has(t.id) && (status === 'all' || t.status === status)
+      ),
+    [searchQuery.data, shownIds, status]
+  );
 
   return (
     <Flex direction="column" gap={5}>
@@ -236,7 +342,7 @@ const TicketsPage: NextPageWithLayout = () => {
                 </InputLeftElement>
                 <Input
                   variant="main"
-                  placeholder="Search opener or comment…"
+                  placeholder="Search tickets & transcripts…"
                   value={search}
                   onChange={(ev) => setSearch(ev.target.value)}
                 />
@@ -285,6 +391,13 @@ const TicketsPage: NextPageWithLayout = () => {
           )}
         </Box>
       </QueryStatus>
+
+      <TranscriptHits
+        hits={transcriptHits}
+        query={debounced}
+        isLoading={searchQuery.isFetching}
+        onView={setSelected}
+      />
 
       <TranscriptModal
         guild={guild}

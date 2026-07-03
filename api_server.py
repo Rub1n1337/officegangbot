@@ -375,11 +375,13 @@ async def get_audit(request: Request, guild_id: int):
     return data
 
 @app.get("/api/guild/{guild_id}/tickets", dependencies=[Depends(verify_api_key)])
-@limiter.limit("30/minute")
-async def get_tickets(request: Request, guild_id: int):
-    """Returns the guild's tickets (open first, then most recent)."""
-    data = await _rpc("get_tickets", guild_id=guild_id)
-    return data
+@limiter.limit("60/minute")
+async def get_tickets(request: Request, guild_id: int, q: str = ""):
+    """Returns the guild's tickets (open first, then most recent). With `q`,
+    searches inside closed-ticket transcripts and closing comments instead."""
+    if q.strip():
+        return await _rpc("search_tickets", guild_id=guild_id, query=q)
+    return await _rpc("get_tickets", guild_id=guild_id)
 
 @app.get("/api/guild/{guild_id}/tickets/{ticket_id}", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")

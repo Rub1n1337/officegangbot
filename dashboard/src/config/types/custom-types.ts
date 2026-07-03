@@ -189,6 +189,8 @@ export type Ticket = {
   closedByName: string | null;
   closeComment: string | null;
   hasTranscript: boolean;
+  // Only present on transcript-search results: text around the first match.
+  snippet?: string | null;
 };
 
 export type TicketDetail = {

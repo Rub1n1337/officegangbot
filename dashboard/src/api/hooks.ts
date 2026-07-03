@@ -14,6 +14,7 @@ import {
   fetchMemberDetail,
   fetchModeration,
   fetchTickets,
+  searchTickets,
   fetchTicketTranscript,
   getFeature,
   moderateMember,
@@ -431,6 +432,25 @@ export function useTicketsQuery(guild: string) {
     async () => (await fetchTickets(session!!, guild)).tickets,
     {
       enabled: status === 'authenticated',
+      staleTime: 20_000,
+      retry: 2,
+      retryDelay,
+    }
+  );
+}
+
+// Searches inside closed-ticket transcripts. Enabled only once the (debounced)
+// query is at least 2 characters, so typing doesn't fire a request per keystroke.
+export function useTicketSearchQuery(guild: string, query: string) {
+  const { status, session } = useSession();
+  const q = query.trim();
+
+  return useQuery<Ticket[]>(
+    ['ticket_search', guild, q],
+    async () => (await searchTickets(session!!, guild, q)).tickets,
+    {
+      enabled: status === 'authenticated' && q.length >= 2,
+      keepPreviousData: true,
       staleTime: 20_000,
       retry: 2,
       retryDelay,
