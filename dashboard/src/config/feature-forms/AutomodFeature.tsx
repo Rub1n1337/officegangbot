@@ -33,6 +33,7 @@ import {
   MdAdd,
   MdDelete,
   MdRule,
+  MdScience,
 } from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
 import { useFormText } from '@/config/translations/form-text';
@@ -40,6 +41,7 @@ import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
 const schema = z.object({
+  dryRun: z.boolean(),
   blockInvites: z.boolean(),
   blockLinks: z.boolean(),
   allowedDomains: z.array(z.string()),
@@ -197,6 +199,7 @@ function NumberRule({
 
 function defaultsFrom(data: Partial<AutomodFeature>): Input {
   return {
+    dryRun: data.dryRun ?? false,
     blockInvites: data.blockInvites ?? false,
     blockLinks: data.blockLinks ?? false,
     allowedDomains: (data.allowedDomains ?? []).slice().sort(),
@@ -228,10 +231,42 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
   const { fields, append, remove } = useFieldArray({ control, name: 'rules' });
   const blockLinks = watch('blockLinks');
   const strikesEnabled = watch('strikesEnabled');
+  const dryRun = watch('dryRun');
 
   return {
     component: (
       <Flex direction="column" gap={3}>
+        <ToggleRule
+          icon={MdScience}
+          title={ft('Dry-run (test mode)')}
+          description={ft(
+            'Detect and log violations to your log channel without deleting messages, timing out members or adding strikes. Use it to tune your rules safely before enforcing them.'
+          )}
+          checked={dryRun}
+          onChange={(v) => setValue('dryRun', v, { shouldDirty: true })}
+        />
+        {dryRun && (
+          <Flex
+            bg="orange.50"
+            _dark={{ bg: 'orange.900', borderColor: 'orange.700' }}
+            borderWidth="1px"
+            borderColor="orange.200"
+            rounded="xl"
+            p={3}
+            gap={2}
+            align="center"
+          >
+            <Icon as={MdScience} color="orange.500" flexShrink={0} />
+            <Text fontSize="sm" color="orange.800" _dark={{ color: 'orange.100' }}>
+              {ft(
+                'Dry-run is on — AutoMod will only log what it would do (needs the Logging feature and a punishment log channel). No messages are deleted and no strikes are added.'
+              )}
+            </Text>
+          </Flex>
+        )}
+
+        <Divider my={1} />
+
         <Text fontWeight="600">{ft('Content filter')}</Text>
         <ToggleRule
           icon={MdGroupAdd}
@@ -437,6 +472,7 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
     onSubmit: handleSubmit(async (e) => {
       const result = await onSubmit(
         JSON.stringify({
+          dryRun: e.dryRun,
           blockInvites: e.blockInvites,
           blockLinks: e.blockLinks,
           allowedDomains: e.allowedDomains,
