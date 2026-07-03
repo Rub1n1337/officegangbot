@@ -655,7 +655,7 @@ class MyBot(commands.Bot):
         if action == "get_audit":
             if not self.db:
                 return {"error": "Database unavailable"}
-            entries = await self.db.get_dashboard_audit(guild_id, 50)
+            entries = await self.db.get_dashboard_audit(guild_id, 200)
             return {
                 "entries": [
                     {
