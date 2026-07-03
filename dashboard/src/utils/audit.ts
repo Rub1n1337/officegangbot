@@ -68,3 +68,22 @@ export function actionLabel(action: string): string {
   const s = action.replace(/_/g, ' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+/** Serialize audit entries to CSV (RFC-4180 quoting) for export. Prefixed with a
+ * BOM so Excel reads the UTF-8 correctly. */
+export function auditToCsv(entries: AuditEntry[]): string {
+  const esc = (v: string | null | undefined): string => {
+    const s = v == null ? '' : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = ['Timestamp', 'Actor', 'Action', 'Description', 'Target', 'Detail'];
+  const lines = [header.join(',')];
+  for (const e of entries) {
+    lines.push(
+      [e.createdAt ?? '', e.actorName ?? '', e.action, describeAudit(e), e.target ?? '', e.detail ?? '']
+        .map(esc)
+        .join(',')
+    );
+  }
+  return '﻿' + lines.join('\r\n');
+}
