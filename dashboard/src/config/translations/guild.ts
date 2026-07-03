@@ -22,6 +22,7 @@ export const guild = createI18n(provider, {
       members: 'Members',
       tickets: 'Tickets',
       audit: 'Audit log',
+      analytics: 'Analytics',
     },
   },
   ru: {
@@ -44,6 +45,7 @@ export const guild = createI18n(provider, {
       members: 'Участники',
       tickets: 'Тикеты',
       audit: 'Журнал',
+      analytics: 'Аналитика',
     },
   },
   cn: {
@@ -66,6 +68,7 @@ export const guild = createI18n(provider, {
       members: '成員',
       tickets: '工單',
       audit: '審計日誌',
+      analytics: '分析',
     },
   },
 });

@@ -374,6 +374,13 @@ async def get_audit(request: Request, guild_id: int):
     data = await _rpc("get_audit", guild_id=guild_id)
     return data
 
+@app.get("/api/guild/{guild_id}/analytics", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def get_analytics(request: Request, guild_id: int, days: int = 30):
+    """Returns the activity heatmap plus moderation/ticket trends for a guild."""
+    data = await _rpc("get_analytics", guild_id=guild_id, days=days)
+    return data
+
 @app.get("/api/guild/{guild_id}/tickets", dependencies=[Depends(verify_api_key)])
 @limiter.limit("60/minute")
 async def get_tickets(request: Request, guild_id: int, q: str = ""):

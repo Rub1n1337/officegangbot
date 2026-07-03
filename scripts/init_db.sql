@@ -276,6 +276,19 @@ CREATE TABLE IF NOT EXISTS level_seasons (
 
 CREATE INDEX IF NOT EXISTS idx_level_seasons_guild ON level_seasons(guild_id, season_number DESC);
 
+-- Activity analytics: an *aggregate* count of human messages per guild, bucketed
+-- by weekday (0=Mon..6=Sun) and hour (0-23, UTC). Deliberately stores NO message
+-- content, author or per-message timestamp — only a running count per bucket, so
+-- there is nothing to age out and no PII. Powers the dashboard activity heatmap.
+CREATE TABLE IF NOT EXISTS activity_buckets (
+    guild_id BIGINT NOT NULL,
+    weekday SMALLINT NOT NULL,
+    hour SMALLINT NOT NULL,
+    count BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, weekday, hour),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;

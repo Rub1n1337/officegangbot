@@ -3,6 +3,7 @@ import { QueryClient, onlineManager, useMutation, useQuery } from '@tanstack/rea
 import { UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
 import {
   deleteWarning,
+  fetchAnalytics,
   fetchAudit,
   disableFeature,
   enableFeature,
@@ -25,6 +26,7 @@ import {
 import type { ModeratePayload } from '@/api/bot';
 import { GuildInfo } from '@/config/types';
 import type {
+  AnalyticsData,
   AuditEntry,
   MemberDetail,
   MemberSearchItem,
@@ -482,6 +484,22 @@ export function useModerationQuery(guild: string) {
     retry: 2,
     retryDelay,
   });
+}
+
+export function useAnalyticsQuery(guild: string, days: number) {
+  const { status, session } = useSession();
+
+  return useQuery<AnalyticsData>(
+    ['analytics', guild, days],
+    () => fetchAnalytics(session!!, guild, days),
+    {
+      enabled: status === 'authenticated',
+      keepPreviousData: true,
+      staleTime: 60_000,
+      retry: 2,
+      retryDelay,
+    }
+  );
 }
 
 export function useDeleteWarningMutation() {

@@ -459,6 +459,7 @@ class MyBot(commands.Bot):
             "get_moderation", "delete_warning", "set_locale",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
+            "get_analytics",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -670,6 +671,12 @@ class MyBot(commands.Bot):
                     ],
                 },
             }
+
+        if action == "get_analytics":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            days = self._clamp_int(payload.get("days"), 30, 7, 90)
+            return await self.db.get_analytics(guild_id, days)
 
         if action == "get_audit":
             if not self.db:
