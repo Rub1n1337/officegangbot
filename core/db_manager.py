@@ -866,6 +866,47 @@ class DatabaseManager:
                 )
         return int(count)
 
+    async def get_active_strikes(self, guild_id: int) -> Dict[str, Any]:
+        """Summarises AutoMod strikes per user for the dashboard: how many are
+        currently active (inside the decay window) and when each user's oldest
+        active strike will decay, so the UI can show "N strikes, next expires
+        in X". Also returns the strike-escalation config for context."""
+        async with self.pool.acquire() as conn:
+            cfg = await conn.fetchrow(
+                "SELECT automod_strikes_enabled, automod_strike_expiry_hours, "
+                "automod_strike_mute_at, automod_strike_kick_at, automod_strike_ban_at "
+                "FROM guilds WHERE guild_id = $1",
+                guild_id,
+            )
+            expiry = int(cfg["automod_strike_expiry_hours"]) if cfg and cfg["automod_strike_expiry_hours"] is not None else 24
+            if expiry > 0:
+                rows = await conn.fetch(
+                    "SELECT user_id, COUNT(*) AS count, "
+                    "MIN(created_at) + ($2 || ' hours')::interval AS next_decay, "
+                    "MAX(created_at) AS last_strike "
+                    "FROM automod_strikes WHERE guild_id = $1 "
+                    "AND created_at > NOW() - ($2 || ' hours')::interval "
+                    "GROUP BY user_id ORDER BY count DESC, last_strike DESC",
+                    guild_id, str(expiry),
+                )
+            else:
+                # No decay: every strike counts forever, so there is no expiry.
+                rows = await conn.fetch(
+                    "SELECT user_id, COUNT(*) AS count, "
+                    "NULL::timestamptz AS next_decay, MAX(created_at) AS last_strike "
+                    "FROM automod_strikes WHERE guild_id = $1 "
+                    "GROUP BY user_id ORDER BY count DESC, last_strike DESC",
+                    guild_id,
+                )
+        return {
+            "enabled": bool(cfg["automod_strikes_enabled"]) if cfg else False,
+            "expiry_hours": expiry,
+            "mute_at": int(cfg["automod_strike_mute_at"]) if cfg and cfg["automod_strike_mute_at"] is not None else 0,
+            "kick_at": int(cfg["automod_strike_kick_at"]) if cfg and cfg["automod_strike_kick_at"] is not None else 0,
+            "ban_at": int(cfg["automod_strike_ban_at"]) if cfg and cfg["automod_strike_ban_at"] is not None else 0,
+            "users": [dict(r) for r in rows],
+        }
+
     # --- Role menus --------------------------------------------------------
 
     async def get_reaction_menus(self, guild_id: int) -> List[Dict[str, Any]]:

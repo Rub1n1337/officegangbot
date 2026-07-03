@@ -44,10 +44,28 @@ export type ModerationLeaderItem = {
   xp: number;
 };
 
+export type ModerationStrikeUser = {
+  userId: string;
+  userName: string;
+  count: number;
+  nextDecayAt: string | null;
+  lastStrikeAt: string | null;
+};
+
+export type ModerationStrikes = {
+  enabled: boolean;
+  expiryHours: number;
+  muteAt: number;
+  kickAt: number;
+  banAt: number;
+  users: ModerationStrikeUser[];
+};
+
 export type ModerationData = {
   warnings: ModerationWarning[];
   punishments: ModerationPunishment[];
   leaderboard: ModerationLeaderItem[];
+  strikes: ModerationStrikes;
 };
 
 export type AuditEntry = {
