@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuditEntry,
   CustomFeatures,
   CustomGuildInfo,
@@ -77,6 +78,22 @@ export async function fetchGuildStats(session: AccessToken, guild: string): Prom
 export async function fetchModeration(session: AccessToken, guild: string): Promise<ModerationData> {
   return await callReturn<ModerationData>(
     `/api/guild/${guild}/moderation`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
+/** Activity heatmap + moderation/ticket trends for a guild over the last `days`. */
+export async function fetchAnalytics(
+  session: AccessToken,
+  guild: string,
+  days: number
+): Promise<AnalyticsData> {
+  return await callReturn<AnalyticsData>(
+    `/api/guild/${guild}/analytics?days=${days}`,
     botRequest(session, {
       request: {
         method: 'GET',

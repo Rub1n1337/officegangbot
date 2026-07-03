@@ -68,6 +68,22 @@ export type ModerationData = {
   strikes: ModerationStrikes;
 };
 
+export type HeatmapCell = { weekday: number; hour: number; count: number };
+export type DayCount = { day: string; count: number };
+export type ModActionDay = { day: string; action: string; count: number };
+export type TopModerator = { name: string; count: number };
+
+export type AnalyticsData = {
+  days: number;
+  heatmap: HeatmapCell[];
+  modActionsByDay: ModActionDay[];
+  automodByDay: DayCount[];
+  ticketsOpenedByDay: DayCount[];
+  ticketsClosedByDay: DayCount[];
+  avgTicketResolutionHours: number | null;
+  topModerators: TopModerator[];
+};
+
 export type AuditEntry = {
   id: number;
   actorId: string | null;

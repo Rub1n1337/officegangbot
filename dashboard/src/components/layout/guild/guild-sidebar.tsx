@@ -7,7 +7,7 @@ import { getFeatures } from '@/utils/common';
 import { featureCategories } from '@/config/features';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 import { IoStatsChart, IoSearch, IoPeople } from 'react-icons/io5';
-import { MdGavel, MdHistory, MdConfirmationNumber } from 'react-icons/md';
+import { MdGavel, MdHistory, MdConfirmationNumber, MdInsights } from 'react-icons/md';
 import { useGuildPreview } from '@/api/hooks';
 import { sidebarBreakpoint } from '@/theme/breakpoints';
 import { guild as view } from '@/config/translations/guild';
@@ -81,6 +81,12 @@ export function InGuildSidebar() {
           active={router.route === `/guilds/[guild]/audit`}
           icon={<Icon as={MdHistory} />}
           name={t.bn.audit}
+        />
+        <SidebarItem
+          href={`/guilds/${guildId}/analytics`}
+          active={router.route === `/guilds/[guild]/analytics`}
+          icon={<Icon as={MdInsights} />}
+          name={t.bn.analytics}
         />
         {featureCategories.map((cat) => {
           const items = getFeatures().filter((f) => f.category === cat.id);
