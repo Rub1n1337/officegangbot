@@ -235,11 +235,13 @@ async def _rpc(action: str, **kwargs) -> Any:
     # still count as successful RPCs for latency/error metrics.
     metrics.record(action, (time.perf_counter() - start) * 1000, ok=True)
     if isinstance(envelope, dict) and "error" in envelope and "data" not in envelope:
-        # Logical errors from the bot handler (e.g. "Guild not found") arrive as a
-        # bare {"error": ...} envelope. Map "not found" to 404 so the dashboard can
-        # tell "bot isn't in this guild" apart from a real gateway failure (502).
+        # Logical errors from the bot handler (e.g. "Guild not found", a rejected
+        # AutoMod pattern) arrive as a bare {"error": ...} envelope. These are the
+        # bot refusing a request, not a gateway failure — 404 for "not found",
+        # otherwise 400 so the dashboard can surface the message as a validation
+        # error rather than a scary 5xx.
         err = envelope["error"]
-        status = 404 if isinstance(err, str) and "not found" in err.lower() else 502
+        status = 404 if isinstance(err, str) and "not found" in err.lower() else 400
         raise HTTPException(status_code=status, detail=err)
 
     result = envelope.get("data", envelope) if isinstance(envelope, dict) else envelope

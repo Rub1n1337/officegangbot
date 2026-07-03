@@ -49,8 +49,18 @@ export async function callReturn<T>(url: string, init: ReturnOptions<T>): Promis
 /** throw error if condition matches */
 async function handleError(res: Response, options: Options) {
   if (!res.ok && (options.errorOnFail ?? true)) {
-    const raw = await res.json();
-    throw new Error(raw);
+    // Surface the API's `{ detail: "..." }` (or a string body) as the Error
+    // message. Previously this threw `new Error(rawObject)`, whose message became
+    // the useless "[object Object]" — so callers couldn't show why a save failed.
+    let message = `Request failed (${res.status})`;
+    try {
+      const raw = await res.json();
+      if (raw && typeof raw.detail === 'string') message = raw.detail;
+      else if (typeof raw === 'string' && raw) message = raw;
+    } catch {
+      /* non-JSON body — keep the status message */
+    }
+    throw new Error(message);
   }
 }
 

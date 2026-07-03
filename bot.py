@@ -26,7 +26,7 @@ from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
 from core.permissions import role_is_assignable
 from core.content_filter import normalize_domain
-from core.automod_rules import sanitize_rules
+from core.automod_rules import sanitize_rules, validate_pattern, MAX_RULES
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from core.observability import init_sentry
@@ -996,6 +996,21 @@ class MyBot(commands.Bot):
             # AutoMod content-filter config (invite/link blocking) lives in guilds
             # columns but is cached, so it goes through set_automod_config.
             if feature == "automod":
+                # Validate custom regex rules up front so a bad/unsafe pattern
+                # rejects the whole save (no partial write) with a clear message,
+                # instead of the config being written and the rule silently dropped.
+                rules_raw = options.get("rules")
+                if isinstance(rules_raw, list):
+                    non_empty = [r for r in rules_raw if str(r.get("pattern", "")).strip()]
+                    if len(non_empty) > MAX_RULES:
+                        return {"error": f"Too many custom filters (max {MAX_RULES})."}
+                    for r in non_empty:
+                        pattern = str(r.get("pattern", "")).strip()
+                        reason = validate_pattern(pattern)
+                        if reason:
+                            preview = pattern if len(pattern) <= 40 else pattern[:40] + "…"
+                            return {"error": f"Custom filter “{preview}” rejected — {reason}."}
+
                 block_invites = bool(options.get("blockInvites", False))
                 block_links = bool(options.get("blockLinks", False))
                 domains_raw = options.get("allowedDomains") or []
@@ -1019,8 +1034,7 @@ class MyBot(commands.Bot):
                     guild_id, strikes_enabled, strike_expiry, strike_mute, strike_kick, strike_ban,
                 )
 
-                # Custom regex rules: validated/capped server-side before persisting.
-                rules_raw = options.get("rules")
+                # Persist the (already-validated above) custom regex rules.
                 if isinstance(rules_raw, list):
                     await self.db.replace_automod_rules(guild_id, sanitize_rules(rules_raw))
 
