@@ -109,6 +109,22 @@ export async function fetchTickets(session: AccessToken, guild: string): Promise
   );
 }
 
+/** Searches inside closed-ticket transcripts and closing comments. */
+export async function searchTickets(
+  session: AccessToken,
+  guild: string,
+  query: string
+): Promise<{ tickets: Ticket[] }> {
+  return await callReturn<{ tickets: Ticket[] }>(
+    `/api/guild/${guild}/tickets?q=${encodeURIComponent(query)}`,
+    botRequest(session, {
+      request: {
+        method: 'GET',
+      },
+    })
+  );
+}
+
 /** A single ticket's metadata plus its full transcript. */
 export async function fetchTicketTranscript(
   session: AccessToken,

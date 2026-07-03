@@ -458,7 +458,7 @@ class MyBot(commands.Bot):
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale",
             "search_members", "get_member", "moderate_member", "get_audit",
-            "get_tickets", "get_ticket_transcript",
+            "get_tickets", "get_ticket_transcript", "search_tickets",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -709,6 +709,34 @@ class MyBot(commands.Bot):
                         "closedByName": r["closed_by_name"],
                         "closeComment": r["close_comment"],
                         "hasTranscript": bool(r["has_transcript"]),
+                    }
+                    for r in rows
+                ]
+            }
+
+        if action == "search_tickets":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            query = str(payload.get("query") or "").strip()
+            if len(query) < 2:
+                return {"tickets": []}
+            rows = await self.db.search_ticket_transcripts(guild_id, query[:100], 50)
+            return {
+                "tickets": [
+                    {
+                        "id": r["id"],
+                        "channelId": str(r["channel_id"]),
+                        "openerId": str(r["opener_id"]),
+                        "openerName": r["opener_name"],
+                        "priority": r["priority"],
+                        "status": r["status"],
+                        "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
+                        "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
+                        "closedById": str(r["closed_by_id"]) if r["closed_by_id"] else None,
+                        "closedByName": r["closed_by_name"],
+                        "closeComment": r["close_comment"],
+                        "hasTranscript": bool(r["has_transcript"]),
+                        "snippet": r["snippet"],
                     }
                     for r in rows
                 ]

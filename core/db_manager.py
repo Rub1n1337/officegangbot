@@ -1064,6 +1064,34 @@ class DatabaseManager:
             )
         return [dict(r) for r in rows]
 
+    async def search_ticket_transcripts(
+        self, guild_id: int, query: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Full-text-ish search across closed ticket transcripts (and closing
+        comments). Returns matching tickets in the same shape as get_tickets,
+        plus a short `snippet` of transcript text around the first match."""
+        # Escape LIKE wildcards so the user's text is matched literally; the raw
+        # query is used for position()/substring() to build the snippet window.
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, channel_id, opener_id, opener_name, priority, status, "
+                "opened_at, closed_at, closed_by_id, closed_by_name, close_comment, "
+                "(transcript IS NOT NULL) AS has_transcript, "
+                "CASE WHEN position(lower($2) in lower(transcript)) > 0 THEN "
+                "  substring(transcript from greatest(1, position(lower($2) in lower(transcript)) - 40) "
+                "            for char_length($2) + 80) "
+                "  ELSE NULL END AS snippet "
+                "FROM tickets "
+                "WHERE guild_id = $1 AND transcript IS NOT NULL "
+                "AND (transcript ILIKE '%' || $3 || '%' ESCAPE '\\' "
+                "     OR close_comment ILIKE '%' || $3 || '%' ESCAPE '\\') "
+                "ORDER BY (status = 'open') DESC, COALESCE(closed_at, opened_at) DESC "
+                "LIMIT $4",
+                guild_id, query, escaped, max(1, min(int(limit), 100)),
+            )
+        return [dict(r) for r in rows]
+
     async def get_ticket_transcript(self, guild_id: int, ticket_id: int) -> Optional[Dict[str, Any]]:
         """Returns a single ticket's metadata + full transcript, scoped to guild."""
         async with self.pool.acquire() as conn:
