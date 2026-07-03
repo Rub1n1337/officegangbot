@@ -273,12 +273,18 @@ export function useUpdateFeatureMutation() {
           position: 'bottom-right',
         });
       },
-      onError() {
+      onError(error: unknown) {
+        // Show the server's reason (e.g. a rejected AutoMod regex) instead of a
+        // generic message, so the user can actually fix the problem.
+        const description =
+          error instanceof Error && error.message
+            ? error.message
+            : 'An error occurred while saving. Please try again.';
         toast({
           title: 'Failed to save settings',
-          description: 'An error occurred while saving. Please try again.',
+          description,
           status: 'error',
-          duration: 5000,
+          duration: 6000,
           isClosable: true,
           position: 'bottom-right',
         });
