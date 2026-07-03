@@ -121,6 +121,9 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
                 control={{
                   label: ft('Date & time (your local time)'),
                   description: ft('When to first post it'),
+                  tooltip: ft(
+                    'Entered in your browser’s timezone and converted automatically — the bot posts at that exact moment. Recurring schedules repeat from this time.'
+                  ),
                   error: formState.errors.items?.[index]?.scheduledAt?.message,
                 }}
                 type="datetime-local"

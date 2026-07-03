@@ -187,6 +187,9 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
             control={{
               label: ft('Global multiplier'),
               description: ft('Applies to all XP (e.g. 2 for a double-XP weekend). 0.1–10.'),
+              tooltip: ft(
+                'Stacks with the per-role multipliers below: a member’s XP = base × this × their best role multiplier.'
+              ),
               error: formState.errors.xpMultiplier?.message,
             }}
             type="number"

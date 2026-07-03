@@ -91,6 +91,8 @@ const RU: Record<string, string> = {
   'Global multiplier': 'Глобальный множитель',
   'Applies to all XP (e.g. 2 for a double-XP weekend). 0.1–10.':
     'Применяется ко всему опыту (напр. 2 — двойной опыт на выходных). 0.1–10.',
+  'Stacks with the per-role multipliers below: a member’s XP = base × this × their best role multiplier.':
+    'Складывается с множителями по ролям ниже: опыт участника = база × этот множитель × лучший множитель его ролей.',
   'Prestige level': 'Уровень престижа',
   'Members can /prestige at this level. 0 disables prestige.':
     'На этом уровне участники могут /prestige. 0 отключает престиж.',
@@ -166,6 +168,8 @@ const RU: Record<string, string> = {
   'Message ID': 'ID сообщения',
   'Developer Mode → right-click the message → Copy Message ID.':
     'Режим разработчика → ПКМ по сообщению → «Копировать ID сообщения».',
+  'Turn on Developer Mode in Discord (User Settings → Advanced). Then right-click (or long-press on mobile) the message and choose “Copy Message ID”. It is an 18–19 digit number.':
+    'Включите режим разработчика в Discord (Настройки → Расширенные). Затем ПКМ (или долгое нажатие на телефоне) по сообщению → «Копировать ID сообщения». Это число из 18–19 цифр.',
   Emoji: 'Эмодзи',
   'Emoji members react with': 'Эмодзи, которым реагируют участники',
   'Role to grant on reaction': 'Роль, выдаваемая за реакцию',
@@ -196,6 +200,8 @@ const RU: Record<string, string> = {
   'Where to post the message': 'Куда отправлять сообщение',
   'Date & time (your local time)': 'Дата и время (по вашему местному времени)',
   'When to first post it': 'Когда отправить впервые',
+  'Entered in your browser’s timezone and converted automatically — the bot posts at that exact moment. Recurring schedules repeat from this time.':
+    'Указывается в часовом поясе вашего браузера и конвертируется автоматически — бот отправит ровно в этот момент. Повторяющиеся расписания считаются от этого времени.',
   'Up to 2000 characters.': 'До 2000 символов.',
   '📢 Weekly reminder: read the rules and have a great week!':
     '📢 Еженедельное напоминание: прочтите правила и хорошей недели!',
