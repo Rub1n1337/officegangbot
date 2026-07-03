@@ -41,6 +41,11 @@ const RU: Record<string, string> = {
   'Mention limit': 'Лимит упоминаний',
   'Delete a message with more than this many user/role mentions.':
     'Удалять сообщение, где упоминаний пользователей/ролей больше этого числа.',
+  'Dry-run (test mode)': 'Пробный режим (без действий)',
+  'Detect and log violations to your log channel without deleting messages, timing out members or adding strikes. Use it to tune your rules safely before enforcing them.':
+    'Находит и записывает нарушения в лог-канал, но не удаляет сообщения, не выдаёт таймауты и не начисляет страйки. Удобно, чтобы безопасно настроить правила перед включением.',
+  'Dry-run is on — AutoMod will only log what it would do (needs the Logging feature and a punishment log channel). No messages are deleted and no strikes are added.':
+    'Пробный режим включён — AutoMod только записывает, что сделал бы (нужны функция «Логирование» и канал лога наказаний). Сообщения не удаляются, страйки не начисляются.',
   'Strike system': 'Система страйков',
   'Enable strikes': 'Включить страйки',
   'Every AutoMod violation adds a strike; crossing a threshold escalates the punishment.':

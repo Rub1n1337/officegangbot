@@ -289,6 +289,9 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_spam_count INTEGER DEFAULT 5
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_spam_window INTEGER DEFAULT 3;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_mention_limit INTEGER DEFAULT 5;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_mass_mentions BOOLEAN DEFAULT FALSE;
+-- AutoMod dry-run: detect + log violations without deleting/timing-out/striking,
+-- so admins can tune filters safely before enforcing.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_dry_run BOOLEAN DEFAULT FALSE;
 -- AutoMod strike escalation: each violation records a strike; at the configured
 -- thresholds the member is muted / kicked / banned (0 = that tier disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strikes_enabled BOOLEAN DEFAULT FALSE;

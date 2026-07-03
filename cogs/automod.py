@@ -40,6 +40,15 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             return
         member = message.author
         guild = message.guild
+        if config.get("dry_run"):
+            # Dry-run: report the strike that *would* be issued, but don't
+            # touch the strike count or escalate.
+            await self._log_automod(
+                guild,
+                f"🧪 **[Dry-run]** Would add a **strike** to {member.mention} "
+                f"(`{member.id}`) — {reason}",
+            )
+            return
         try:
             count = await self.bot.db.add_strike(
                 guild.id, member.id, reason, config.get("strike_expiry_hours", 24)
@@ -122,9 +131,14 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         except discord.Forbidden:
             pass
 
-    async def _block_message(self, message: discord.Message, loc: str, notice_key: str, log_description: str):
+    async def _block_message(self, message: discord.Message, loc: str, notice_key: str,
+                             log_description: str, dry_run: bool = False):
         """Delete a message that broke a content rule, briefly notify the author,
-        and record it in the AutoMod log."""
+        and record it in the AutoMod log. In dry-run mode nothing is deleted —
+        only a log entry is written so admins can see what *would* have happened."""
+        if dry_run:
+            await self._log_automod(message.guild, f"🧪 **[Dry-run]** No action — {log_description}")
+            return
         try:
             await message.delete()
         except (discord.Forbidden, discord.NotFound):
@@ -159,10 +173,14 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
 
         # --- Content filter (invite / link blocking) ---
         config = await self.bot.db.get_automod_config(guild_id)
+        # In dry-run mode we still run every detection below, but log what *would*
+        # have happened instead of deleting/timing-out/striking.
+        dry_run = config["dry_run"]
         if config["block_invites"] and contains_invite(message.content):
             await self._block_message(
                 message, loc, "automod.invite_blocked",
                 f"**Invite link** by {message.author.mention} (`{user_id}`) — message deleted.",
+                dry_run=dry_run,
             )
             await self._register_strike(message, "invite link")
             return
@@ -172,6 +190,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self._block_message(
                     message, loc, "automod.link_blocked",
                     f"**Disallowed link** by {message.author.mention} (`{user_id}`) — message deleted.",
+                    dry_run=dry_run,
                 )
                 await self._register_strike(message, "disallowed link")
                 return
@@ -184,6 +203,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 await self._block_message(
                     message, loc, "automod.rule_blocked",
                     f"**Custom filter** matched a message by {message.author.mention} (`{user_id}`) — deleted.",
+                    dry_run=dry_run,
                 )
                 if matched == "strike":
                     await self._register_strike(message, "custom filter match")
@@ -191,19 +211,12 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
 
         # --- Mass mentions (@everyone / @here) ---
         if config["block_mass_mentions"] and message.mention_everyone:
-            try:
-                await message.delete()
-                await message.channel.send(
-                    t(loc, "automod.mass_mention_blocked", mention=message.author.mention),
-                    delete_after=5
-                )
-                await self._log_automod(
-                    message.guild,
-                    f"**Mass mention** (@everyone/@here) by {message.author.mention} "
-                    f"(`{user_id}`) — message deleted."
-                )
-            except discord.Forbidden:
-                pass
+            await self._block_message(
+                message, loc, "automod.mass_mention_blocked",
+                f"**Mass mention** (@everyone/@here) by {message.author.mention} "
+                f"(`{user_id}`) — message deleted.",
+                dry_run=dry_run,
+            )
             await self._register_strike(message, "mass mention")
             return
 
@@ -211,19 +224,12 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         mention_limit = config["mention_limit"]
         total_mentions = len(message.mentions) + len(message.role_mentions)
         if total_mentions > mention_limit:
-            try:
-                await message.delete()
-                await message.channel.send(
-                    t(loc, "automod.mention_spam", mention=message.author.mention),
-                    delete_after=5
-                )
-                await self._log_automod(
-                    message.guild,
-                    f"**Mention Spam** by {message.author.mention} (`{user_id}`)\n"
-                    f"Message contained **{total_mentions}** mentions and was deleted."
-                )
-            except discord.Forbidden:
-                pass
+            await self._block_message(
+                message, loc, "automod.mention_spam",
+                f"**Mention Spam** by {message.author.mention} (`{user_id}`)\n"
+                f"Message contained **{total_mentions}** mentions and was deleted.",
+                dry_run=dry_run,
+            )
             await self._register_strike(message, "mention spam")
             return
 
@@ -234,19 +240,27 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             msg_count = await self.bot.redis.log_message(guild_id, user_id, spam_window)
             if msg_count >= spam_count:
                 await self.bot.redis.clear_message_log(guild_id, user_id)
-                try:
-                    await message.channel.send(
-                        t(loc, "automod.spam_timeout", mention=message.author.mention),
-                        delete_after=10
+                if dry_run:
+                    await self._log_automod(
+                        message.guild,
+                        f"🧪 **[Dry-run]** No action — **spam** by {message.author.mention} "
+                        f"(`{user_id}`): {spam_count}+ messages in {spam_window}s "
+                        f"(would time out 10m)."
                     )
-                except discord.Forbidden:
-                    pass
-                await self._log_automod(
-                    message.guild,
-                    f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                    f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
-                )
-                await self._apply_timeout(message.author, "AutoMod: spam detection")
+                else:
+                    try:
+                        await message.channel.send(
+                            t(loc, "automod.spam_timeout", mention=message.author.mention),
+                            delete_after=10
+                        )
+                    except discord.Forbidden:
+                        pass
+                    await self._log_automod(
+                        message.guild,
+                        f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
+                        f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
+                    )
+                    await self._apply_timeout(message.author, "AutoMod: spam detection")
                 await self._register_strike(message, "spam")
         else:
             # Fallback to in-memory if Redis unavailable
@@ -266,20 +280,28 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
 
             if len(user_log) >= spam_count:
                 user_log.clear()
-                try:
-                    await message.channel.send(
-                        t(loc, "automod.spam_timeout", mention=message.author.mention),
-                        delete_after=10
+                if dry_run:
+                    await self._log_automod(
+                        message.guild,
+                        f"🧪 **[Dry-run]** No action — **spam** by {message.author.mention} "
+                        f"(`{user_id}`): {spam_count}+ messages in {spam_window}s "
+                        f"(would time out 10m)."
                     )
-                except discord.Forbidden:
-                    pass
+                else:
+                    try:
+                        await message.channel.send(
+                            t(loc, "automod.spam_timeout", mention=message.author.mention),
+                            delete_after=10
+                        )
+                    except discord.Forbidden:
+                        pass
 
-                await self._log_automod(
-                    message.guild,
-                    f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                    f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
-                )
-                await self._apply_timeout(message.author, "AutoMod: spam detection")
+                    await self._log_automod(
+                        message.guild,
+                        f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
+                        f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
+                    )
+                    await self._apply_timeout(message.author, "AutoMod: spam detection")
                 await self._register_strike(message, "spam")
 
 async def setup(bot: commands.Bot):

@@ -352,6 +352,7 @@ class MyBot(commands.Bot):
                 "strikeMuteAt": int(settings.get("automod_strike_mute_at") or 0),
                 "strikeKickAt": int(settings.get("automod_strike_kick_at") or 0),
                 "strikeBanAt": int(settings.get("automod_strike_ban_at") or 0),
+                "dryRun": bool(settings.get("automod_dry_run")),
                 "rules": [
                     {"pattern": r["pattern"], "action": r["action"], "enabled": bool(r["enabled"])}
                     for r in automod_rules
@@ -1016,12 +1017,13 @@ class MyBot(commands.Bot):
                 domains_raw = options.get("allowedDomains") or []
                 domains = sorted({normalize_domain(str(d)) for d in domains_raw if normalize_domain(str(d))})[:50]
                 block_mass_mentions = bool(options.get("blockMassMentions", False))
+                dry_run = bool(options.get("dryRun", False))
                 spam_count = self._clamp_int(options.get("spamCount"), 5, 3, 20)
                 spam_window = self._clamp_int(options.get("spamWindow"), 3, 1, 30)
                 mention_limit = self._clamp_int(options.get("mentionLimit"), 5, 3, 30)
                 await self.db.set_automod_config(
                     guild_id, block_invites, block_links, domains,
-                    spam_count, spam_window, mention_limit, block_mass_mentions,
+                    spam_count, spam_window, mention_limit, block_mass_mentions, dry_run,
                 )
 
                 # Strike escalation config (0 = that tier disabled).
