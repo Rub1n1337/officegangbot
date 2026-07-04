@@ -44,12 +44,84 @@ export function getServerSession(
 }
 
 export function setServerSession(req: NextApiRequest, res: NextApiResponse, data: AccessToken) {
-  // Tie the cookie lifetime to the Discord token's own lifetime so it can't
-  // outlive a token we don't refresh (a stale token otherwise fails the guild
-  // permission lookup and surfaces as a 502 on every dashboard call).
-  const maxAge = data.expires_in > 0 ? data.expires_in : DEFAULT_MAX_AGE;
+  // Stamp when we stored it so getFreshSession can tell when the access token is
+  // near expiry and refresh it. The cookie itself lives longer than one access
+  // token (we refresh in place), so the session survives past a single token's
+  // lifetime instead of forcing a re-login every ~7 days.
+  const stamped: AccessToken = { ...data, obtained_at: Date.now() };
   // Encrypt at rest when SESSION_SECRET is configured (no-op otherwise).
-  setCookie(TokenCookie, encryptSession(JSON.stringify(data)), { req, res, ...options, maxAge });
+  setCookie(TokenCookie, encryptSession(JSON.stringify(stamped)), {
+    req, res, ...options, maxAge: DEFAULT_MAX_AGE,
+  });
+}
+
+// Refresh the Discord token near expiry so the session isn't dropped every time
+// one access token lapses. Proactive, single-flighted (so a page's burst of
+// requests doesn't fire N concurrent refreshes) and non-fatal.
+const REFRESH_WINDOW_MS = 1000 * 60 * 60 * 24; // refresh when < 1 day remains
+const refreshInflight = new Map<string, Promise<AccessToken | null>>();
+
+async function refreshAccessToken(refreshToken: string): Promise<AccessToken | null> {
+  try {
+    const resp = await fetch(`${API_ENDPOINT}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+    if (!resp.ok) return null;
+    const parsed = tokenSchema.safeParse(await resp.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function refreshOnce(refreshToken: string): Promise<AccessToken | null> {
+  const existing = refreshInflight.get(refreshToken);
+  if (existing) return existing;
+  const p = refreshAccessToken(refreshToken).finally(() => refreshInflight.delete(refreshToken));
+  refreshInflight.set(refreshToken, p);
+  return p;
+}
+
+/**
+ * The current session token, refreshing it in place if it's near expiry.
+ * Returns null (and clears the cookie) only when there's no usable session left,
+ * so callers can treat null as "not authenticated". Refresh failure with a
+ * still-valid token falls through with that token — never worse than before.
+ */
+export async function getFreshSession(
+  req: NextApiRequest,
+  res: NextApiResponse
+): Promise<AccessToken | null> {
+  const parsed = getServerSession(req);
+  if (!parsed.success) return null;
+  const session = parsed.data;
+
+  const now = Date.now();
+  const expiresAt = session.obtained_at != null ? session.obtained_at + session.expires_in * 1000 : null;
+  const nearExpiry = expiresAt != null && expiresAt - now < REFRESH_WINDOW_MS;
+
+  if (nearExpiry && session.refresh_token) {
+    const refreshed = await refreshOnce(session.refresh_token);
+    if (refreshed) {
+      setServerSession(req, res, refreshed);
+      return refreshed;
+    }
+    // Refresh failed. If the token is already expired there's nothing usable
+    // left — clear the session so the user re-logs in cleanly rather than
+    // erroring for the cookie's whole lifetime.
+    if (expiresAt != null && expiresAt <= now) {
+      deleteCookie(TokenCookie, { req, res, ...options });
+      return null;
+    }
+  }
+  return session;
 }
 
 // --- OAuth CSRF state ---
