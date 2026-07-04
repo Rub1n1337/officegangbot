@@ -260,6 +260,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tickets.close_comment_field": "📝 Closing comment",
         "tickets.closed_dm_title": "Your ticket was closed",
         "tickets.closed_dm_desc": "Your support ticket in **{guild}** has been closed. A transcript is attached for your records.",
+        "tickets.auto_closed_notice": "🔒 This ticket has been inactive for over **{hours}h** and will be closed automatically.",
+        "tickets.auto_close_comment": "Automatically closed after {hours}h of inactivity.",
         # --- logs (staff-facing) ---
         "auditlog.deleted_desc": "**Message sent by {author} deleted in {channel}**",
         "auditlog.field_content": "Content",
@@ -523,6 +525,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tickets.close_comment_field": "📝 Комментарий при закрытии",
         "tickets.closed_dm_title": "Ваш тикет закрыт",
         "tickets.closed_dm_desc": "Ваш тикет поддержки в **{guild}** был закрыт. Транскрипт прилагается.",
+        "tickets.auto_closed_notice": "🔒 Тикет неактивен более **{hours}ч** и будет закрыт автоматически.",
+        "tickets.auto_close_comment": "Автоматически закрыт после {hours}ч без активности.",
         # --- logs (staff-facing) ---
         "auditlog.deleted_desc": "**Сообщение от {author} удалено в {channel}**",
         "auditlog.field_content": "Содержимое",
