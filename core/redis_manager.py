@@ -275,7 +275,7 @@ class RedisManager:
         try:
             return json.loads(result[1])
         except Exception as e:
-            logger.error(f"RPC response decode error for {request_id}: {e}")
+            logger.exception(f"RPC response decode error for {request_id}: {e}")
             return None
 
     async def start_rpc_listener(self, channel: str, handler) -> None:
@@ -332,7 +332,7 @@ class RedisManager:
                             try:
                                 payload = json.loads(fields.get("data", "{}"))
                             except Exception as e:
-                                logger.error(f"RPC payload decode error: {e}")
+                                logger.exception(f"RPC payload decode error: {e}")
                                 continue
                             spawn(payload)
 

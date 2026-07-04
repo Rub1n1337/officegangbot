@@ -54,7 +54,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
                 guild.id, member.id, reason, config.get("strike_expiry_hours", 24)
             )
         except Exception as e:
-            logger.error(f"AutoMod: failed to record strike: {e}")
+            logger.exception(f"AutoMod: failed to record strike: {e}")
             return
 
         ban_at = config.get("strike_ban_at", 0)
@@ -99,7 +99,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         except discord.Forbidden:
             logger.warning(f"AutoMod: Cannot timeout {member} in {member.guild.name} — missing permissions")
         except Exception as e:
-            logger.error(f"AutoMod: Error timing out {member}: {e}")
+            logger.exception(f"AutoMod: Error timing out {member}: {e}")
 
     async def _log_automod(self, guild: discord.Guild, description: str):
         """Sends a log message to the moderation log channel."""

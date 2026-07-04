@@ -37,7 +37,7 @@ class AppealModal(discord.ui.Modal):
         try:
             await db.add_ban_appeal(self.guild_id, interaction.user.id, str(interaction.user), text)
         except Exception as e:
-            logger.error(f"Failed to store ban appeal for {interaction.user} in {self.guild_id}: {e}")
+            logger.exception(f"Failed to store ban appeal for {interaction.user} in {self.guild_id}: {e}")
             await interaction.response.send_message(t(self.loc, "appeal.error"), ephemeral=True)
             return
         await interaction.response.send_message(t(self.loc, "appeal.submitted"), ephemeral=True)

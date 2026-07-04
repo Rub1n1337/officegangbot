@@ -47,7 +47,7 @@ class MemberLogCog(commands.Cog):
         except discord.Forbidden:
             pass
         except Exception as e:
-            logger.error(f"Error sending leave log: {e}")
+            logger.exception(f"Error sending leave log: {e}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberLogCog(bot))
