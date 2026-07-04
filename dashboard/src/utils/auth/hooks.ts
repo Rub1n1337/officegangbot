@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { client, Keys } from '@/api/hooks';
-import { AccessToken } from './server';
+import type { AccessToken } from './server';
 import { callReturn, callDefault } from '@/utils/fetch/core';
 import Router from 'next/router';
 
