@@ -158,6 +158,41 @@ export async function fetchTicketTranscript(
   );
 }
 
+/** Enables/disables the ban-appeal flow for a guild. */
+export async function setBanAppeals(session: AccessToken, guild: string, enabled: boolean) {
+  return await callDefault(
+    `/api/guild/${guild}/appeals/config`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      },
+    })
+  );
+}
+
+/** Approves (unbans) or denies a pending ban appeal. */
+export async function decideBanAppeal(
+  session: AccessToken,
+  guild: string,
+  appealId: number,
+  decision: 'approve' | 'deny'
+): Promise<{ success?: boolean; status?: string; error?: string }> {
+  const res = await callReturn<{ success?: boolean; status?: string; error?: string }>(
+    `/api/guild/${guild}/appeals/${appealId}`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      },
+    })
+  );
+  if (res?.error) throw new Error(res.error);
+  return res;
+}
+
 export async function deleteWarning(session: AccessToken, guild: string, warningId: number) {
   return await callDefault(
     `/api/guild/${guild}/warnings/${warningId}`,

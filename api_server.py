@@ -274,6 +274,14 @@ class LocalePayload(BaseModel):
     locale: Literal["en", "ru"]
 
 
+class BanAppealsConfigPayload(BaseModel):
+    enabled: bool
+
+
+class AppealDecisionPayload(BaseModel):
+    decision: Literal["approve", "deny"]
+
+
 # --- API Endpoints ---
 
 @app.get("/guilds/{guild_id}", dependencies=[Depends(verify_api_key)])
@@ -409,6 +417,23 @@ async def delete_warning(request: Request, guild_id: int, warning_id: int):
 async def set_locale(request: Request, guild_id: int, payload: LocalePayload):
     """Sets the guild's bot language ('en' / 'ru')."""
     data = await _rpc("set_locale", guild_id=guild_id, locale=payload.locale, **_actor(request))
+    return data
+
+@app.post("/api/guild/{guild_id}/appeals/config", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def set_ban_appeals(request: Request, guild_id: int, payload: BanAppealsConfigPayload):
+    """Enables/disables the ban-appeal flow (appeal button in ban DMs)."""
+    data = await _rpc("set_ban_appeals", guild_id=guild_id, enabled=payload.enabled, **_actor(request))
+    return data
+
+@app.post("/api/guild/{guild_id}/appeals/{appeal_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def decide_ban_appeal(request: Request, guild_id: int, appeal_id: int, payload: AppealDecisionPayload):
+    """Approves (unbans) or denies a pending ban appeal."""
+    data = await _rpc(
+        "decide_ban_appeal", guild_id=guild_id, appeal_id=appeal_id,
+        decision=payload.decision, **_actor(request),
+    )
     return data
 
 @app.get("/api/guild/{guild_id}/members", dependencies=[Depends(verify_api_key)])

@@ -289,6 +289,26 @@ CREATE TABLE IF NOT EXISTS activity_buckets (
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
 
+-- Ban appeals: a banned user's request to be unbanned, submitted from the ban
+-- DM (button + modal). One active appeal per (guild, user); moderators review
+-- and approve (unban) / deny from the dashboard.
+CREATE TABLE IF NOT EXISTS ban_appeals (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    user_name VARCHAR(100),
+    reason TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    decided_by_id BIGINT,
+    decided_by_name VARCHAR(100),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    decided_at TIMESTAMPTZ,
+    UNIQUE (guild_id, user_id),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ban_appeals_guild ON ban_appeals(guild_id, status, created_at DESC);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
@@ -326,6 +346,8 @@ ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT FA
 -- Tickets: auto-close open tickets after this many hours of inactivity
 -- (0 = disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ticket_auto_close_hours INTEGER DEFAULT 0;
+-- Ban appeals: when on, ban DMs include an "Appeal" button (opt-in per guild).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ban_appeals_enabled BOOLEAN DEFAULT FALSE;
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')

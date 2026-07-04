@@ -5,6 +5,7 @@ from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission, member_hierarchy_block
 from core.i18n import t
+from core.appeals import send_ban_appeal_dm
 from typing import Optional
 from .utils import reply
 
@@ -223,7 +224,12 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         if not view.confirmed:
             return
 
-        dm_sent = await self._notify_user(member, ctx.guild.name, "mod.dm_banned_title", reason, loc)
+        # When ban appeals are enabled, the DM carries an "Appeal" button;
+        # otherwise it's the plain ban notice.
+        if await self.bot.db.get_guild_setting(ctx.guild.id, "ban_appeals_enabled"):
+            dm_sent = await send_ban_appeal_dm(ctx.guild, member, reason, loc)
+        else:
+            dm_sent = await self._notify_user(member, ctx.guild.name, "mod.dm_banned_title", reason, loc)
         await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
         await self._log_action(ctx, "🔨 Ban", member, reason, dm_notified="✅" if dm_sent else "❌")
 
