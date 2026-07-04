@@ -472,957 +472,986 @@ class MyBot(commands.Bot):
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
 
-        if action == "get_guild_info":
-            guild = self.get_guild(guild_id) if guild_id else None
-            if not guild:
-                return {"error": "Guild not found"}
-            if not self.db:
-                return {"error": "Database unavailable"}
-            settings = await self.db.get_all_guild_settings(guild_id)
-            # Snowflake ids are BIGINTs that exceed JS's safe-integer range, so
-            # serialize every *_id as a string — otherwise a JSON consumer (the
-            # dashboard, etc.) silently loses precision on the last few digits.
-            settings = {
-                k: (str(v) if (k.endswith("_id") and isinstance(v, int)) else v)
-                for k, v in settings.items()
-            }
+        handlers = {
+            "get_guild_info": self._rpc_get_guild_info,
+            "get_guild_stats": self._rpc_get_guild_stats,
+            "get_stats": self._rpc_get_stats,
+            "get_guilds": self._rpc_get_guilds,
+            "get_guild_roles": self._rpc_get_guild_roles,
+            "get_guild_channels": self._rpc_get_guild_channels,
+            "get_guild_emojis": self._rpc_get_guild_emojis,
+            "get_feature": self._rpc_get_feature,
+            "get_moderation": self._rpc_get_moderation,
+            "get_analytics": self._rpc_get_analytics,
+            "get_audit": self._rpc_get_audit,
+            "get_tickets": self._rpc_get_tickets,
+            "search_tickets": self._rpc_search_tickets,
+            "get_ticket_transcript": self._rpc_get_ticket_transcript,
+            "delete_warning": self._rpc_delete_warning,
+            "set_ban_appeals": self._rpc_set_ban_appeals,
+            "decide_ban_appeal": self._rpc_decide_ban_appeal,
+            "set_locale": self._rpc_set_locale,
+            "search_members": self._rpc_search_members,
+            "get_member": self._rpc_get_member,
+            "moderate_member": self._rpc_moderate_member,
+            "enable_feature": self._rpc_enable_feature,
+            "disable_feature": self._rpc_disable_feature,
+            "update_feature": self._rpc_update_feature,
+        }
+        handler = handlers.get(action)
+        if handler is None:
+            return {"error": "Unknown action"}
+        return await handler(guild_id, payload)
+
+    async def _rpc_get_guild_info(self, guild_id, payload):
+        guild = self.get_guild(guild_id) if guild_id else None
+        if not guild:
+            return {"error": "Guild not found"}
+        if not self.db:
+            return {"error": "Database unavailable"}
+        settings = await self.db.get_all_guild_settings(guild_id)
+        # Snowflake ids are BIGINTs that exceed JS's safe-integer range, so
+        # serialize every *_id as a string — otherwise a JSON consumer (the
+        # dashboard, etc.) silently loses precision on the last few digits.
+        settings = {
+            k: (str(v) if (k.endswith("_id") and isinstance(v, int)) else v)
+            for k, v in settings.items()
+        }
+        enabled_features = await self.db.get_enabled_features(guild_id)
+        return {
+            "id": str(guild.id),
+            "name": guild.name,
+            "icon": str(guild.icon) if guild.icon else None,
+            "member_count": guild.member_count,
+            "owner_id": str(guild.owner_id),
+            "locale": settings.get("locale") or "en",
+            "settings": settings,
+            "enabledFeatures": enabled_features,
+        }
+
+    async def _rpc_get_guild_stats(self, guild_id, payload):
+        guild = self.get_guild(guild_id) if guild_id else None
+        if not guild:
+            return {"error": "Guild not found"}
+
+        # Channel and role counts come straight from the cached guild object
+        # (always available). member_count is reliable; per-member iteration
+        # is avoided since the members intent/cache may be incomplete.
+        text_channels = sum(1 for ch in guild.channels if isinstance(ch, discord.TextChannel))
+        voice_channels = sum(1 for ch in guild.channels if isinstance(ch, discord.VoiceChannel))
+
+        enabled_features = []
+        top_xp = []
+        if self.db:
             enabled_features = await self.db.get_enabled_features(guild_id)
-            return {
-                "id": str(guild.id),
-                "name": guild.name,
-                "icon": str(guild.icon) if guild.icon else None,
-                "member_count": guild.member_count,
-                "owner_id": str(guild.owner_id),
-                "locale": settings.get("locale") or "en",
-                "settings": settings,
-                "enabledFeatures": enabled_features,
+            try:
+                rows = await self.db.get_leaderboard(guild_id, limit=5)
+                for row in rows:
+                    member = guild.get_member(row["user_id"])
+                    name = (
+                        member.display_name if member
+                        else (row.get("display_name") or f"User {row['user_id']}")
+                    )
+                    top_xp.append({"name": name, "level": row["level"], "xp": row["xp"]})
+            except Exception as e:
+                logger.warning(f"get_guild_stats leaderboard failed for {guild_id}: {e}")
+
+        return {
+            "id": str(guild.id),
+            "name": guild.name,
+            "icon": str(guild.icon) if guild.icon else None,
+            "online": True,
+            "member_count": guild.member_count,
+            "channel_count": len(guild.channels),
+            "text_channels": text_channels,
+            "voice_channels": voice_channels,
+            "role_count": len(guild.roles),
+            "latency_ms": round(self.latency * 1000, 2),
+            "enabled_feature_count": len(enabled_features),
+            "top_xp": top_xp,
+        }
+
+    async def _rpc_get_stats(self, guild_id, payload):
+        import psutil
+        return {
+            "status": "online",
+            "guilds": len(self.guilds),
+            "total_users": sum(g.member_count for g in self.guilds),
+            "latency_ms": round(self.latency * 1000, 2),
+            "cpu_percent": psutil.cpu_percent(interval=None),
+            "ram_percent": psutil.virtual_memory().percent,
+            "ram_used_mb": round(psutil.virtual_memory().used / 1024 / 1024, 2),
+        }
+
+    async def _rpc_get_guilds(self, guild_id, payload):
+        return {
+            "guilds": [
+                {
+                    "id": str(g.id),
+                    "name": g.name,
+                    "icon": str(g.icon) if g.icon else None,
+                    "member_count": g.member_count
+                }
+                for g in self.guilds
+            ]
+        }
+
+    async def _rpc_get_guild_roles(self, guild_id, payload):
+        guild = self.get_guild(guild_id) if guild_id else None
+        if not guild:
+            return {"error": "Guild not found"}
+        return [
+            {
+                "id": str(role.id),
+                "name": role.name,
+                "color": role.color.value,
+                "position": role.position,
             }
+            for role in guild.roles
+            if not role.is_default()
+        ]
 
-        if action == "get_guild_stats":
-            guild = self.get_guild(guild_id) if guild_id else None
-            if not guild:
-                return {"error": "Guild not found"}
-
-            # Channel and role counts come straight from the cached guild object
-            # (always available). member_count is reliable; per-member iteration
-            # is avoided since the members intent/cache may be incomplete.
-            text_channels = sum(1 for ch in guild.channels if isinstance(ch, discord.TextChannel))
-            voice_channels = sum(1 for ch in guild.channels if isinstance(ch, discord.VoiceChannel))
-
-            enabled_features = []
-            top_xp = []
-            if self.db:
-                enabled_features = await self.db.get_enabled_features(guild_id)
-                try:
-                    rows = await self.db.get_leaderboard(guild_id, limit=5)
-                    for row in rows:
-                        member = guild.get_member(row["user_id"])
-                        name = (
-                            member.display_name if member
-                            else (row.get("display_name") or f"User {row['user_id']}")
-                        )
-                        top_xp.append({"name": name, "level": row["level"], "xp": row["xp"]})
-                except Exception as e:
-                    logger.warning(f"get_guild_stats leaderboard failed for {guild_id}: {e}")
-
-            return {
-                "id": str(guild.id),
-                "name": guild.name,
-                "icon": str(guild.icon) if guild.icon else None,
-                "online": True,
-                "member_count": guild.member_count,
-                "channel_count": len(guild.channels),
-                "text_channels": text_channels,
-                "voice_channels": voice_channels,
-                "role_count": len(guild.roles),
-                "latency_ms": round(self.latency * 1000, 2),
-                "enabled_feature_count": len(enabled_features),
-                "top_xp": top_xp,
+    async def _rpc_get_guild_channels(self, guild_id, payload):
+        guild = self.get_guild(guild_id) if guild_id else None
+        if not guild:
+            return {"error": "Guild not found"}
+        return [
+            {
+                "id": str(ch.id),
+                "name": ch.name,
+                "type": ch.type.value,
+                "category": str(ch.category_id) if ch.category_id else None,
             }
+            for ch in guild.channels
+        ]
 
-        if action == "get_stats":
-            import psutil
-            return {
-                "status": "online",
-                "guilds": len(self.guilds),
-                "total_users": sum(g.member_count for g in self.guilds),
-                "latency_ms": round(self.latency * 1000, 2),
-                "cpu_percent": psutil.cpu_percent(interval=None),
-                "ram_percent": psutil.virtual_memory().percent,
-                "ram_used_mb": round(psutil.virtual_memory().used / 1024 / 1024, 2),
+    async def _rpc_get_guild_emojis(self, guild_id, payload):
+        guild = self.get_guild(guild_id) if guild_id else None
+        if not guild:
+            return {"error": "Guild not found"}
+        return [
+            {
+                "id": str(e.id),
+                "name": e.name,
+                "animated": e.animated,
+                "url": str(e.url),
             }
+            for e in guild.emojis
+        ]
 
-        if action == "get_guilds":
-            return {
-                "guilds": [
+    async def _rpc_get_feature(self, guild_id, payload):
+        feature = payload.get("feature")
+        if not self.db:
+            return {"error": "Database unavailable"}
+        # Return the settings regardless of enabled state — the dashboard
+        # shows the config form (greyed out) for disabled features and reads
+        # the enabled flag from the guild info query, not from here.
+        return await self._get_feature_payload(guild_id, feature)
+
+    async def _rpc_get_moderation(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        guild = self.get_guild(guild_id)
+
+        def _member_name(uid):
+            m = guild.get_member(int(uid)) if guild else None
+            return m.display_name if m else f"User {uid}"
+
+        warnings = await self.db.get_recent_warnings(guild_id, 50)
+        punishments = await self.db.get_timed_punishments(guild_id)
+        leaderboard = await self.db.get_leaderboard(guild_id, 25)
+        strikes = await self.db.get_active_strikes(guild_id)
+        appeals = await self.db.get_ban_appeals(guild_id, 50)
+        appeals_enabled = bool(await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"))
+        return {
+            "warnings": [
+                {
+                    "id": w["id"],
+                    "userId": str(w["user_id"]),
+                    "userName": _member_name(w["user_id"]),
+                    "reason": w["reason"],
+                    "moderatorName": w["moderator_name"],
+                    "createdAt": w["created_at"].isoformat() if w["created_at"] else None,
+                }
+                for w in warnings
+            ],
+            "punishments": [
+                {
+                    "userId": str(p["user_id"]),
+                    "userName": _member_name(p["user_id"]),
+                    "type": p["punishment_type"],
+                    "reason": p.get("reason"),
+                    "expiresAt": p["expires_at"].isoformat() if p["expires_at"] else None,
+                }
+                for p in punishments
+            ],
+            "leaderboard": [
+                {
+                    "userId": str(r["user_id"]),
+                    "name": r["display_name"] or _member_name(r["user_id"]),
+                    "level": r["level"],
+                    "xp": r["xp"],
+                }
+                for r in leaderboard
+            ],
+            "strikes": {
+                "enabled": strikes["enabled"],
+                "expiryHours": strikes["expiry_hours"],
+                "muteAt": strikes["mute_at"],
+                "kickAt": strikes["kick_at"],
+                "banAt": strikes["ban_at"],
+                "users": [
                     {
-                        "id": str(g.id),
-                        "name": g.name,
-                        "icon": str(g.icon) if g.icon else None,
-                        "member_count": g.member_count
+                        "userId": str(u["user_id"]),
+                        "userName": _member_name(u["user_id"]),
+                        "count": int(u["count"]),
+                        "nextDecayAt": u["next_decay"].isoformat() if u["next_decay"] else None,
+                        "lastStrikeAt": u["last_strike"].isoformat() if u["last_strike"] else None,
                     }
-                    for g in self.guilds
-                ]
-            }
+                    for u in strikes["users"]
+                ],
+            },
+            "appeals": {
+                "enabled": appeals_enabled,
+                "items": [
+                    {
+                        "id": a["id"],
+                        "userId": str(a["user_id"]),
+                        "userName": a["user_name"],
+                        "reason": a["reason"],
+                        "status": a["status"],
+                        "decidedByName": a["decided_by_name"],
+                        "createdAt": a["created_at"].isoformat() if a["created_at"] else None,
+                        "decidedAt": a["decided_at"].isoformat() if a["decided_at"] else None,
+                    }
+                    for a in appeals
+                ],
+            },
+        }
 
-        if action == "get_guild_roles":
-            guild = self.get_guild(guild_id) if guild_id else None
-            if not guild:
-                return {"error": "Guild not found"}
-            return [
+    async def _rpc_get_analytics(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        days = self._clamp_int(payload.get("days"), 30, 7, 90)
+        return await self.db.get_analytics(guild_id, days)
+
+    async def _rpc_get_audit(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        entries = await self.db.get_dashboard_audit(guild_id, 200)
+        return {
+            "entries": [
                 {
-                    "id": str(role.id),
-                    "name": role.name,
-                    "color": role.color.value,
-                    "position": role.position,
+                    "id": e["id"],
+                    "actorId": str(e["actor_id"]) if e["actor_id"] else None,
+                    "actorName": e["actor_name"],
+                    "action": e["action"],
+                    "target": e["target"],
+                    "detail": e["detail"],
+                    "createdAt": e["created_at"].isoformat() if e["created_at"] else None,
                 }
-                for role in guild.roles
-                if not role.is_default()
+                for e in entries
             ]
+        }
 
-        if action == "get_guild_channels":
-            guild = self.get_guild(guild_id) if guild_id else None
-            if not guild:
-                return {"error": "Guild not found"}
-            return [
+    async def _rpc_get_tickets(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        rows = await self.db.get_tickets(guild_id, 200)
+        return {
+            "tickets": [
                 {
-                    "id": str(ch.id),
-                    "name": ch.name,
-                    "type": ch.type.value,
-                    "category": str(ch.category_id) if ch.category_id else None,
+                    "id": r["id"],
+                    "channelId": str(r["channel_id"]),
+                    "openerId": str(r["opener_id"]),
+                    "openerName": r["opener_name"],
+                    "priority": r["priority"],
+                    "status": r["status"],
+                    "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
+                    "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
+                    "closedById": str(r["closed_by_id"]) if r["closed_by_id"] else None,
+                    "closedByName": r["closed_by_name"],
+                    "closeComment": r["close_comment"],
+                    "hasTranscript": bool(r["has_transcript"]),
                 }
-                for ch in guild.channels
+                for r in rows
             ]
+        }
 
-        if action == "get_guild_emojis":
-            guild = self.get_guild(guild_id) if guild_id else None
-            if not guild:
-                return {"error": "Guild not found"}
-            return [
+    async def _rpc_search_tickets(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        query = str(payload.get("query") or "").strip()
+        if len(query) < 2:
+            return {"tickets": []}
+        rows = await self.db.search_ticket_transcripts(guild_id, query[:100], 50)
+        return {
+            "tickets": [
                 {
-                    "id": str(e.id),
-                    "name": e.name,
-                    "animated": e.animated,
-                    "url": str(e.url),
+                    "id": r["id"],
+                    "channelId": str(r["channel_id"]),
+                    "openerId": str(r["opener_id"]),
+                    "openerName": r["opener_name"],
+                    "priority": r["priority"],
+                    "status": r["status"],
+                    "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
+                    "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
+                    "closedById": str(r["closed_by_id"]) if r["closed_by_id"] else None,
+                    "closedByName": r["closed_by_name"],
+                    "closeComment": r["close_comment"],
+                    "hasTranscript": bool(r["has_transcript"]),
+                    "snippet": r["snippet"],
                 }
-                for e in guild.emojis
+                for r in rows
             ]
+        }
 
-        if action == "get_feature":
-            feature = payload.get("feature")
-            if not self.db:
-                return {"error": "Database unavailable"}
-            # Return the settings regardless of enabled state — the dashboard
-            # shows the config form (greyed out) for disabled features and reads
-            # the enabled flag from the guild info query, not from here.
+    async def _rpc_get_ticket_transcript(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        try:
+            ticket_id = int(payload.get("ticket_id"))
+        except (TypeError, ValueError):
+            return {"error": "Invalid ticket id"}
+        row = await self.db.get_ticket_transcript(guild_id, ticket_id)
+        if not row:
+            return {"error": "Ticket not found"}
+        return {
+            "id": row["id"],
+            "openerName": row["opener_name"],
+            "priority": row["priority"],
+            "status": row["status"],
+            "openedAt": row["opened_at"].isoformat() if row["opened_at"] else None,
+            "closedAt": row["closed_at"].isoformat() if row["closed_at"] else None,
+            "closedByName": row["closed_by_name"],
+            "closeComment": row["close_comment"],
+            "transcript": row["transcript"],
+        }
+
+    async def _rpc_delete_warning(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        try:
+            warning_id = int(payload.get("warning_id"))
+        except (TypeError, ValueError):
+            return {"error": "Invalid warning id"}
+        removed = await self.db.delete_warning(guild_id, warning_id)
+        if removed:
+            await self._record_audit(guild_id, payload, "delete_warning", target=str(warning_id))
+        return {"success": removed}
+
+    async def _rpc_set_ban_appeals(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        enabled = bool(payload.get("enabled"))
+        await self.db.set_guild_setting(guild_id, "ban_appeals_enabled", enabled)
+        await self._record_audit(
+            guild_id, payload, "set_ban_appeals", detail="enabled" if enabled else "disabled"
+        )
+        return {"success": True, "enabled": enabled}
+
+    async def _rpc_decide_ban_appeal(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        try:
+            appeal_id = int(payload.get("appeal_id"))
+        except (TypeError, ValueError):
+            return {"error": "Invalid appeal id"}
+        decision = payload.get("decision")
+        status = {"approve": "approved", "deny": "denied"}.get(decision)
+        if not status:
+            return {"error": "Invalid decision"}
+        row = await self.db.decide_ban_appeal(
+            appeal_id, guild_id, status,
+            payload.get("actor_id"), payload.get("actor_name"),
+        )
+        if not row:
+            return {"error": "Appeal not found or already decided"}
+
+        guild = self.get_guild(guild_id)
+        user_id = int(row["user_id"])
+        # Approve → lift the ban. Deny → leave it in place. Either way, DM
+        # the user the outcome (best-effort).
+        if status == "approved" and guild:
+            try:
+                await guild.unban(discord.Object(id=user_id), reason="Ban appeal approved")
+            except discord.NotFound:
+                pass  # already unbanned
+            except discord.HTTPException as e:
+                logger.warning(f"Appeal approve: couldn't unban {user_id} in {guild_id}: {e}")
+        loc = await self.db.get_locale(guild_id)
+        gname = guild.name if guild else "the server"
+        try:
+            user = self.get_user(user_id) or await self.fetch_user(user_id)
+            key = "approved" if status == "approved" else "denied"
+            embed = discord.Embed(
+                title=t(loc, f"appeal.{key}_dm_title"),
+                description=t(loc, f"appeal.{key}_dm_desc", guild=gname),
+                color=discord.Color.green() if status == "approved" else discord.Color.red(),
+            )
+            await user.send(embed=embed)
+        except discord.HTTPException:
+            pass
+        await self._record_audit(
+            guild_id, payload, "decide_ban_appeal", target=str(user_id), detail=status
+        )
+        return {"success": True, "status": status}
+
+    async def _rpc_set_locale(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        locale = payload.get("locale")
+        if locale not in ("en", "ru"):
+            return {"error": "Unsupported locale"}
+        await self.db.set_locale(guild_id, locale)
+        await self._record_audit(guild_id, payload, "set_locale", detail=locale)
+        return {"success": True, "locale": locale}
+
+    async def _rpc_search_members(self, guild_id, payload):
+        guild = self.get_guild(guild_id)
+        if not guild:
+            return {"error": "Guild not found"}
+        return search_guild_members(guild, payload.get("query"))
+
+    async def _rpc_get_member(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        try:
+            user_id = _validate_discord_id(payload.get("user_id"))
+        except ValueError:
+            return {"error": "Invalid user id"}
+        guild = self.get_guild(guild_id)
+        return await build_member_profile(guild, self.db, guild_id, user_id)
+
+    async def _rpc_moderate_member(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        try:
+            user_id = _validate_discord_id(payload.get("user_id"))
+        except ValueError:
+            return {"error": "Invalid user id"}
+        guild = self.get_guild(guild_id)
+        if not guild:
+            return {"error": "Guild not found"}
+        try:
+            mod_id = int(payload.get("moderator_id")) if payload.get("moderator_id") else 0
+        except (TypeError, ValueError):
+            mod_id = 0
+        # For a ban with appeals enabled, DM the appeal button *before* the
+        # ban (afterwards there's no shared guild to DM through).
+        if payload.get("act") == "ban" and await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"):
+            target = guild.get_member(user_id) or self.get_user(user_id)
+            if target is None:
+                try:
+                    target = await self.fetch_user(user_id)
+                except discord.HTTPException:
+                    target = None
+            if target is not None:
+                loc = await self.db.get_locale(guild_id)
+                await send_ban_appeal_dm(guild, target, payload.get("reason") or "—", loc)
+        result = await perform_moderation(
+            db=self.db,
+            guild=guild,
+            bot_user_id=self.user.id,
+            user_id=user_id,
+            act=payload.get("act"),
+            reason=payload.get("reason"),
+            mod_name=payload.get("moderator_name"),
+            mod_id=mod_id,
+            duration_minutes=payload.get("duration_minutes"),
+            log_action=self._log_dashboard_action,
+        )
+        if isinstance(result, dict) and result.get("success"):
+            await self._record_audit(
+                guild_id,
+                {"actor_id": payload.get("moderator_id"), "actor_name": payload.get("moderator_name")},
+                payload.get("act") or "moderate",
+                target=str(user_id),
+                detail=payload.get("reason"),
+            )
+        return result
+
+    async def _rpc_enable_feature(self, guild_id, payload):
+        feature = payload.get("feature")
+        if not self.db:
+            return {"error": "Database unavailable"}
+        await self.db.set_feature_enabled(guild_id, feature, True)
+        enabled_features = await self.db.get_enabled_features(guild_id)
+        await self._record_audit(guild_id, payload, "enable_feature", target=feature)
+        return {"success": True, "enabled_features": enabled_features}
+
+    async def _rpc_disable_feature(self, guild_id, payload):
+        feature = payload.get("feature")
+        if not self.db:
+            return {"error": "Database unavailable"}
+        await self.db.set_feature_enabled(guild_id, feature, False)
+        enabled_features = await self.db.get_enabled_features(guild_id)
+        await self._record_audit(guild_id, payload, "disable_feature", target=feature)
+        return {"success": True, "enabled_features": enabled_features}
+
+    async def _rpc_update_feature(self, guild_id, payload):
+        feature = payload.get("feature")
+        options = payload.get("options", {})
+        if not self.db:
+            return {"error": "Database unavailable"}
+        await self._record_audit(guild_id, payload, "update_feature", target=feature)
+
+        # Moderation permission roles live in the mod_roles table, not in
+        # guilds columns, so they are handled separately from the column
+        # mapping below. Each level holds one role from the dashboard;
+        # setting a role replaces that level (matches /config role).
+        if feature == "moderation":
+            for perm in ("config", "kick", "ban", "mute", "warn", "clear"):
+                if perm not in options:
+                    continue
+                await self.db.remove_mod_role(guild_id, perm)
+                raw = options.get(perm)
+                if raw:
+                    try:
+                        role_id = _validate_discord_id(raw)
+                    except ValueError:
+                        return {"error": f"Invalid role id for {perm}: {raw}"}
+                    await self.db.set_mod_role(guild_id, role_id, perm)
             return await self._get_feature_payload(guild_id, feature)
 
-        if action == "get_moderation":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            guild = self.get_guild(guild_id)
-
-            def _member_name(uid):
-                m = guild.get_member(int(uid)) if guild else None
-                return m.display_name if m else f"User {uid}"
-
-            warnings = await self.db.get_recent_warnings(guild_id, 50)
-            punishments = await self.db.get_timed_punishments(guild_id)
-            leaderboard = await self.db.get_leaderboard(guild_id, 25)
-            strikes = await self.db.get_active_strikes(guild_id)
-            appeals = await self.db.get_ban_appeals(guild_id, 50)
-            appeals_enabled = bool(await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"))
-            return {
-                "warnings": [
-                    {
-                        "id": w["id"],
-                        "userId": str(w["user_id"]),
-                        "userName": _member_name(w["user_id"]),
-                        "reason": w["reason"],
-                        "moderatorName": w["moderator_name"],
-                        "createdAt": w["created_at"].isoformat() if w["created_at"] else None,
-                    }
-                    for w in warnings
-                ],
-                "punishments": [
-                    {
-                        "userId": str(p["user_id"]),
-                        "userName": _member_name(p["user_id"]),
-                        "type": p["punishment_type"],
-                        "reason": p.get("reason"),
-                        "expiresAt": p["expires_at"].isoformat() if p["expires_at"] else None,
-                    }
-                    for p in punishments
-                ],
-                "leaderboard": [
-                    {
-                        "userId": str(r["user_id"]),
-                        "name": r["display_name"] or _member_name(r["user_id"]),
-                        "level": r["level"],
-                        "xp": r["xp"],
-                    }
-                    for r in leaderboard
-                ],
-                "strikes": {
-                    "enabled": strikes["enabled"],
-                    "expiryHours": strikes["expiry_hours"],
-                    "muteAt": strikes["mute_at"],
-                    "kickAt": strikes["kick_at"],
-                    "banAt": strikes["ban_at"],
-                    "users": [
-                        {
-                            "userId": str(u["user_id"]),
-                            "userName": _member_name(u["user_id"]),
-                            "count": int(u["count"]),
-                            "nextDecayAt": u["next_decay"].isoformat() if u["next_decay"] else None,
-                            "lastStrikeAt": u["last_strike"].isoformat() if u["last_strike"] else None,
-                        }
-                        for u in strikes["users"]
-                    ],
-                },
-                "appeals": {
-                    "enabled": appeals_enabled,
-                    "items": [
-                        {
-                            "id": a["id"],
-                            "userId": str(a["user_id"]),
-                            "userName": a["user_name"],
-                            "reason": a["reason"],
-                            "status": a["status"],
-                            "decidedByName": a["decided_by_name"],
-                            "createdAt": a["created_at"].isoformat() if a["created_at"] else None,
-                            "decidedAt": a["decided_at"].isoformat() if a["decided_at"] else None,
-                        }
-                        for a in appeals
-                    ],
-                },
-            }
-
-        if action == "get_analytics":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            days = self._clamp_int(payload.get("days"), 30, 7, 90)
-            return await self.db.get_analytics(guild_id, days)
-
-        if action == "get_audit":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            entries = await self.db.get_dashboard_audit(guild_id, 200)
-            return {
-                "entries": [
-                    {
-                        "id": e["id"],
-                        "actorId": str(e["actor_id"]) if e["actor_id"] else None,
-                        "actorName": e["actor_name"],
-                        "action": e["action"],
-                        "target": e["target"],
-                        "detail": e["detail"],
-                        "createdAt": e["created_at"].isoformat() if e["created_at"] else None,
-                    }
-                    for e in entries
-                ]
-            }
-
-        if action == "get_tickets":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            rows = await self.db.get_tickets(guild_id, 200)
-            return {
-                "tickets": [
-                    {
-                        "id": r["id"],
-                        "channelId": str(r["channel_id"]),
-                        "openerId": str(r["opener_id"]),
-                        "openerName": r["opener_name"],
-                        "priority": r["priority"],
-                        "status": r["status"],
-                        "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
-                        "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
-                        "closedById": str(r["closed_by_id"]) if r["closed_by_id"] else None,
-                        "closedByName": r["closed_by_name"],
-                        "closeComment": r["close_comment"],
-                        "hasTranscript": bool(r["has_transcript"]),
-                    }
-                    for r in rows
-                ]
-            }
-
-        if action == "search_tickets":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            query = str(payload.get("query") or "").strip()
-            if len(query) < 2:
-                return {"tickets": []}
-            rows = await self.db.search_ticket_transcripts(guild_id, query[:100], 50)
-            return {
-                "tickets": [
-                    {
-                        "id": r["id"],
-                        "channelId": str(r["channel_id"]),
-                        "openerId": str(r["opener_id"]),
-                        "openerName": r["opener_name"],
-                        "priority": r["priority"],
-                        "status": r["status"],
-                        "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
-                        "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
-                        "closedById": str(r["closed_by_id"]) if r["closed_by_id"] else None,
-                        "closedByName": r["closed_by_name"],
-                        "closeComment": r["close_comment"],
-                        "hasTranscript": bool(r["has_transcript"]),
-                        "snippet": r["snippet"],
-                    }
-                    for r in rows
-                ]
-            }
-
-        if action == "get_ticket_transcript":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            try:
-                ticket_id = int(payload.get("ticket_id"))
-            except (TypeError, ValueError):
-                return {"error": "Invalid ticket id"}
-            row = await self.db.get_ticket_transcript(guild_id, ticket_id)
-            if not row:
-                return {"error": "Ticket not found"}
-            return {
-                "id": row["id"],
-                "openerName": row["opener_name"],
-                "priority": row["priority"],
-                "status": row["status"],
-                "openedAt": row["opened_at"].isoformat() if row["opened_at"] else None,
-                "closedAt": row["closed_at"].isoformat() if row["closed_at"] else None,
-                "closedByName": row["closed_by_name"],
-                "closeComment": row["close_comment"],
-                "transcript": row["transcript"],
-            }
-
-        if action == "delete_warning":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            try:
-                warning_id = int(payload.get("warning_id"))
-            except (TypeError, ValueError):
-                return {"error": "Invalid warning id"}
-            removed = await self.db.delete_warning(guild_id, warning_id)
-            if removed:
-                await self._record_audit(guild_id, payload, "delete_warning", target=str(warning_id))
-            return {"success": removed}
-
-        if action == "set_ban_appeals":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            enabled = bool(payload.get("enabled"))
-            await self.db.set_guild_setting(guild_id, "ban_appeals_enabled", enabled)
-            await self._record_audit(
-                guild_id, payload, "set_ban_appeals", detail="enabled" if enabled else "disabled"
-            )
-            return {"success": True, "enabled": enabled}
-
-        if action == "decide_ban_appeal":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            try:
-                appeal_id = int(payload.get("appeal_id"))
-            except (TypeError, ValueError):
-                return {"error": "Invalid appeal id"}
-            decision = payload.get("decision")
-            status = {"approve": "approved", "deny": "denied"}.get(decision)
-            if not status:
-                return {"error": "Invalid decision"}
-            row = await self.db.decide_ban_appeal(
-                appeal_id, guild_id, status,
-                payload.get("actor_id"), payload.get("actor_name"),
-            )
-            if not row:
-                return {"error": "Appeal not found or already decided"}
-
-            guild = self.get_guild(guild_id)
-            user_id = int(row["user_id"])
-            # Approve → lift the ban. Deny → leave it in place. Either way, DM
-            # the user the outcome (best-effort).
-            if status == "approved" and guild:
+        # Level role rewards live in the level_roles table (one role per
+        # level), not in guilds columns, so they are reconciled separately:
+        # set/replace the levels present and drop the ones removed. The
+        # level-up announce channel is a normal column.
+        if feature == "levels":
+            if "channel" in options and options.get("channel") is not None:
                 try:
-                    await guild.unban(discord.Object(id=user_id), reason="Ban appeal approved")
-                except discord.NotFound:
-                    pass  # already unbanned
-                except discord.HTTPException as e:
-                    logger.warning(f"Appeal approve: couldn't unban {user_id} in {guild_id}: {e}")
-            loc = await self.db.get_locale(guild_id)
-            gname = guild.name if guild else "the server"
-            try:
-                user = self.get_user(user_id) or await self.fetch_user(user_id)
-                key = "approved" if status == "approved" else "denied"
-                embed = discord.Embed(
-                    title=t(loc, f"appeal.{key}_dm_title"),
-                    description=t(loc, f"appeal.{key}_dm_desc", guild=gname),
-                    color=discord.Color.green() if status == "approved" else discord.Color.red(),
-                )
-                await user.send(embed=embed)
-            except discord.HTTPException:
-                pass
-            await self._record_audit(
-                guild_id, payload, "decide_ban_appeal", target=str(user_id), detail=status
-            )
-            return {"success": True, "status": status}
-
-        if action == "set_locale":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            locale = payload.get("locale")
-            if locale not in ("en", "ru"):
-                return {"error": "Unsupported locale"}
-            await self.db.set_locale(guild_id, locale)
-            await self._record_audit(guild_id, payload, "set_locale", detail=locale)
-            return {"success": True, "locale": locale}
-
-        if action == "search_members":
-            guild = self.get_guild(guild_id)
-            if not guild:
-                return {"error": "Guild not found"}
-            return search_guild_members(guild, payload.get("query"))
-
-        if action == "get_member":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            try:
-                user_id = _validate_discord_id(payload.get("user_id"))
-            except ValueError:
-                return {"error": "Invalid user id"}
-            guild = self.get_guild(guild_id)
-            return await build_member_profile(guild, self.db, guild_id, user_id)
-
-        if action == "moderate_member":
-            if not self.db:
-                return {"error": "Database unavailable"}
-            try:
-                user_id = _validate_discord_id(payload.get("user_id"))
-            except ValueError:
-                return {"error": "Invalid user id"}
-            guild = self.get_guild(guild_id)
-            if not guild:
-                return {"error": "Guild not found"}
-            try:
-                mod_id = int(payload.get("moderator_id")) if payload.get("moderator_id") else 0
-            except (TypeError, ValueError):
-                mod_id = 0
-            # For a ban with appeals enabled, DM the appeal button *before* the
-            # ban (afterwards there's no shared guild to DM through).
-            if payload.get("act") == "ban" and await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"):
-                target = guild.get_member(user_id) or self.get_user(user_id)
-                if target is None:
-                    try:
-                        target = await self.fetch_user(user_id)
-                    except discord.HTTPException:
-                        target = None
-                if target is not None:
-                    loc = await self.db.get_locale(guild_id)
-                    await send_ban_appeal_dm(guild, target, payload.get("reason") or "—", loc)
-            result = await perform_moderation(
-                db=self.db,
-                guild=guild,
-                bot_user_id=self.user.id,
-                user_id=user_id,
-                act=payload.get("act"),
-                reason=payload.get("reason"),
-                mod_name=payload.get("moderator_name"),
-                mod_id=mod_id,
-                duration_minutes=payload.get("duration_minutes"),
-                log_action=self._log_dashboard_action,
-            )
-            if isinstance(result, dict) and result.get("success"):
-                await self._record_audit(
-                    guild_id,
-                    {"actor_id": payload.get("moderator_id"), "actor_name": payload.get("moderator_name")},
-                    payload.get("act") or "moderate",
-                    target=str(user_id),
-                    detail=payload.get("reason"),
-                )
-            return result
-
-        if action == "enable_feature":
-            feature = payload.get("feature")
-            if not self.db:
-                return {"error": "Database unavailable"}
-            await self.db.set_feature_enabled(guild_id, feature, True)
-            enabled_features = await self.db.get_enabled_features(guild_id)
-            await self._record_audit(guild_id, payload, "enable_feature", target=feature)
-            return {"success": True, "enabled_features": enabled_features}
-
-        if action == "disable_feature":
-            feature = payload.get("feature")
-            if not self.db:
-                return {"error": "Database unavailable"}
-            await self.db.set_feature_enabled(guild_id, feature, False)
-            enabled_features = await self.db.get_enabled_features(guild_id)
-            await self._record_audit(guild_id, payload, "disable_feature", target=feature)
-            return {"success": True, "enabled_features": enabled_features}
-
-        if action == "update_feature":
-            feature = payload.get("feature")
-            options = payload.get("options", {})
-            if not self.db:
-                return {"error": "Database unavailable"}
-            await self._record_audit(guild_id, payload, "update_feature", target=feature)
-
-            # Moderation permission roles live in the mod_roles table, not in
-            # guilds columns, so they are handled separately from the column
-            # mapping below. Each level holds one role from the dashboard;
-            # setting a role replaces that level (matches /config role).
-            if feature == "moderation":
-                for perm in ("config", "kick", "ban", "mute", "warn", "clear"):
-                    if perm not in options:
+                    await self.db.set_guild_setting(
+                        guild_id, "level_up_channel_id", int(options["channel"])
+                    )
+                except (TypeError, ValueError):
+                    return {"error": "Invalid level-up channel id"}
+            rewards = options.get("rewards")
+            if isinstance(rewards, list):
+                if len(rewards) > 100:
+                    return {"error": "Too many level rewards (max 100)."}
+                desired: dict[int, int] = {}
+                for r in rewards:
+                    lvl_raw, role_raw = r.get("level"), r.get("roleId")
+                    if lvl_raw in (None, "") or not role_raw:
                         continue
-                    await self.db.remove_mod_role(guild_id, perm)
-                    raw = options.get(perm)
-                    if raw:
-                        try:
-                            role_id = _validate_discord_id(raw)
-                        except ValueError:
-                            return {"error": f"Invalid role id for {perm}: {raw}"}
-                        await self.db.set_mod_role(guild_id, role_id, perm)
-                return await self._get_feature_payload(guild_id, feature)
-
-            # Level role rewards live in the level_roles table (one role per
-            # level), not in guilds columns, so they are reconciled separately:
-            # set/replace the levels present and drop the ones removed. The
-            # level-up announce channel is a normal column.
-            if feature == "levels":
-                if "channel" in options and options.get("channel") is not None:
                     try:
-                        await self.db.set_guild_setting(
-                            guild_id, "level_up_channel_id", int(options["channel"])
-                        )
+                        lvl = int(lvl_raw)
+                        role_id = _validate_discord_id(role_raw)
                     except (TypeError, ValueError):
-                        return {"error": "Invalid level-up channel id"}
-                rewards = options.get("rewards")
-                if isinstance(rewards, list):
-                    if len(rewards) > 100:
-                        return {"error": "Too many level rewards (max 100)."}
-                    desired: dict[int, int] = {}
-                    for r in rewards:
-                        lvl_raw, role_raw = r.get("level"), r.get("roleId")
-                        if lvl_raw in (None, "") or not role_raw:
-                            continue
-                        try:
-                            lvl = int(lvl_raw)
-                            role_id = _validate_discord_id(role_raw)
-                        except (TypeError, ValueError):
-                            return {"error": "Invalid level reward (level must be a number, role a valid id)"}
-                        if lvl < 1:
-                            continue
-                        desired[lvl] = role_id
-                    bad = self._unassignable_roles(self.get_guild(guild_id), list(desired.values()))
-                    if bad:
-                        labels = ", ".join(label for _, label in bad)
-                        return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
-                    current = await self.db.get_level_roles(guild_id)
-                    for lvl in current:
-                        if lvl not in desired:
-                            await self.db.remove_level_role(guild_id, lvl)
-                    for lvl, role_id in desired.items():
-                        await self.db.set_level_role(guild_id, lvl, role_id)
-
-                # Voice XP / global multiplier / prestige threshold live in guilds
-                # columns; the season counter is managed by /season_reset, not here.
-                voice_enabled = bool(options.get("voiceXpEnabled", False))
-                voice_per_min = self._clamp_int(options.get("voiceXpPerMin"), 5, 0, 100)
-                xp_multiplier = sanitize_multiplier(options.get("xpMultiplier"), 1.0)
-                prestige_level = self._clamp_int(options.get("prestigeLevel"), 100, 0, 1000)
-                await self.db.set_levels_config(
-                    guild_id, voice_enabled, voice_per_min, xp_multiplier, prestige_level,
-                )
-
-                # Per-role XP multipliers: validate ids and clamp each multiplier.
-                role_mults_raw = options.get("roleMultipliers")
-                if isinstance(role_mults_raw, list):
-                    seen: set[int] = set()
-                    role_mults = []
-                    for r in role_mults_raw[:50]:
-                        rid = r.get("roleId")
-                        if not rid:
-                            continue
-                        try:
-                            role_id = _validate_discord_id(rid)
-                        except ValueError:
-                            continue
-                        if role_id in seen:
-                            continue
-                        seen.add(role_id)
-                        role_mults.append({"role_id": role_id, "multiplier": sanitize_multiplier(r.get("multiplier"), 1.0)})
-                    await self.db.replace_level_multiplier_roles(guild_id, role_mults)
-
-                return await self._get_feature_payload(guild_id, feature)
-
-            # Filter word list is a TEXT[] column and feeds a cached compiled
-            # regex, so it is handled separately: normalise the list and
-            # invalidate the filter cog's pattern cache so changes apply at once.
-            if feature == "filter":
-                words = options.get("words")
-                if isinstance(words, list):
-                    # Cap word length (and overall count) so a bad payload can't
-                    # bloat the TEXT[] column or the compiled filter regex.
-                    cleaned = sorted({str(w).strip().lower()[:100] for w in words if str(w).strip()})
-                    if len(cleaned) > 500:
-                        return {"error": "Too many filter words (max 500)."}
-                    await self.db.set_guild_setting(guild_id, "filter_words", cleaned)
-                    filter_cog = self.get_cog("🚫 Filter")
-                    if filter_cog:
-                        await filter_cog._invalidate_pattern(guild_id)
-                return await self._get_feature_payload(guild_id, feature)
-
-            # Reaction roles live in the reaction_roles table (many per guild).
-            # Replace the standalone set and best-effort add each reaction to its
-            # message so members can click it.
-            if feature == "reaction-role":
-                items = options.get("items")
-                if isinstance(items, list):
-                    if len(items) > 100:
-                        return {"error": "Too many reaction roles (max 100)."}
-                    rows = []
-                    for it in items:
-                        ch, msg = it.get("channelId"), it.get("messageId")
-                        emoji = (it.get("emoji") or "").strip()
-                        role = it.get("roleId")
-                        if not (ch and msg and emoji and role):
-                            continue
-                        try:
-                            rows.append({
-                                "channel_id": _validate_discord_id(ch),
-                                "message_id": _validate_discord_id(msg),
-                                "emoji": emoji,
-                                "role_id": _validate_discord_id(role),
-                            })
-                        except ValueError:
-                            return {"error": "Invalid reaction-role entry (ids must be numeric)"}
-                    bad = self._unassignable_roles(self.get_guild(guild_id), [r["role_id"] for r in rows])
-                    if bad:
-                        labels = ", ".join(label for _, label in bad)
-                        return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
-                    old_rows = await self.db.get_reaction_roles(guild_id, "reaction-role")
-                    await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
-                    await self._sync_reactions(guild_id, rows, old_rows)
-                # Return the freshly-persisted payload so the dashboard re-syncs its
-                # form state (otherwise the Save button stays enabled and edits look
-                # like they didn't apply).
-                return await self._get_feature_payload(guild_id, feature)
-
-            # Scheduled / recurring announcements live in the scheduled_messages
-            # table (many per guild); replace the set like reaction roles.
-            if feature == "scheduled-messages":
-                items = options.get("items")
-                if isinstance(items, list):
-                    if len(items) > 50:
-                        return {"error": "Too many scheduled messages (max 50)."}
-                    rows = []
-                    for it in items:
-                        ch = it.get("channelId")
-                        content = (it.get("content") or "").strip()[:2000]
-                        sched = it.get("scheduledAt")
-                        repeat = it.get("repeat") or "none"
-                        enabled = bool(it.get("enabled", True))
-                        if not (ch and content and sched):
-                            continue
-                        if repeat not in ("none", "daily", "weekly"):
-                            repeat = "none"
-                        try:
-                            channel_id = _validate_discord_id(ch)
-                            scheduled_at = datetime.datetime.fromisoformat(str(sched).replace("Z", "+00:00"))
-                        except (ValueError, TypeError):
-                            return {"error": "Invalid scheduled message (check the channel and time)."}
-                        if scheduled_at.tzinfo is None:
-                            scheduled_at = scheduled_at.replace(tzinfo=datetime.timezone.utc)
-                        rows.append({
-                            "channel_id": channel_id,
-                            "content": content,
-                            "scheduled_at": scheduled_at,
-                            "repeat": repeat,
-                            "enabled": enabled,
-                        })
-                    await self.db.replace_scheduled_messages(guild_id, rows)
-                return await self._get_feature_payload(guild_id, feature)
-
-            # AutoMod content-filter config (invite/link blocking) lives in guilds
-            # columns but is cached, so it goes through set_automod_config.
-            if feature == "automod":
-                # Validate custom regex rules up front so a bad/unsafe pattern
-                # rejects the whole save (no partial write) with a clear message,
-                # instead of the config being written and the rule silently dropped.
-                rules_raw = options.get("rules")
-                if isinstance(rules_raw, list):
-                    non_empty = [r for r in rules_raw if str(r.get("pattern", "")).strip()]
-                    if len(non_empty) > MAX_RULES:
-                        return {"error": f"Too many custom filters (max {MAX_RULES})."}
-                    for r in non_empty:
-                        pattern = str(r.get("pattern", "")).strip()
-                        reason = validate_pattern(pattern)
-                        if reason:
-                            preview = pattern if len(pattern) <= 40 else pattern[:40] + "…"
-                            return {"error": f"Custom filter “{preview}” rejected — {reason}."}
-
-                block_invites = bool(options.get("blockInvites", False))
-                block_links = bool(options.get("blockLinks", False))
-                domains_raw = options.get("allowedDomains") or []
-                domains = sorted({normalize_domain(str(d)) for d in domains_raw if normalize_domain(str(d))})[:50]
-                block_mass_mentions = bool(options.get("blockMassMentions", False))
-                dry_run = bool(options.get("dryRun", False))
-                spam_count = self._clamp_int(options.get("spamCount"), 5, 3, 20)
-                spam_window = self._clamp_int(options.get("spamWindow"), 3, 1, 30)
-                mention_limit = self._clamp_int(options.get("mentionLimit"), 5, 3, 30)
-                await self.db.set_automod_config(
-                    guild_id, block_invites, block_links, domains,
-                    spam_count, spam_window, mention_limit, block_mass_mentions, dry_run,
-                )
-
-                # Strike escalation config (0 = that tier disabled).
-                strikes_enabled = bool(options.get("strikesEnabled", False))
-                strike_expiry = self._clamp_int(options.get("strikeExpiryHours"), 24, 0, 720)
-                strike_mute = self._clamp_int(options.get("strikeMuteAt"), 3, 0, 50)
-                strike_kick = self._clamp_int(options.get("strikeKickAt"), 0, 0, 50)
-                strike_ban = self._clamp_int(options.get("strikeBanAt"), 0, 0, 50)
-                await self.db.set_automod_strikes(
-                    guild_id, strikes_enabled, strike_expiry, strike_mute, strike_kick, strike_ban,
-                )
-
-                # Persist the (already-validated above) custom regex rules.
-                if isinstance(rules_raw, list):
-                    await self.db.replace_automod_rules(guild_id, sanitize_rules(rules_raw))
-
-                return await self._get_feature_payload(guild_id, feature)
-
-            # Role menus: the bot posts/edits an embed per menu and reconciles its
-            # emoji reactions and reaction_roles (source='menu', keyed by the
-            # posted message). Many messages per guild, so each uses a per-message
-            # replace rather than the whole-source replace.
-            if feature == "reaction-menus":
-                menus_in = options.get("menus")
-                if isinstance(menus_in, list):
-                    if len(menus_in) > 25:
-                        return {"error": "Too many role menus (max 25)."}
-                    guild = self.get_guild(guild_id)
-                    if not guild:
-                        return {"error": "Guild not found"}
-                    current = await self.db.get_reaction_menus(guild_id)
-                    current_by_id = {m["id"]: m for m in current}
-                    desired_ids = set()
-                    for d in menus_in:
-                        if d.get("id"):
-                            try:
-                                desired_ids.add(int(d["id"]))
-                            except (TypeError, ValueError):
-                                pass
-                    # Delete menus that were removed in the dashboard.
-                    for m in current:
-                        if m["id"] not in desired_ids:
-                            if m["message_id"]:
-                                await self._delete_menu_message(guild, m["channel_id"], m["message_id"])
-                                await self.db.replace_message_reaction_roles(guild_id, m["message_id"], "menu", [])
-                            await self.db.delete_reaction_menu(m["id"])
-                    # Create / update the rest.
-                    for d in menus_in:
-                        ch = d.get("channelId")
-                        title = (d.get("title") or "Role Menu").strip()[:256]
-                        description = (d.get("description") or "").strip()[:2000]
-                        exclusive = bool(d.get("exclusive", False))
-                        items_in = d.get("items") or []
-                        if not (ch and items_in):
-                            continue
-                        try:
-                            channel_id = _validate_discord_id(ch)
-                        except ValueError:
-                            return {"error": "Invalid role-menu channel id"}
-                        item_rows_partial = []
-                        for it in items_in:
-                            emoji = (it.get("emoji") or "").strip()
-                            role = it.get("roleId")
-                            if not (emoji and role):
-                                continue
-                            try:
-                                role_id = _validate_discord_id(role)
-                            except ValueError:
-                                return {"error": "Invalid role-menu role id"}
-                            item_rows_partial.append({"emoji": emoji, "role_id": role_id})
-                        if not item_rows_partial:
-                            continue
-                        bad = self._unassignable_roles(guild, [r["role_id"] for r in item_rows_partial])
-                        if bad:
-                            labels = ", ".join(label for _, label in bad)
-                            return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
-                        item_lines = []
-                        for r in item_rows_partial:
-                            role_obj = guild.get_role(r["role_id"])
-                            item_lines.append((r["emoji"], role_obj.mention if role_obj else f"<@&{r['role_id']}>"))
-
-                        menu_id = int(d["id"]) if (d.get("id") and int(d["id"]) in current_by_id) else None
-                        existing = current_by_id.get(menu_id) if menu_id else None
-                        old_message_id = existing["message_id"] if existing else None
-                        old_channel_id = existing["channel_id"] if existing else None
-                        old_items = existing["items"] if existing else []
-                        # Only edit the existing message if it's in the same channel.
-                        edit_id = old_message_id if (old_message_id and old_channel_id == channel_id) else None
-                        new_message_id = await self._render_menu(guild, channel_id, title, description, item_lines, edit_id)
-                        if new_message_id is None:
-                            return {"error": "I couldn't post the role menu — check I can see and post in that channel."}
-                        # If the menu moved channels, remove the old message + mappings.
-                        if old_message_id and old_message_id != new_message_id:
-                            await self._delete_menu_message(guild, old_channel_id, old_message_id)
-                            await self.db.replace_message_reaction_roles(guild_id, old_message_id, "menu", [])
-                        if menu_id is None:
-                            menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description, exclusive)
-                        await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id, exclusive)
-
-                        new_rows = [
-                            {"channel_id": channel_id, "message_id": new_message_id, "emoji": r["emoji"], "role_id": r["role_id"]}
-                            for r in item_rows_partial
-                        ]
-                        await self.db.replace_message_reaction_roles(guild_id, new_message_id, "menu", new_rows)
-                        old_rows = (
-                            [{"channel_id": old_channel_id or channel_id, "message_id": old_message_id, "emoji": it["emoji"]} for it in old_items]
-                            if old_message_id else []
-                        )
-                        await self._sync_reactions(guild_id, new_rows, old_rows)
-                return await self._get_feature_payload(guild_id, feature)
-
-            # Settings keys that map to BIGINT columns in Postgres and need int conversion
-            BIGINT_SETTINGS = {
-                "rules_channel_id", "rules_message_id", "welcome_channel_id",
-                "autorole_id", "level_up_channel_id",
-                "ticket_support_role_id", "ticket_category_id",
-                "reaction_role_id", "punishment_log_id",
-                "usage_log_id", "audit_log_id", "leave_log_id",
-                "config_role_id", "kick_role_id", "ban_role_id",
-                "mute_role_id", "warn_role_id", "clear_role_id",
-            }
-
-            # Map feature options to settings keys
-            mapping = {
-                "rules": {
-                    "channel": "rules_channel_id",
-                    "message": "rules_message",
-                },
-                "welcome-message": {
-                    "channel": "welcome_channel_id",
-                    "message": "welcome_message",
-                    "autorole": "autorole_id",
-                },
-                "logging": {
-                    "logChannel": "punishment_log_id",
-                    "usageChannel": "usage_log_id",
-                    "messagesChannel": "audit_log_id",
-                    "leaveChannel": "leave_log_id",
-                },
-                "tickets": {
-                    "supportRole": "ticket_support_role_id",
-                    "category": "ticket_category_id",
-                },
-            }
-
-            # The welcome autorole is granted to every new member, so reject one
-            # the bot can't assign (above its role / managed) up front instead of
-            # letting it fail silently on each join.
-            if feature == "welcome-message" and options.get("autorole"):
-                bad = self._unassignable_roles(self.get_guild(guild_id), [options["autorole"]])
+                        return {"error": "Invalid level reward (level must be a number, role a valid id)"}
+                    if lvl < 1:
+                        continue
+                    desired[lvl] = role_id
+                bad = self._unassignable_roles(self.get_guild(guild_id), list(desired.values()))
                 if bad:
                     labels = ", ".join(label for _, label in bad)
-                    return {"error": f"I can't grant {labels} as the autorole — move my role above it (and it can't be a managed role)."}
+                    return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
+                current = await self.db.get_level_roles(guild_id)
+                for lvl in current:
+                    if lvl not in desired:
+                        await self.db.remove_level_role(guild_id, lvl)
+                for lvl, role_id in desired.items():
+                    await self.db.set_level_role(guild_id, lvl, role_id)
 
-            if feature in mapping:
-                for option_key, setting_key in mapping[feature].items():
-                    if option_key not in options:
+            # Voice XP / global multiplier / prestige threshold live in guilds
+            # columns; the season counter is managed by /season_reset, not here.
+            voice_enabled = bool(options.get("voiceXpEnabled", False))
+            voice_per_min = self._clamp_int(options.get("voiceXpPerMin"), 5, 0, 100)
+            xp_multiplier = sanitize_multiplier(options.get("xpMultiplier"), 1.0)
+            prestige_level = self._clamp_int(options.get("prestigeLevel"), 100, 0, 1000)
+            await self.db.set_levels_config(
+                guild_id, voice_enabled, voice_per_min, xp_multiplier, prestige_level,
+            )
+
+            # Per-role XP multipliers: validate ids and clamp each multiplier.
+            role_mults_raw = options.get("roleMultipliers")
+            if isinstance(role_mults_raw, list):
+                seen: set[int] = set()
+                role_mults = []
+                for r in role_mults_raw[:50]:
+                    rid = r.get("roleId")
+                    if not rid:
                         continue
-                    value = options[option_key]
-                    if value is None:
-                        # Explicit null means the admin cleared an optional
-                        # channel/role in the dashboard — unset the column.
-                        await self.db.set_guild_setting(guild_id, setting_key, None)
+                    try:
+                        role_id = _validate_discord_id(rid)
+                    except ValueError:
                         continue
-                    if setting_key in BIGINT_SETTINGS:
+                    if role_id in seen:
+                        continue
+                    seen.add(role_id)
+                    role_mults.append({"role_id": role_id, "multiplier": sanitize_multiplier(r.get("multiplier"), 1.0)})
+                await self.db.replace_level_multiplier_roles(guild_id, role_mults)
+
+            return await self._get_feature_payload(guild_id, feature)
+
+        # Filter word list is a TEXT[] column and feeds a cached compiled
+        # regex, so it is handled separately: normalise the list and
+        # invalidate the filter cog's pattern cache so changes apply at once.
+        if feature == "filter":
+            words = options.get("words")
+            if isinstance(words, list):
+                # Cap word length (and overall count) so a bad payload can't
+                # bloat the TEXT[] column or the compiled filter regex.
+                cleaned = sorted({str(w).strip().lower()[:100] for w in words if str(w).strip()})
+                if len(cleaned) > 500:
+                    return {"error": "Too many filter words (max 500)."}
+                await self.db.set_guild_setting(guild_id, "filter_words", cleaned)
+                filter_cog = self.get_cog("🚫 Filter")
+                if filter_cog:
+                    await filter_cog._invalidate_pattern(guild_id)
+            return await self._get_feature_payload(guild_id, feature)
+
+        # Reaction roles live in the reaction_roles table (many per guild).
+        # Replace the standalone set and best-effort add each reaction to its
+        # message so members can click it.
+        if feature == "reaction-role":
+            items = options.get("items")
+            if isinstance(items, list):
+                if len(items) > 100:
+                    return {"error": "Too many reaction roles (max 100)."}
+                rows = []
+                for it in items:
+                    ch, msg = it.get("channelId"), it.get("messageId")
+                    emoji = (it.get("emoji") or "").strip()
+                    role = it.get("roleId")
+                    if not (ch and msg and emoji and role):
+                        continue
+                    try:
+                        rows.append({
+                            "channel_id": _validate_discord_id(ch),
+                            "message_id": _validate_discord_id(msg),
+                            "emoji": emoji,
+                            "role_id": _validate_discord_id(role),
+                        })
+                    except ValueError:
+                        return {"error": "Invalid reaction-role entry (ids must be numeric)"}
+                bad = self._unassignable_roles(self.get_guild(guild_id), [r["role_id"] for r in rows])
+                if bad:
+                    labels = ", ".join(label for _, label in bad)
+                    return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
+                old_rows = await self.db.get_reaction_roles(guild_id, "reaction-role")
+                await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
+                await self._sync_reactions(guild_id, rows, old_rows)
+            # Return the freshly-persisted payload so the dashboard re-syncs its
+            # form state (otherwise the Save button stays enabled and edits look
+            # like they didn't apply).
+            return await self._get_feature_payload(guild_id, feature)
+
+        # Scheduled / recurring announcements live in the scheduled_messages
+        # table (many per guild); replace the set like reaction roles.
+        if feature == "scheduled-messages":
+            items = options.get("items")
+            if isinstance(items, list):
+                if len(items) > 50:
+                    return {"error": "Too many scheduled messages (max 50)."}
+                rows = []
+                for it in items:
+                    ch = it.get("channelId")
+                    content = (it.get("content") or "").strip()[:2000]
+                    sched = it.get("scheduledAt")
+                    repeat = it.get("repeat") or "none"
+                    enabled = bool(it.get("enabled", True))
+                    if not (ch and content and sched):
+                        continue
+                    if repeat not in ("none", "daily", "weekly"):
+                        repeat = "none"
+                    try:
+                        channel_id = _validate_discord_id(ch)
+                        scheduled_at = datetime.datetime.fromisoformat(str(sched).replace("Z", "+00:00"))
+                    except (ValueError, TypeError):
+                        return {"error": "Invalid scheduled message (check the channel and time)."}
+                    if scheduled_at.tzinfo is None:
+                        scheduled_at = scheduled_at.replace(tzinfo=datetime.timezone.utc)
+                    rows.append({
+                        "channel_id": channel_id,
+                        "content": content,
+                        "scheduled_at": scheduled_at,
+                        "repeat": repeat,
+                        "enabled": enabled,
+                    })
+                await self.db.replace_scheduled_messages(guild_id, rows)
+            return await self._get_feature_payload(guild_id, feature)
+
+        # AutoMod content-filter config (invite/link blocking) lives in guilds
+        # columns but is cached, so it goes through set_automod_config.
+        if feature == "automod":
+            # Validate custom regex rules up front so a bad/unsafe pattern
+            # rejects the whole save (no partial write) with a clear message,
+            # instead of the config being written and the rule silently dropped.
+            rules_raw = options.get("rules")
+            if isinstance(rules_raw, list):
+                non_empty = [r for r in rules_raw if str(r.get("pattern", "")).strip()]
+                if len(non_empty) > MAX_RULES:
+                    return {"error": f"Too many custom filters (max {MAX_RULES})."}
+                for r in non_empty:
+                    pattern = str(r.get("pattern", "")).strip()
+                    reason = validate_pattern(pattern)
+                    if reason:
+                        preview = pattern if len(pattern) <= 40 else pattern[:40] + "…"
+                        return {"error": f"Custom filter “{preview}” rejected — {reason}."}
+
+            block_invites = bool(options.get("blockInvites", False))
+            block_links = bool(options.get("blockLinks", False))
+            domains_raw = options.get("allowedDomains") or []
+            domains = sorted({normalize_domain(str(d)) for d in domains_raw if normalize_domain(str(d))})[:50]
+            block_mass_mentions = bool(options.get("blockMassMentions", False))
+            dry_run = bool(options.get("dryRun", False))
+            spam_count = self._clamp_int(options.get("spamCount"), 5, 3, 20)
+            spam_window = self._clamp_int(options.get("spamWindow"), 3, 1, 30)
+            mention_limit = self._clamp_int(options.get("mentionLimit"), 5, 3, 30)
+            await self.db.set_automod_config(
+                guild_id, block_invites, block_links, domains,
+                spam_count, spam_window, mention_limit, block_mass_mentions, dry_run,
+            )
+
+            # Strike escalation config (0 = that tier disabled).
+            strikes_enabled = bool(options.get("strikesEnabled", False))
+            strike_expiry = self._clamp_int(options.get("strikeExpiryHours"), 24, 0, 720)
+            strike_mute = self._clamp_int(options.get("strikeMuteAt"), 3, 0, 50)
+            strike_kick = self._clamp_int(options.get("strikeKickAt"), 0, 0, 50)
+            strike_ban = self._clamp_int(options.get("strikeBanAt"), 0, 0, 50)
+            await self.db.set_automod_strikes(
+                guild_id, strikes_enabled, strike_expiry, strike_mute, strike_kick, strike_ban,
+            )
+
+            # Persist the (already-validated above) custom regex rules.
+            if isinstance(rules_raw, list):
+                await self.db.replace_automod_rules(guild_id, sanitize_rules(rules_raw))
+
+            return await self._get_feature_payload(guild_id, feature)
+
+        # Role menus: the bot posts/edits an embed per menu and reconciles its
+        # emoji reactions and reaction_roles (source='menu', keyed by the
+        # posted message). Many messages per guild, so each uses a per-message
+        # replace rather than the whole-source replace.
+        if feature == "reaction-menus":
+            menus_in = options.get("menus")
+            if isinstance(menus_in, list):
+                if len(menus_in) > 25:
+                    return {"error": "Too many role menus (max 25)."}
+                guild = self.get_guild(guild_id)
+                if not guild:
+                    return {"error": "Guild not found"}
+                current = await self.db.get_reaction_menus(guild_id)
+                current_by_id = {m["id"]: m for m in current}
+                desired_ids = set()
+                for d in menus_in:
+                    if d.get("id"):
                         try:
-                            value = int(value)
+                            desired_ids.add(int(d["id"]))
                         except (TypeError, ValueError):
-                            return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
-                    await self.db.set_guild_setting(guild_id, setting_key, value)
-
-                # Tickets auto-close is a plain integer setting (hours; 0 = off),
-                # clamped rather than routed through the id/channel mapping above.
-                if feature == "tickets" and "autoCloseHours" in options:
-                    hours = self._clamp_int(options.get("autoCloseHours"), 0, 0, 720)
-                    await self.db.set_guild_setting(guild_id, "ticket_auto_close_hours", hours)
-
-                # --- E2E Sync: Rules ---
-                if feature == "rules":
-                    logger.info(f"Starting Rules E2E sync for guild {guild_id}")
-                    guild = self.get_guild(guild_id)
-                    if not guild:
+                            pass
+                # Delete menus that were removed in the dashboard.
+                for m in current:
+                    if m["id"] not in desired_ids:
+                        if m["message_id"]:
+                            await self._delete_menu_message(guild, m["channel_id"], m["message_id"])
+                            await self.db.replace_message_reaction_roles(guild_id, m["message_id"], "menu", [])
+                        await self.db.delete_reaction_menu(m["id"])
+                # Create / update the rest.
+                for d in menus_in:
+                    ch = d.get("channelId")
+                    title = (d.get("title") or "Role Menu").strip()[:256]
+                    description = (d.get("description") or "").strip()[:2000]
+                    exclusive = bool(d.get("exclusive", False))
+                    items_in = d.get("items") or []
+                    if not (ch and items_in):
+                        continue
+                    try:
+                        channel_id = _validate_discord_id(ch)
+                    except ValueError:
+                        return {"error": "Invalid role-menu channel id"}
+                    item_rows_partial = []
+                    for it in items_in:
+                        emoji = (it.get("emoji") or "").strip()
+                        role = it.get("roleId")
+                        if not (emoji and role):
+                            continue
                         try:
-                            guild = await self.fetch_guild(guild_id)
-                            logger.info(f"Guild {guild_id} fetched from API (not in cache)")
-                        except discord.NotFound:
-                            logger.error(f"Guild {guild_id} not found during Rules sync")
-                            return {"error": "Guild not found"}
+                            role_id = _validate_discord_id(role)
+                        except ValueError:
+                            return {"error": "Invalid role-menu role id"}
+                        item_rows_partial.append({"emoji": emoji, "role_id": role_id})
+                    if not item_rows_partial:
+                        continue
+                    bad = self._unassignable_roles(guild, [r["role_id"] for r in item_rows_partial])
+                    if bad:
+                        labels = ", ".join(label for _, label in bad)
+                        return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
+                    item_lines = []
+                    for r in item_rows_partial:
+                        role_obj = guild.get_role(r["role_id"])
+                        item_lines.append((r["emoji"], role_obj.mention if role_obj else f"<@&{r['role_id']}>"))
+
+                    menu_id = int(d["id"]) if (d.get("id") and int(d["id"]) in current_by_id) else None
+                    existing = current_by_id.get(menu_id) if menu_id else None
+                    old_message_id = existing["message_id"] if existing else None
+                    old_channel_id = existing["channel_id"] if existing else None
+                    old_items = existing["items"] if existing else []
+                    # Only edit the existing message if it's in the same channel.
+                    edit_id = old_message_id if (old_message_id and old_channel_id == channel_id) else None
+                    new_message_id = await self._render_menu(guild, channel_id, title, description, item_lines, edit_id)
+                    if new_message_id is None:
+                        return {"error": "I couldn't post the role menu — check I can see and post in that channel."}
+                    # If the menu moved channels, remove the old message + mappings.
+                    if old_message_id and old_message_id != new_message_id:
+                        await self._delete_menu_message(guild, old_channel_id, old_message_id)
+                        await self.db.replace_message_reaction_roles(guild_id, old_message_id, "menu", [])
+                    if menu_id is None:
+                        menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description, exclusive)
+                    await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id, exclusive)
+
+                    new_rows = [
+                        {"channel_id": channel_id, "message_id": new_message_id, "emoji": r["emoji"], "role_id": r["role_id"]}
+                        for r in item_rows_partial
+                    ]
+                    await self.db.replace_message_reaction_roles(guild_id, new_message_id, "menu", new_rows)
+                    old_rows = (
+                        [{"channel_id": old_channel_id or channel_id, "message_id": old_message_id, "emoji": it["emoji"]} for it in old_items]
+                        if old_message_id else []
+                    )
+                    await self._sync_reactions(guild_id, new_rows, old_rows)
+            return await self._get_feature_payload(guild_id, feature)
+
+        # Settings keys that map to BIGINT columns in Postgres and need int conversion
+        BIGINT_SETTINGS = {
+            "rules_channel_id", "rules_message_id", "welcome_channel_id",
+            "autorole_id", "level_up_channel_id",
+            "ticket_support_role_id", "ticket_category_id",
+            "reaction_role_id", "punishment_log_id",
+            "usage_log_id", "audit_log_id", "leave_log_id",
+            "config_role_id", "kick_role_id", "ban_role_id",
+            "mute_role_id", "warn_role_id", "clear_role_id",
+        }
+
+        # Map feature options to settings keys
+        mapping = {
+            "rules": {
+                "channel": "rules_channel_id",
+                "message": "rules_message",
+            },
+            "welcome-message": {
+                "channel": "welcome_channel_id",
+                "message": "welcome_message",
+                "autorole": "autorole_id",
+            },
+            "logging": {
+                "logChannel": "punishment_log_id",
+                "usageChannel": "usage_log_id",
+                "messagesChannel": "audit_log_id",
+                "leaveChannel": "leave_log_id",
+            },
+            "tickets": {
+                "supportRole": "ticket_support_role_id",
+                "category": "ticket_category_id",
+            },
+        }
+
+        # The welcome autorole is granted to every new member, so reject one
+        # the bot can't assign (above its role / managed) up front instead of
+        # letting it fail silently on each join.
+        if feature == "welcome-message" and options.get("autorole"):
+            bad = self._unassignable_roles(self.get_guild(guild_id), [options["autorole"]])
+            if bad:
+                labels = ", ".join(label for _, label in bad)
+                return {"error": f"I can't grant {labels} as the autorole — move my role above it (and it can't be a managed role)."}
+
+        if feature in mapping:
+            for option_key, setting_key in mapping[feature].items():
+                if option_key not in options:
+                    continue
+                value = options[option_key]
+                if value is None:
+                    # Explicit null means the admin cleared an optional
+                    # channel/role in the dashboard — unset the column.
+                    await self.db.set_guild_setting(guild_id, setting_key, None)
+                    continue
+                if setting_key in BIGINT_SETTINGS:
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
+                await self.db.set_guild_setting(guild_id, setting_key, value)
+
+            # Tickets auto-close is a plain integer setting (hours; 0 = off),
+            # clamped rather than routed through the id/channel mapping above.
+            if feature == "tickets" and "autoCloseHours" in options:
+                hours = self._clamp_int(options.get("autoCloseHours"), 0, 0, 720)
+                await self.db.set_guild_setting(guild_id, "ticket_auto_close_hours", hours)
+
+            # --- E2E Sync: Rules ---
+            if feature == "rules":
+                logger.info(f"Starting Rules E2E sync for guild {guild_id}")
+                guild = self.get_guild(guild_id)
+                if not guild:
+                    try:
+                        guild = await self.fetch_guild(guild_id)
+                        logger.info(f"Guild {guild_id} fetched from API (not in cache)")
+                    except discord.NotFound:
+                        logger.error(f"Guild {guild_id} not found during Rules sync")
+                        return {"error": "Guild not found"}
+                
+                if guild:
+                    channel_id = options.get("channel")
+                    rules_text = options.get("message")
+                    logger.info(f"Sync details: channel={channel_id}, text_len={len(rules_text) if rules_text else 0}")
                     
-                    if guild:
-                        channel_id = options.get("channel")
-                        rules_text = options.get("message")
-                        logger.info(f"Sync details: channel={channel_id}, text_len={len(rules_text) if rules_text else 0}")
-                        
-                        if channel_id and rules_text:
-                            try:
-                                channel_id_int = int(channel_id)
-                                channel = guild.get_channel(channel_id_int)
-                                if not channel:
+                    if channel_id and rules_text:
+                        try:
+                            channel_id_int = int(channel_id)
+                            channel = guild.get_channel(channel_id_int)
+                            if not channel:
+                                try:
+                                    channel = await guild.fetch_channel(channel_id_int)
+                                    logger.info(f"Channel {channel_id_int} fetched from API")
+                                except discord.NotFound:
+                                    logger.error(f"Channel {channel_id_int} not found")
+                                    return {"error": "Channel not found"}
+                            
+                            if channel and isinstance(channel, discord.TextChannel):
+                                # Check for existing message ID to edit
+                                message_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
+                                if message_id:
                                     try:
-                                        channel = await guild.fetch_channel(channel_id_int)
-                                        logger.info(f"Channel {channel_id_int} fetched from API")
-                                    except discord.NotFound:
-                                        logger.error(f"Channel {channel_id_int} not found")
-                                        return {"error": "Channel not found"}
-                                
-                                if channel and isinstance(channel, discord.TextChannel):
-                                    # Check for existing message ID to edit
-                                    message_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
-                                    if message_id:
-                                        try:
-                                            msg = await channel.fetch_message(int(message_id))
-                                            await msg.edit(content=rules_text)
-                                            logger.info(f"Rules message {message_id} edited successfully")
-                                        except (discord.NotFound, discord.Forbidden, ValueError):
-                                            # If not found or can't edit, post new one
-                                            new_msg = await channel.send(content=rules_text)
-                                            await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
-                                            logger.info(f"Rules message not found/editable, posted new: {new_msg.id}")
-                                    else:
+                                        msg = await channel.fetch_message(int(message_id))
+                                        await msg.edit(content=rules_text)
+                                        logger.info(f"Rules message {message_id} edited successfully")
+                                    except (discord.NotFound, discord.Forbidden, ValueError):
+                                        # If not found or can't edit, post new one
                                         new_msg = await channel.send(content=rules_text)
                                         await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
-                                        logger.info(f"No previous rules message, posted new: {new_msg.id}")
-                            except Exception as e:
-                                logger.error(f"Error during Rules E2E sync: {e}", exc_info=True)
-                                return {"error": f"Failed to sync with Discord: {str(e)}"}
+                                        logger.info(f"Rules message not found/editable, posted new: {new_msg.id}")
+                                else:
+                                    new_msg = await channel.send(content=rules_text)
+                                    await self.db.set_guild_setting(guild_id, "rules_message_id", new_msg.id)
+                                    logger.info(f"No previous rules message, posted new: {new_msg.id}")
+                        except Exception as e:
+                            logger.error(f"Error during Rules E2E sync: {e}", exc_info=True)
+                            return {"error": f"Failed to sync with Discord: {str(e)}"}
 
-                        # Rules reaction-role (one mapping on the rules message)
-                        rules_msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
-                        rules_ch_id = await self.db.get_guild_setting(guild_id, "rules_channel_id")
-                        old_rules = await self.db.get_reaction_roles(guild_id, "rules")
-                        if options.get("reactionEnabled") and options.get("reactionRole") and rules_msg_id and rules_ch_id:
-                            try:
-                                rr = {
-                                    "channel_id": int(rules_ch_id),
-                                    "message_id": int(rules_msg_id),
-                                    "emoji": (options.get("reactionEmoji") or "✅").strip(),
-                                    "role_id": _validate_discord_id(options.get("reactionRole")),
-                                }
-                            except ValueError:
-                                return {"error": "Invalid rules reaction role id"}
-                            await self.db.replace_reaction_roles(guild_id, "rules", [rr])
-                            await self._sync_reactions(guild_id, [rr], old_rules)
-                        else:
-                            await self.db.replace_reaction_roles(guild_id, "rules", [])
-                            # Remove the bot's stale reaction if the rules role was turned off.
-                            await self._sync_reactions(guild_id, [], old_rules)
+                    # Rules reaction-role (one mapping on the rules message)
+                    rules_msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
+                    rules_ch_id = await self.db.get_guild_setting(guild_id, "rules_channel_id")
+                    old_rules = await self.db.get_reaction_roles(guild_id, "rules")
+                    if options.get("reactionEnabled") and options.get("reactionRole") and rules_msg_id and rules_ch_id:
+                        try:
+                            rr = {
+                                "channel_id": int(rules_ch_id),
+                                "message_id": int(rules_msg_id),
+                                "emoji": (options.get("reactionEmoji") or "✅").strip(),
+                                "role_id": _validate_discord_id(options.get("reactionRole")),
+                            }
+                        except ValueError:
+                            return {"error": "Invalid rules reaction role id"}
+                        await self.db.replace_reaction_roles(guild_id, "rules", [rr])
+                        await self._sync_reactions(guild_id, [rr], old_rules)
+                    else:
+                        await self.db.replace_reaction_roles(guild_id, "rules", [])
+                        # Remove the bot's stale reaction if the rules role was turned off.
+                        await self._sync_reactions(guild_id, [], old_rules)
 
-                return await self._get_feature_payload(guild_id, feature)
-
-        return {"error": "Unknown action"}
+            return await self._get_feature_payload(guild_id, feature)
 
     async def _sync_reactions(self, guild_id: int, rows: list, old_rows: Optional[list] = None) -> None:
         """Best-effort reconcile of the bot's own reactions on each mapped message:
