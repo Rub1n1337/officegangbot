@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from '@/utils/auth/server';
+import { getFreshSession } from '@/utils/auth/server';
 
 export const config = {
   api: {
@@ -186,11 +186,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // reaches it. Require a logged-in user here, and for guild-scoped paths verify
   // the user is an administrator of that guild — otherwise anyone could call the
   // proxy to manage any guild the bot is in.
-  const session = getServerSession(req);
-  if (!session.success) {
+  const accessToken = (await getFreshSession(req, res))?.access_token;
+  if (!accessToken) {
     return res.status(401).json({ detail: 'Not authenticated' });
   }
-  const accessToken = session.data.access_token;
 
   const rawPath = req.query.path;
   const segments = (Array.isArray(rawPath) ? rawPath : [rawPath ?? '']) as string[];

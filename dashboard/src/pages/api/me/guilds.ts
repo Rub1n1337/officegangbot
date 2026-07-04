@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from '@/utils/auth/server';
+import { getFreshSession } from '@/utils/auth/server';
 
 const botApiUrl = process.env.BOT_API_URL ?? 'http://localhost:8000';
 const ADMINISTRATOR = BigInt(1 << 3); // Discord ADMINISTRATOR permission flag
@@ -47,15 +47,14 @@ async function fetchUserGuilds(accessToken: string): Promise<Response | null> {
  * erroring, so a transient hiccup never breaks the picker.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = getServerSession(req);
-  if (!session.success) {
+  const accessToken = (await getFreshSession(req, res))?.access_token;
+  if (!accessToken) {
     return res.status(401).json({ detail: 'Not authenticated' });
   }
   const apiKey = process.env.BOT_API_KEY ?? process.env.API_SECRET_KEY;
   if (!apiKey) {
     return res.status(500).json({ detail: 'BOT_API_KEY is not configured' });
   }
-  const accessToken = session.data.access_token;
 
   // The caller's admin guild ids (Discord). Without these we can't safely
   // intersect, so degrade to "no badges" rather than failing the request.

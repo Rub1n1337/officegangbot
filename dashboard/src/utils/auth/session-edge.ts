@@ -16,6 +16,9 @@ export const tokenSchema = z.object({
   expires_in: z.number(),
   refresh_token: z.string(),
   scope: z.string(),
+  // When we stored the token (ms epoch). Stamped by setServerSession; absent on
+  // legacy cookies, in which case we don't proactively refresh.
+  obtained_at: z.number().optional(),
 });
 
 export type AccessToken = z.infer<typeof tokenSchema>;
