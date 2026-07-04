@@ -22,7 +22,8 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'autorole_id', 'rules_channel_id', 'rules_message_id', 'rules_message',
     'reaction_emoji', 'reaction_role_id', 'setup_complete', 'levels_enabled',
     'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
-    'ticket_support_role_id', 'ticket_category_id', 'enabled_features',
+    'ticket_support_role_id', 'ticket_category_id', 'ticket_auto_close_hours',
+    'enabled_features',
     'locale', 'automod_block_invites', 'automod_block_links',
     'automod_allowed_domains', 'automod_spam_count', 'automod_spam_window',
     'automod_mention_limit', 'automod_block_mass_mentions',
@@ -1028,6 +1029,18 @@ class DatabaseManager:
                 int(channel_id),
             )
         return dict(row) if row else None
+
+    async def get_autoclose_candidates(self) -> List[Dict[str, Any]]:
+        """Returns open tickets in guilds that have auto-close enabled, with the
+        guild's threshold, so the ticket cog can close the idle ones."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT t.guild_id, t.channel_id, t.opened_at, "
+                "g.ticket_auto_close_hours AS hours "
+                "FROM tickets t JOIN guilds g ON g.guild_id = t.guild_id "
+                "WHERE t.status = 'open' AND COALESCE(g.ticket_auto_close_hours, 0) > 0"
+            )
+        return [dict(r) for r in rows]
 
     async def set_ticket_priority(self, channel_id: int, priority: str) -> bool:
         """Sets the priority on the open ticket for a channel. Returns True if a

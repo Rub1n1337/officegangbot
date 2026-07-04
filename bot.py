@@ -338,6 +338,7 @@ class MyBot(commands.Bot):
             "tickets": {
                 "supportRole": self._snowflake_or_none(settings.get("ticket_support_role_id")),
                 "category": self._snowflake_or_none(settings.get("ticket_category_id")),
+                "autoCloseHours": int(settings.get("ticket_auto_close_hours") or 0),
             },
             "automod": {
                 "blockInvites": bool(settings.get("automod_block_invites")),
@@ -1248,7 +1249,13 @@ class MyBot(commands.Bot):
                         except (TypeError, ValueError):
                             return {"error": f"Invalid value for {option_key}: must be a numeric Discord ID"}
                     await self.db.set_guild_setting(guild_id, setting_key, value)
-                
+
+                # Tickets auto-close is a plain integer setting (hours; 0 = off),
+                # clamped rather than routed through the id/channel mapping above.
+                if feature == "tickets" and "autoCloseHours" in options:
+                    hours = self._clamp_int(options.get("autoCloseHours"), 0, 0, 720)
+                    await self.db.set_guild_setting(guild_id, "ticket_auto_close_hours", hours)
+
                 # --- E2E Sync: Rules ---
                 if feature == "rules":
                     logger.info(f"Starting Rules E2E sync for guild {guild_id}")

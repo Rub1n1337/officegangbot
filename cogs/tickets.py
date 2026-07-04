@@ -1,6 +1,6 @@
 # cogs/tickets.py
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 from core.logger import logger
 from core.i18n import t
@@ -8,6 +8,7 @@ from core.tickets import build_transcript, normalize_priority, PRIORITY_LABELS
 from .utils import reply
 from typing import Optional
 import asyncio
+import datetime
 import io
 import re
 
@@ -86,31 +87,38 @@ async def _notify_opener(bot, guild, ticket, comment, transcript, loc):
         pass
 
 
+async def _close_channel(bot, guild, channel, closer_id, closer_name, comment, loc):
+    """Core close flow: capture the transcript, persist, notify the opener and
+    delete the channel. Shared by the close modal and the auto-close loop."""
+    transcript = await _capture_transcript(channel, guild)
+    ticket = await bot.db.close_ticket(channel.id, closer_id, closer_name, comment, transcript)
+    if ticket:
+        await _notify_opener(bot, guild, ticket, comment, transcript, loc)
+
+    await asyncio.sleep(3)
+    try:
+        await channel.delete(reason=f"Ticket closed by {closer_name}")
+        logger.info(f"Ticket channel {channel.name} closed by {closer_name}")
+    except discord.Forbidden:
+        try:
+            await channel.send(t(loc, "tickets.close_no_delete_perm"))
+        except discord.HTTPException:
+            pass
+    except discord.NotFound:
+        pass
+    return ticket
+
+
 async def _finalize_close(interaction: discord.Interaction, comment: Optional[str]):
-    """Shared close flow: capture transcript, persist, notify opener, delete
-    the channel. Used by the close modal."""
+    """Close flow from the close modal: acks the interaction, then runs the
+    shared close."""
     bot = interaction.client
     guild = interaction.guild
     channel = interaction.channel
     loc = await bot.db.get_locale(guild.id)
 
     await interaction.response.send_message(t(loc, "tickets.closing"), ephemeral=False)
-
-    transcript = await _capture_transcript(channel, guild)
-    ticket = await bot.db.close_ticket(
-        channel.id, interaction.user.id, str(interaction.user), comment, transcript
-    )
-    if ticket:
-        await _notify_opener(bot, guild, ticket, comment, transcript, loc)
-
-    await asyncio.sleep(3)
-    try:
-        await channel.delete(reason=f"Ticket closed by {interaction.user}")
-        logger.info(f"Ticket channel {channel.name} closed by {interaction.user}")
-    except discord.Forbidden:
-        await channel.send(t(loc, "tickets.close_no_delete_perm"))
-    except discord.NotFound:
-        pass
+    await _close_channel(bot, guild, channel, interaction.user.id, str(interaction.user), comment, loc)
 
 
 class CloseTicketModal(discord.ui.Modal):
@@ -294,6 +302,62 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         # by custom_id after a restart — displayed labels come from posted views).
         bot.add_view(OpenTicketView())
         bot.add_view(TicketControlView())
+        self.auto_close_loop.start()
+
+    def cog_unload(self):
+        self.auto_close_loop.cancel()
+
+    @staticmethod
+    async def _channel_last_activity(channel: discord.TextChannel, opened_at):
+        """Best-effort last-activity time for a ticket channel: derived from the
+        last message's snowflake (no fetch), falling back to a history read, then
+        the ticket's open time."""
+        last_id = channel.last_message_id
+        if last_id:
+            return discord.utils.snowflake_time(last_id)
+        try:
+            async for m in channel.history(limit=1):
+                return m.created_at
+        except discord.HTTPException:
+            pass
+        return opened_at
+
+    @tasks.loop(minutes=15)
+    async def auto_close_loop(self):
+        """Closes open tickets that have been idle beyond their guild's
+        configured auto-close threshold."""
+        try:
+            if not self.bot.db:
+                return
+            candidates = await self.bot.db.get_autoclose_candidates()
+            now = datetime.datetime.now(datetime.timezone.utc)
+            for c in candidates:
+                hours = int(c["hours"])
+                channel = self.bot.get_channel(int(c["channel_id"]))
+                if not isinstance(channel, discord.TextChannel):
+                    continue  # gone or not visible; leave the record for a manual close
+                last_activity = await self._channel_last_activity(channel, c["opened_at"])
+                if last_activity is None:
+                    continue
+                idle_hours = (now - last_activity).total_seconds() / 3600.0
+                if idle_hours < hours:
+                    continue
+                loc = await self.bot.db.get_locale(int(c["guild_id"]))
+                try:
+                    await channel.send(t(loc, "tickets.auto_closed_notice", hours=hours))
+                except discord.HTTPException:
+                    pass
+                await _close_channel(
+                    self.bot, channel.guild, channel, self.bot.user.id, "Auto-close",
+                    t(loc, "tickets.auto_close_comment", hours=hours), loc,
+                )
+                logger.info(f"Auto-closed idle ticket #{channel.name} in {channel.guild.name}")
+        except Exception as e:
+            logger.error(f"Ticket auto-close loop crashed: {e}", exc_info=True)
+
+    @auto_close_loop.before_loop
+    async def before_auto_close(self):
+        await self.bot.wait_until_ready()
 
     @commands.hybrid_command(name="ticket_setup", description="Send the ticket panel to a channel.")
     @app_commands.describe(

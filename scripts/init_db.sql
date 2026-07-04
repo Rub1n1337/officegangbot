@@ -323,6 +323,9 @@ ALTER TABLE users_xp ADD COLUMN IF NOT EXISTS prestige INTEGER DEFAULT 0;
 -- Reaction menus: exclusive (single-select) mode — picking a role in the menu
 -- removes the member's other roles from the same menu.
 ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT FALSE;
+-- Tickets: auto-close open tickets after this many hours of inactivity
+-- (0 = disabled).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ticket_auto_close_hours INTEGER DEFAULT 0;
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')

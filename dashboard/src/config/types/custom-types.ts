@@ -189,6 +189,7 @@ export type ScheduledMessagesFeature = {
 export type TicketsFeature = {
   supportRole?: string | null;
   category?: string | null;
+  autoCloseHours?: number;
 };
 
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';

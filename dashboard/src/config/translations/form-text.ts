@@ -46,6 +46,10 @@ const RU: Record<string, string> = {
     'Находит и записывает нарушения в лог-канал, но не удаляет сообщения, не выдаёт таймауты и не начисляет страйки. Удобно, чтобы безопасно настроить правила перед включением.',
   'Dry-run is on — AutoMod will only log what it would do (needs the Logging feature and a punishment log channel). No messages are deleted and no strikes are added.':
     'Пробный режим включён — AutoMod только записывает, что сделал бы (нужны функция «Логирование» и канал лога наказаний). Сообщения не удаляются, страйки не начисляются.',
+  'Auto-close after inactivity (hours)': 'Автозакрытие при простое (часы)',
+  'Idle tickets close automatically after this many hours.':
+    'Неактивные тикеты закрываются автоматически через столько часов.',
+  '0 = never auto-close.': '0 = не закрывать автоматически.',
   'Single-select (exclusive)': 'Только один вариант (эксклюзивно)',
   'Members can hold only one role from this menu — picking another swaps it.':
     'Из этого меню участник может держать только одну роль — выбор другой заменит текущую.',
