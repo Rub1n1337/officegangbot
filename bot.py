@@ -365,6 +365,7 @@ class MyBot(commands.Bot):
                         "channelId": str(m["channel_id"]),
                         "title": m["title"],
                         "description": m["description"],
+                        "exclusive": bool(m.get("exclusive")),
                         "items": [
                             {"emoji": it["emoji"], "roleId": str(it["role_id"])}
                             for it in m["items"]
@@ -1128,6 +1129,7 @@ class MyBot(commands.Bot):
                         ch = d.get("channelId")
                         title = (d.get("title") or "Role Menu").strip()[:256]
                         description = (d.get("description") or "").strip()[:2000]
+                        exclusive = bool(d.get("exclusive", False))
                         items_in = d.get("items") or []
                         if not (ch and items_in):
                             continue
@@ -1172,8 +1174,8 @@ class MyBot(commands.Bot):
                             await self._delete_menu_message(guild, old_channel_id, old_message_id)
                             await self.db.replace_message_reaction_roles(guild_id, old_message_id, "menu", [])
                         if menu_id is None:
-                            menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description)
-                        await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id)
+                            menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description, exclusive)
+                        await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id, exclusive)
 
                         new_rows = [
                             {"channel_id": channel_id, "message_id": new_message_id, "emoji": r["emoji"], "role_id": r["role_id"]}

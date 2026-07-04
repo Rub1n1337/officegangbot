@@ -70,8 +70,43 @@ class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
                 logger.info(f"Removed role '{role.name}' from {member.name} in {guild.name}.")
         except discord.Forbidden:
             logger.error(f"Cannot manage reaction role in {guild.name}: missing 'Manage Roles' or role too high.")
+            return
         except Exception as e:
             logger.error(f"Unexpected error in reaction role management: {e}", exc_info=True)
+            return
+
+        # Exclusive (single-select) menus: picking one role clears the member's
+        # other roles from the same menu, and their reactions on the other emojis.
+        if add_role and match.get("exclusive"):
+            await self._enforce_exclusive(guild, member, payload, mappings, match)
+
+    async def _enforce_exclusive(self, guild, member, payload, mappings, match) -> None:
+        """Removes the member's other roles from this exclusive menu and clears
+        their reactions on the menu's other emojis so it reflects one choice."""
+        keep_role_id = int(match["role_id"])
+        other_ids = {int(m["role_id"]) for m in mappings} - {keep_role_id}
+        to_remove = [r for rid in other_ids if (r := guild.get_role(rid)) and r in member.roles]
+        if to_remove:
+            try:
+                await member.remove_roles(*to_remove, reason="Exclusive role menu (single select).")
+            except (discord.Forbidden, discord.HTTPException):
+                logger.warning(f"Exclusive menu: couldn't remove other roles from {member} in {guild.name}.")
+
+        channel = guild.get_channel(payload.channel_id)
+        if channel is None:
+            return
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except (discord.HTTPException, discord.Forbidden):
+            return
+        for reaction in message.reactions:
+            if _emoji_match(reaction.emoji, match["emoji"]):
+                continue  # keep the just-selected reaction
+            if any(_emoji_match(reaction.emoji, m["emoji"]) for m in mappings):
+                try:
+                    await reaction.remove(member)
+                except (discord.HTTPException, discord.Forbidden):
+                    pass
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):

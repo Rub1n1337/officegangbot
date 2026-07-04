@@ -166,6 +166,7 @@ export type ReactionMenuConfig = {
   channelId?: string | null;
   title: string;
   description: string;
+  exclusive?: boolean;
   items: ReactionMenuItemConfig[];
 };
 
