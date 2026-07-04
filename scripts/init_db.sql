@@ -327,6 +327,10 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_mass_mentions BOOLEAN 
 -- AutoMod dry-run: detect + log violations without deleting/timing-out/striking,
 -- so admins can tune filters safely before enforcing.
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_dry_run BOOLEAN DEFAULT FALSE;
+-- AutoMod exemptions: channels and roles that bypass AutoMod entirely
+-- (e.g. a #media channel or a trusted role).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_ignored_channels BIGINT[] DEFAULT '{}';
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_ignored_roles BIGINT[] DEFAULT '{}';
 -- AutoMod strike escalation: each violation records a strike; at the configured
 -- thresholds the member is muted / kicked / banned (0 = that tier disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strikes_enabled BOOLEAN DEFAULT FALSE;

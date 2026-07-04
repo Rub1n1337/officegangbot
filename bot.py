@@ -360,6 +360,8 @@ class MyBot(commands.Bot):
                 "strikeKickAt": int(settings.get("automod_strike_kick_at") or 0),
                 "strikeBanAt": int(settings.get("automod_strike_ban_at") or 0),
                 "dryRun": bool(settings.get("automod_dry_run")),
+                "ignoredChannels": [str(c) for c in (settings.get("automod_ignored_channels") or [])],
+                "ignoredRoles": [str(r) for r in (settings.get("automod_ignored_roles") or [])],
                 "rules": [
                     {"pattern": r["pattern"], "action": r["action"], "enabled": bool(r["enabled"])}
                     for r in automod_rules
@@ -1207,9 +1209,22 @@ class MyBot(commands.Bot):
             spam_count = self._clamp_int(options.get("spamCount"), 5, 3, 20)
             spam_window = self._clamp_int(options.get("spamWindow"), 3, 1, 30)
             mention_limit = self._clamp_int(options.get("mentionLimit"), 5, 3, 30)
+
+            def _id_list(raw):
+                out = []
+                for v in (raw or [])[:100]:
+                    try:
+                        out.append(_validate_discord_id(v))
+                    except (ValueError, TypeError):
+                        continue
+                return out
+
+            ignored_channels = _id_list(options.get("ignoredChannels"))
+            ignored_roles = _id_list(options.get("ignoredRoles"))
             await self.db.set_automod_config(
                 guild_id, block_invites, block_links, domains,
                 spam_count, spam_window, mention_limit, block_mass_mentions, dry_run,
+                ignored_channels, ignored_roles,
             )
 
             # Strike escalation config (0 = that tier disabled).

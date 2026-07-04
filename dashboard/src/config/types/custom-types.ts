@@ -248,6 +248,8 @@ export type AutomodRule = {
 
 export type AutomodFeature = {
   dryRun: boolean;
+  ignoredChannels: string[];
+  ignoredRoles: string[];
   blockInvites: boolean;
   blockLinks: boolean;
   allowedDomains: string[];

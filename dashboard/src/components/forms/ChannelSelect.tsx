@@ -10,8 +10,8 @@ import { useRouter } from 'next/router';
 import { SelectInstance, Props as SelectProps } from 'chakra-react-select';
 import { Override } from '@/utils/types';
 import { ControlledInput } from './types';
-import { FormCard } from './Form';
-import { useController } from 'react-hook-form';
+import { FormCard, FormCardProps } from './Form';
+import { useController, UseControllerProps } from 'react-hook-form';
 import { common } from '@/config/translations/common';
 
 /**
@@ -119,6 +119,41 @@ export const ChannelSelectForm: ControlledInput<Omit<Props, 'value' | 'onChange'
   return (
     <FormCard {...control} error={fieldState.error?.message}>
       <ChannelSelect {...field} {...props} />
+    </FormCard>
+  );
+};
+
+// Multi-select variant: the field value is a string[] of channel ids.
+type MultiFormProps = {
+  control: Omit<FormCardProps, 'error' | 'children'>;
+  controller: UseControllerProps<any>;
+};
+
+export const ChannelMultiSelectForm = ({ control, controller }: MultiFormProps) => {
+  const { field, fieldState } = useController(controller);
+  const guild = useRouter().query.guild as string;
+  const channelsQuery = useGuildChannelsQuery(guild);
+  const value: string[] = field.value ?? [];
+  const options = useMemo(
+    () => (channelsQuery.data != null ? mapOptions(channelsQuery.data) : []),
+    [channelsQuery.data]
+  );
+  const selected = value
+    .map((id) => channelsQuery.data?.find((c) => c.id === id))
+    .filter((c): c is GuildChannel => c != null)
+    .map(render);
+
+  return (
+    <FormCard {...control} error={fieldState.error?.message}>
+      <SelectField
+        isMulti
+        isDisabled={channelsQuery.isLoading}
+        isLoading={channelsQuery.isLoading}
+        placeholder={<common.T text="select channel" />}
+        value={selected}
+        onChange={(vals: any) => field.onChange(((vals ?? []) as Option[]).map((v) => v.value))}
+        options={options}
+      />
     </FormCard>
   );
 };

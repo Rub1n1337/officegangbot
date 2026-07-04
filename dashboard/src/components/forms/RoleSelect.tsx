@@ -9,8 +9,8 @@ import { forwardRef } from 'react';
 import { SelectInstance, Props as SelectProps } from 'chakra-react-select';
 import { Override } from '@/utils/types';
 import { ControlledInput } from './types';
-import { FormCard } from './Form';
-import { useController } from 'react-hook-form';
+import { FormCard, FormCardProps } from './Form';
+import { useController, UseControllerProps } from 'react-hook-form';
 import { common } from '@/config/translations/common';
 
 import { BsPeopleFill } from 'react-icons/bs';
@@ -73,6 +73,37 @@ export const RoleSelectForm: ControlledInput<Omit<Props, 'value' | 'onChange'>> 
   return (
     <FormCard {...control} error={fieldState?.error?.message}>
       <RoleSelect {...field} {...props} />
+    </FormCard>
+  );
+};
+
+// Multi-select variant: the field value is a string[] of role ids.
+type MultiFormProps = {
+  control: Omit<FormCardProps, 'error' | 'children'>;
+  controller: UseControllerProps<any>;
+};
+
+export const RoleMultiSelectForm = ({ control, controller }: MultiFormProps) => {
+  const { fieldState, field } = useController(controller);
+  const { guild } = useRouter().query as Params;
+  const rolesQuery = useGuildRolesQuery(guild);
+  const value: string[] = field.value ?? [];
+  const selected = value
+    .map((id) => rolesQuery.data?.find((r) => r.id === id))
+    .filter((r): r is Role => r != null)
+    .map(render);
+
+  return (
+    <FormCard {...control} error={fieldState?.error?.message}>
+      <SelectField
+        isMulti
+        isDisabled={rolesQuery.isLoading}
+        isLoading={rolesQuery.isLoading}
+        placeholder={<common.T text="select role" />}
+        value={selected}
+        onChange={(vals: any) => field.onChange(((vals ?? []) as Option[]).map((v) => v.value))}
+        options={rolesQuery.data?.map(render)}
+      />
     </FormCard>
   );
 };

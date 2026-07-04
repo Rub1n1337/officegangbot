@@ -41,6 +41,15 @@ const RU: Record<string, string> = {
   'Mention limit': 'Лимит упоминаний',
   'Delete a message with more than this many user/role mentions.':
     'Удалять сообщение, где упоминаний пользователей/ролей больше этого числа.',
+  'Exemptions': 'Исключения',
+  'Channels and roles listed here are ignored by AutoMod entirely.':
+    'Каналы и роли из этого списка полностью игнорируются AutoMod.',
+  'Ignored channels': 'Игнорируемые каналы',
+  'AutoMod skips messages in these channels (and their categories).':
+    'AutoMod пропускает сообщения в этих каналах (и их категориях).',
+  'Ignored roles': 'Игнорируемые роли',
+  'Members with any of these roles bypass AutoMod.':
+    'Участники с любой из этих ролей не проверяются AutoMod.',
   'Dry-run (test mode)': 'Пробный режим (без действий)',
   'Detect and log violations to your log channel without deleting messages, timing out members or adding strikes. Use it to tune your rules safely before enforcing them.':
     'Находит и записывает нарушения в лог-канал, но не удаляет сообщения, не выдаёт таймауты и не начисляет страйки. Удобно, чтобы безопасно настроить правила перед включением.',
