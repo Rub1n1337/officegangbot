@@ -4,6 +4,8 @@ import {
   API_ENDPOINT,
   CLIENT_ID,
   CLIENT_SECRET,
+  clearOAuthState,
+  getOAuthState,
   setServerSession,
 } from '@/utils/auth/server';
 import { i18n } from 'next.config';
@@ -38,15 +40,7 @@ async function exchangeToken(code: string): Promise<AccessToken> {
 
 const querySchema = z.object({
   code: z.string(),
-  state: z
-    .string()
-    .optional()
-    //Handle unsupported locales
-    .transform((v) => {
-      if (i18n == null || v == null) return undefined;
-
-      return i18n.locales.find((locale) => locale === v);
-    }),
+  state: z.string().optional(),
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -57,8 +51,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { code, state } = query.data;
-  const token = await exchangeToken(code);
+
+  // CSRF: the state must carry the nonce we set (in an httpOnly cookie) when the
+  // flow started. Reject a missing/mismatched nonce — that's a forged or replayed
+  // callback (login CSRF), not a real login we initiated.
+  const cookieNonce = getOAuthState(req);
+  const [nonce, rawLocale] = (state ?? '').split(':');
+  clearOAuthState(req, res);
+  if (!cookieNonce || !nonce || nonce !== cookieNonce) {
+    return res.status(400).json('Invalid OAuth state');
+  }
+
+  // Only trust a locale we actually support for the post-login redirect.
+  const locale = i18n?.locales.find((l) => l === rawLocale);
+
+  let token: AccessToken;
+  try {
+    token = await exchangeToken(code);
+  } catch (err) {
+    // Don't 500 on a Discord token-exchange failure — send the user back to a
+    // page instead of a stack trace.
+    console.error('OAuth token exchange failed:', err);
+    return res.redirect('/?error=auth');
+  }
 
   setServerSession(req, res, token);
-  res.redirect(state ? `/${state}/user/home` : `/user/home`);
+  res.redirect(locale ? `/${locale}/user/home` : `/user/home`);
 }
