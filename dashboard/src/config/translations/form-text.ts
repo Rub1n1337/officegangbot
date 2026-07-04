@@ -41,6 +41,21 @@ const RU: Record<string, string> = {
   'Mention limit': 'Лимит упоминаний',
   'Delete a message with more than this many user/role mentions.':
     'Удалять сообщение, где упоминаний пользователей/ролей больше этого числа.',
+  'Warning auto-escalation': 'Авто-эскалация предупреждений',
+  'Automatically mute/kick/ban a member once their warnings reach a threshold.':
+    'Автоматически мут/кик/бан участнику при достижении порога предупреждений.',
+  'Mute at (warnings)': 'Мут при (предупреждений)',
+  'Timeout the member for 10 minutes at this many warnings. 0 = off.':
+    'Таймаут на 10 минут при таком числе предупреждений. 0 = выкл.',
+  'Kick at (warnings)': 'Кик при (предупреждений)',
+  'Kick the member at this many warnings. 0 = off.':
+    'Кикнуть участника при таком числе предупреждений. 0 = выкл.',
+  'Ban at (warnings)': 'Бан при (предупреждений)',
+  'Ban the member at this many warnings. 0 = off.':
+    'Забанить участника при таком числе предупреждений. 0 = выкл.',
+  'Warning expiry (hours)': 'Срок предупреждения (часы)',
+  'Warnings older than this stop counting toward escalation. 0 = never expire.':
+    'Предупреждения старше этого срока не учитываются в эскалации. 0 = не сгорают.',
   'Exemptions': 'Исключения',
   'Channels and roles listed here are ignored by AutoMod entirely.':
     'Каналы и роли из этого списка полностью игнорируются AutoMod.',

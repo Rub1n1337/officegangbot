@@ -318,6 +318,11 @@ export type ModerationFeature = {
   mute?: string | null;
   warn?: string | null;
   clear?: string | null;
+  warnEscalationEnabled?: boolean;
+  warnExpiryHours?: number;
+  warnMuteAt?: number;
+  warnKickAt?: number;
+  warnBanAt?: number;
 };
 
 export type LoggingFeature = {

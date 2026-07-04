@@ -5,6 +5,7 @@ from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
 from core.i18n import t
+from core.warn_escalation import maybe_escalate_warning
 from .utils import reply, send_paginated
 import datetime
 
@@ -49,6 +50,11 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         embed.add_field(name=t(loc, "field.reason"), value=reason, inline=False)
         embed.add_field(name=t(loc, "field.moderator"), value=ctx.author.mention, inline=False)
         embed.add_field(name=t(loc, "field.total_warnings"), value=f"**{len(warnings)}**", inline=False)
+
+        # Auto-escalate (mute/kick/ban) if the guild's warning thresholds are crossed.
+        escalated = await maybe_escalate_warning(self.bot.db, ctx.guild, member)
+        if escalated:
+            embed.add_field(name=t(loc, "warn.escalated_field"), value=t(loc, "warn.escalated", action=escalated), inline=False)
 
         await reply(ctx, embed=embed)
         logger.info(f"Warning issued to {member} in {ctx.guild.name} by {ctx.author}. Reason: {reason}")

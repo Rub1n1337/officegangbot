@@ -29,6 +29,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "warn.cannot_bot": "❌ You cannot warn bots.",
         "warn.dm_title": "⚠️ You have received a warning in {guild}",
         "warn.issued_title": "⚠️ Warning Issued",
+        "warn.escalated_field": "⚖️ Auto-escalation",
+        "warn.escalated": "Member reached the warning threshold and was **{action}**.",
         # --- /warnings ---
         "warnings.title": "⚠️ Warnings: {member}",
         "warnings.none": "✅ This member has no warnings.",
@@ -311,6 +313,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "warn.cannot_bot": "❌ Нельзя выдавать предупреждения ботам.",
         "warn.dm_title": "⚠️ Вы получили предупреждение на сервере {guild}",
         "warn.issued_title": "⚠️ Предупреждение выдано",
+        "warn.escalated_field": "⚖️ Авто-эскалация",
+        "warn.escalated": "Участник достиг порога предупреждений — **{action}**.",
         # --- /warnings ---
         "warnings.title": "⚠️ Предупреждения: {member}",
         "warnings.none": "✅ У этого участника нет предупреждений.",

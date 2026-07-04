@@ -331,6 +331,14 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_dry_run BOOLEAN DEFAULT FALS
 -- (e.g. a #media channel or a trusted role).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_ignored_channels BIGINT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_ignored_roles BIGINT[] DEFAULT '{}';
+-- Warning escalation: manual /warn auto-escalates (mute/kick/ban) once a member's
+-- active warning count crosses the thresholds (0 = that tier off; expiry 0 = warns
+-- never decay). Mirrors the AutoMod strike system for manual warnings.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_escalation_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_expiry_hours INTEGER DEFAULT 0;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_mute_at INTEGER DEFAULT 0;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_kick_at INTEGER DEFAULT 0;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_ban_at INTEGER DEFAULT 0;
 -- AutoMod strike escalation: each violation records a strike; at the configured
 -- thresholds the member is muted / kicked / banned (0 = that tier disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strikes_enabled BOOLEAN DEFAULT FALSE;

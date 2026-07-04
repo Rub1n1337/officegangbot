@@ -315,6 +315,11 @@ class MyBot(commands.Bot):
                 "mute": _first_role("mute"),
                 "warn": _first_role("warn"),
                 "clear": _first_role("clear"),
+                "warnEscalationEnabled": bool(settings.get("warn_escalation_enabled")),
+                "warnExpiryHours": int(settings.get("warn_expiry_hours") or 0),
+                "warnMuteAt": int(settings.get("warn_mute_at") or 0),
+                "warnKickAt": int(settings.get("warn_kick_at") or 0),
+                "warnBanAt": int(settings.get("warn_ban_at") or 0),
             },
             "logging": {
                 "logChannel": self._snowflake_or_none(settings.get("punishment_log_id")),
@@ -1021,6 +1026,18 @@ class MyBot(commands.Bot):
                     except ValueError:
                         return {"error": f"Invalid role id for {perm}: {raw}"}
                     await self.db.set_mod_role(guild_id, role_id, perm)
+            # Manual-warning escalation config (0 = tier off; expiry 0 = never decay).
+            if any(k in options for k in (
+                "warnEscalationEnabled", "warnExpiryHours", "warnMuteAt", "warnKickAt", "warnBanAt"
+            )):
+                await self.db.set_warn_escalation(
+                    guild_id,
+                    bool(options.get("warnEscalationEnabled", False)),
+                    self._clamp_int(options.get("warnExpiryHours"), 0, 0, 8760),
+                    self._clamp_int(options.get("warnMuteAt"), 0, 0, 50),
+                    self._clamp_int(options.get("warnKickAt"), 0, 0, 50),
+                    self._clamp_int(options.get("warnBanAt"), 0, 0, 50),
+                )
             return await self._get_feature_payload(guild_id, feature)
 
         # Level role rewards live in the level_roles table (one role per
