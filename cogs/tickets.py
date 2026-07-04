@@ -5,6 +5,8 @@ from discord import app_commands
 from core.logger import logger
 from core.i18n import t
 from core.tickets import build_transcript, normalize_priority, PRIORITY_LABELS
+from core.guild_context import GuildContext
+from core.discord_utils import safe_send
 from .utils import reply
 from typing import Optional
 import asyncio
@@ -81,10 +83,7 @@ async def _notify_opener(bot, guild, ticket, comment, transcript, loc):
     file = None
     if transcript:
         file = discord.File(io.BytesIO(transcript.encode("utf-8")), filename=f"transcript-{ticket['id']}.txt")
-    try:
-        await user.send(embed=embed, file=file)
-    except discord.HTTPException:
-        pass
+    await safe_send(user, embed=embed, file=file)
 
 
 async def _close_channel(bot, guild, channel, closer_id, closer_name, comment, loc):
@@ -100,10 +99,7 @@ async def _close_channel(bot, guild, channel, closer_id, closer_name, comment, l
         await channel.delete(reason=f"Ticket closed by {closer_name}")
         logger.info(f"Ticket channel {channel.name} closed by {closer_name}")
     except discord.Forbidden:
-        try:
-            await channel.send(t(loc, "tickets.close_no_delete_perm"))
-        except discord.HTTPException:
-            pass
+        await safe_send(channel, t(loc, "tickets.close_no_delete_perm"))
     except discord.NotFound:
         pass
     return ticket
@@ -208,11 +204,12 @@ class OpenTicketView(discord.ui.View):
         guild = interaction.guild
         member = interaction.user
         bot = interaction.client
-        loc = await bot.db.get_locale(guild.id)
+        # locale + enabled features + settings in one bundled read.
+        ctx = await GuildContext.load(bot.db, guild.id)
+        loc = ctx.locale
 
         # The dashboard toggle controls the ticket system via enabled_features.
-        enabled_features = await bot.db.get_enabled_features(guild.id)
-        if "tickets" not in enabled_features:
+        if not ctx.is_enabled("tickets"):
             await interaction.response.send_message(
                 t(loc, "tickets.disabled"), ephemeral=True
             )
@@ -232,11 +229,11 @@ class OpenTicketView(discord.ui.View):
             return
 
         # Get support role from settings
-        support_role_id = await bot.db.get_guild_setting(guild.id, 'ticket_support_role_id')
+        support_role_id = ctx.setting('ticket_support_role_id')
         support_role = guild.get_role(int(support_role_id)) if support_role_id else None
 
         # Get ticket category
-        category_id = await bot.db.get_guild_setting(guild.id, 'ticket_category_id')
+        category_id = ctx.setting('ticket_category_id')
         category = guild.get_channel(int(category_id)) if category_id else None
 
         # Set permissions
@@ -343,10 +340,7 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
                 if idle_hours < hours:
                     continue
                 loc = await self.bot.db.get_locale(int(c["guild_id"]))
-                try:
-                    await channel.send(t(loc, "tickets.auto_closed_notice", hours=hours))
-                except discord.HTTPException:
-                    pass
+                await safe_send(channel, t(loc, "tickets.auto_closed_notice", hours=hours))
                 await _close_channel(
                     self.bot, channel.guild, channel, self.bot.user.id, "Auto-close",
                     t(loc, "tickets.auto_close_comment", hours=hours), loc,
