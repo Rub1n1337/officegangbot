@@ -30,6 +30,8 @@ from core.automod_rules import sanitize_rules, validate_pattern, MAX_RULES
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from core.observability import init_sentry
+from core.appeals import AppealButton, send_ban_appeal_dm
+from core.i18n import t
 from api_server import app as fastapi_app, set_bot_instance
 
 # --- Bot Initialization ---
@@ -166,6 +168,10 @@ class MyBot(commands.Bot):
         self.health_monitor = HealthMonitor(self)
         self.health_monitor.start()
         logger.info("Health monitor started.")
+
+        # Persistent 'Appeal this ban' buttons (in ban DMs) — registered so they
+        # keep working after a restart.
+        self.add_dynamic_items(AppealButton)
 
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
@@ -461,7 +467,7 @@ class MyBot(commands.Bot):
             "get_moderation", "delete_warning", "set_locale",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
-            "get_analytics",
+            "get_analytics", "set_ban_appeals", "decide_ban_appeal",
         }
         if action in _needs_guild and guild_id is None:
             return {"error": "Missing or invalid guild_id"}
@@ -624,6 +630,8 @@ class MyBot(commands.Bot):
             punishments = await self.db.get_timed_punishments(guild_id)
             leaderboard = await self.db.get_leaderboard(guild_id, 25)
             strikes = await self.db.get_active_strikes(guild_id)
+            appeals = await self.db.get_ban_appeals(guild_id, 50)
+            appeals_enabled = bool(await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"))
             return {
                 "warnings": [
                     {
@@ -670,6 +678,22 @@ class MyBot(commands.Bot):
                             "lastStrikeAt": u["last_strike"].isoformat() if u["last_strike"] else None,
                         }
                         for u in strikes["users"]
+                    ],
+                },
+                "appeals": {
+                    "enabled": appeals_enabled,
+                    "items": [
+                        {
+                            "id": a["id"],
+                            "userId": str(a["user_id"]),
+                            "userName": a["user_name"],
+                            "reason": a["reason"],
+                            "status": a["status"],
+                            "decidedByName": a["decided_by_name"],
+                            "createdAt": a["created_at"].isoformat() if a["created_at"] else None,
+                            "decidedAt": a["decided_at"].isoformat() if a["decided_at"] else None,
+                        }
+                        for a in appeals
                     ],
                 },
             }
@@ -785,6 +809,63 @@ class MyBot(commands.Bot):
                 await self._record_audit(guild_id, payload, "delete_warning", target=str(warning_id))
             return {"success": removed}
 
+        if action == "set_ban_appeals":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            enabled = bool(payload.get("enabled"))
+            await self.db.set_guild_setting(guild_id, "ban_appeals_enabled", enabled)
+            await self._record_audit(
+                guild_id, payload, "set_ban_appeals", detail="enabled" if enabled else "disabled"
+            )
+            return {"success": True, "enabled": enabled}
+
+        if action == "decide_ban_appeal":
+            if not self.db:
+                return {"error": "Database unavailable"}
+            try:
+                appeal_id = int(payload.get("appeal_id"))
+            except (TypeError, ValueError):
+                return {"error": "Invalid appeal id"}
+            decision = payload.get("decision")
+            status = {"approve": "approved", "deny": "denied"}.get(decision)
+            if not status:
+                return {"error": "Invalid decision"}
+            row = await self.db.decide_ban_appeal(
+                appeal_id, guild_id, status,
+                payload.get("actor_id"), payload.get("actor_name"),
+            )
+            if not row:
+                return {"error": "Appeal not found or already decided"}
+
+            guild = self.get_guild(guild_id)
+            user_id = int(row["user_id"])
+            # Approve → lift the ban. Deny → leave it in place. Either way, DM
+            # the user the outcome (best-effort).
+            if status == "approved" and guild:
+                try:
+                    await guild.unban(discord.Object(id=user_id), reason="Ban appeal approved")
+                except discord.NotFound:
+                    pass  # already unbanned
+                except discord.HTTPException as e:
+                    logger.warning(f"Appeal approve: couldn't unban {user_id} in {guild_id}: {e}")
+            loc = await self.db.get_locale(guild_id)
+            gname = guild.name if guild else "the server"
+            try:
+                user = self.get_user(user_id) or await self.fetch_user(user_id)
+                key = "approved" if status == "approved" else "denied"
+                embed = discord.Embed(
+                    title=t(loc, f"appeal.{key}_dm_title"),
+                    description=t(loc, f"appeal.{key}_dm_desc", guild=gname),
+                    color=discord.Color.green() if status == "approved" else discord.Color.red(),
+                )
+                await user.send(embed=embed)
+            except discord.HTTPException:
+                pass
+            await self._record_audit(
+                guild_id, payload, "decide_ban_appeal", target=str(user_id), detail=status
+            )
+            return {"success": True, "status": status}
+
         if action == "set_locale":
             if not self.db:
                 return {"error": "Database unavailable"}
@@ -825,6 +906,18 @@ class MyBot(commands.Bot):
                 mod_id = int(payload.get("moderator_id")) if payload.get("moderator_id") else 0
             except (TypeError, ValueError):
                 mod_id = 0
+            # For a ban with appeals enabled, DM the appeal button *before* the
+            # ban (afterwards there's no shared guild to DM through).
+            if payload.get("act") == "ban" and await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"):
+                target = guild.get_member(user_id) or self.get_user(user_id)
+                if target is None:
+                    try:
+                        target = await self.fetch_user(user_id)
+                    except discord.HTTPException:
+                        target = None
+                if target is not None:
+                    loc = await self.db.get_locale(guild_id)
+                    await send_ban_appeal_dm(guild, target, payload.get("reason") or "—", loc)
             result = await perform_moderation(
                 db=self.db,
                 guild=guild,

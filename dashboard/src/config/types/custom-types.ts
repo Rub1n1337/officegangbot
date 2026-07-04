@@ -61,11 +61,28 @@ export type ModerationStrikes = {
   users: ModerationStrikeUser[];
 };
 
+export type BanAppeal = {
+  id: number;
+  userId: string;
+  userName: string | null;
+  reason: string | null;
+  status: 'pending' | 'approved' | 'denied';
+  decidedByName: string | null;
+  createdAt: string | null;
+  decidedAt: string | null;
+};
+
+export type ModerationAppeals = {
+  enabled: boolean;
+  items: BanAppeal[];
+};
+
 export type ModerationData = {
   warnings: ModerationWarning[];
   punishments: ModerationPunishment[];
   leaderboard: ModerationLeaderItem[];
   strikes: ModerationStrikes;
+  appeals: ModerationAppeals;
 };
 
 export type HeatmapCell = { weekday: number; hour: number; count: number };

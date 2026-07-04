@@ -3,6 +3,8 @@ import { QueryClient, onlineManager, useMutation, useQuery } from '@tanstack/rea
 import { UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
 import {
   deleteWarning,
+  setBanAppeals,
+  decideBanAppeal,
   fetchAnalytics,
   fetchAudit,
   disableFeature,
@@ -484,6 +486,63 @@ export function useModerationQuery(guild: string) {
     retry: 2,
     retryDelay,
   });
+}
+
+export function useSetBanAppealsMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, enabled }: { guild: string; enabled: boolean }) =>
+      setBanAppeals(session!!, guild, enabled),
+    {
+      onSuccess(_, { guild }) {
+        client.invalidateQueries(['moderation', guild]);
+      },
+      onError() {
+        toast({
+          title: 'Failed to update ban appeals',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
+}
+
+export function useDecideBanAppealMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, appealId, decision }: { guild: string; appealId: number; decision: 'approve' | 'deny' }) =>
+      decideBanAppeal(session!!, guild, appealId, decision),
+    {
+      onSuccess(_, { guild, decision }) {
+        client.invalidateQueries(['moderation', guild]);
+        client.invalidateQueries(['audit', guild]);
+        toast({
+          title: decision === 'approve' ? 'Appeal approved — user unbanned' : 'Appeal denied',
+          status: 'success',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError(error: unknown) {
+        toast({
+          title: 'Failed to decide appeal',
+          description: error instanceof Error ? error.message : undefined,
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
 }
 
 export function useAnalyticsQuery(guild: string, days: number) {

@@ -7,10 +7,11 @@ import {
   Icon,
   IconButton,
   Skeleton,
+  Switch,
   Text,
   useToast,
 } from '@chakra-ui/react';
-import { MdDelete, MdGavel, MdTimer, MdHistory, MdShield } from 'react-icons/md';
+import { MdDelete, MdGavel, MdTimer, MdHistory, MdShield, MdOutlineHowToReg } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -20,12 +21,15 @@ import {
   useModerationQuery,
   useDeleteWarningMutation,
   useModerateMemberMutation,
+  useSetBanAppealsMutation,
+  useDecideBanAppealMutation,
   useAuditQuery,
 } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { timeAgo, describeAudit, isModerationAction } from '@/utils/audit';
 import type {
   AuditEntry,
+  ModerationAppeals,
   ModerationLeaderItem,
   ModerationPunishment,
   ModerationStrikes,
@@ -325,6 +329,95 @@ function Strikes({ data }: { data: ModerationStrikes }) {
   );
 }
 
+const APPEAL_STATUS: Record<string, string> = {
+  approved: 'green',
+  denied: 'red',
+  pending: 'yellow',
+};
+
+function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string }) {
+  const setEnabled = useSetBanAppealsMutation();
+  const decide = useDecideBanAppealMutation();
+  const pendingCount = data.items.filter((a) => a.status === 'pending').length;
+
+  return (
+    <Section
+      icon={<Icon as={MdOutlineHowToReg} color="Brand" />}
+      title="Ban appeals"
+      count={pendingCount}
+    >
+      <Flex align="center" justify="space-between" gap={3} mb={4}>
+        <Text fontSize="sm" color="TextSecondary">
+          When on, ban DMs include an “Appeal” button. Appeals show up here for review.
+        </Text>
+        <Switch
+          isChecked={data.enabled}
+          isDisabled={setEnabled.isLoading}
+          onChange={(e) => setEnabled.mutate({ guild, enabled: e.target.checked })}
+          flexShrink={0}
+        />
+      </Flex>
+
+      {data.items.length === 0 ? (
+        <Text fontSize="sm" color="TextSecondary">
+          {data.enabled ? 'No appeals submitted yet.' : 'Ban appeals are off.'}
+        </Text>
+      ) : (
+        <Flex direction="column" gap={2}>
+          {data.items.map((a) => (
+            <Box key={a.id} p={3} rounded="xl" bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.50' }}>
+              <Flex align="center" justify="space-between" gap={3} wrap="wrap">
+                <Flex align="center" gap={2} minW={0}>
+                  <Badge colorScheme={APPEAL_STATUS[a.status] ?? 'gray'} rounded="md" flexShrink={0}>
+                    {a.status}
+                  </Badge>
+                  <Text fontWeight="600" isTruncated>
+                    {a.userName ?? a.userId}
+                  </Text>
+                  <Text fontSize="xs" color="TextSecondary">
+                    {timeAgo(a.createdAt)}
+                  </Text>
+                </Flex>
+                {a.status === 'pending' && (
+                  <Flex gap={2} flexShrink={0}>
+                    <Button
+                      size="xs"
+                      colorScheme="green"
+                      isLoading={decide.isLoading && decide.variables?.appealId === a.id}
+                      onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'approve' })}
+                    >
+                      Approve &amp; unban
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      colorScheme="red"
+                      isLoading={decide.isLoading && decide.variables?.appealId === a.id}
+                      onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'deny' })}
+                    >
+                      Deny
+                    </Button>
+                  </Flex>
+                )}
+                {a.status !== 'pending' && a.decidedByName && (
+                  <Text fontSize="xs" color="TextSecondary" flexShrink={0}>
+                    by {a.decidedByName}
+                  </Text>
+                )}
+              </Flex>
+              {a.reason && (
+                <Text fontSize="sm" color="TextSecondary" mt={2} whiteSpace="pre-wrap">
+                  {a.reason}
+                </Text>
+              )}
+            </Box>
+          ))}
+        </Flex>
+      )}
+    </Section>
+  );
+}
+
 function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
   const medals = ['🥇', '🥈', '🥉'];
   const [showAll, setShowAll] = useState(false);
@@ -464,6 +557,7 @@ const ModerationPage: NextPageWithLayout = () => {
             <Warnings rows={query.data.warnings} guild={guild} />
             <Punishments rows={query.data.punishments} />
             <Strikes data={query.data.strikes} />
+            <BanAppeals data={query.data.appeals} guild={guild} />
             <Leaderboard rows={query.data.leaderboard} />
           </Flex>
         )}
