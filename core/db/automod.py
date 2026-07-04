@@ -18,7 +18,8 @@ class _AutomodMixin:
                 "SELECT automod_block_invites, automod_block_links, automod_allowed_domains, "
                 "automod_spam_count, automod_spam_window, automod_mention_limit, "
                 "automod_block_mass_mentions, automod_strikes_enabled, automod_strike_expiry_hours, "
-                "automod_strike_mute_at, automod_strike_kick_at, automod_strike_ban_at, automod_dry_run "
+                "automod_strike_mute_at, automod_strike_kick_at, automod_strike_ban_at, automod_dry_run, "
+                "automod_ignored_channels, automod_ignored_roles "
                 "FROM guilds WHERE guild_id = $1",
                 guild_id,
             )
@@ -40,6 +41,8 @@ class _AutomodMixin:
             "strike_kick_at": int(row["automod_strike_kick_at"]) if row and row["automod_strike_kick_at"] is not None else 5,
             "strike_ban_at": int(row["automod_strike_ban_at"]) if row and row["automod_strike_ban_at"] is not None else 0,
             "dry_run": bool(row["automod_dry_run"]) if row else False,
+            "ignored_channels": [int(x) for x in row["automod_ignored_channels"]] if row and row["automod_ignored_channels"] else [],
+            "ignored_roles": [int(x) for x in row["automod_ignored_roles"]] if row and row["automod_ignored_roles"] else [],
             "rules": [
                 {"id": r["id"], "pattern": r["pattern"], "action": r["action"], "enabled": bool(r["enabled"])}
                 for r in rule_rows
@@ -59,6 +62,8 @@ class _AutomodMixin:
         mention_limit: int = 5,
         block_mass_mentions: bool = False,
         dry_run: bool = False,
+        ignored_channels: List[int] = None,
+        ignored_roles: List[int] = None,
     ) -> None:
         """Persists the AutoMod content-filter/anti-spam config and invalidates the cache."""
         await self.ensure_guild(guild_id)
@@ -67,10 +72,14 @@ class _AutomodMixin:
                 "UPDATE guilds SET automod_block_invites = $1, automod_block_links = $2, "
                 "automod_allowed_domains = $3, automod_spam_count = $4, automod_spam_window = $5, "
                 "automod_mention_limit = $6, automod_block_mass_mentions = $7, automod_dry_run = $8, "
-                "updated_at = NOW() WHERE guild_id = $9",
+                "automod_ignored_channels = $9, automod_ignored_roles = $10, "
+                "updated_at = NOW() WHERE guild_id = $11",
                 bool(block_invites), bool(block_links), list(allowed_domains),
                 int(spam_count), int(spam_window), int(mention_limit),
-                bool(block_mass_mentions), bool(dry_run), guild_id,
+                bool(block_mass_mentions), bool(dry_run),
+                [int(c) for c in (ignored_channels or [])],
+                [int(r) for r in (ignored_roles or [])],
+                guild_id,
             )
         self._automod_cache.pop(guild_id, None)
 

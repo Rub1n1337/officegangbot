@@ -36,12 +36,16 @@ import {
   MdScience,
 } from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
+import { ChannelMultiSelectForm } from '@/components/forms/ChannelSelect';
+import { RoleMultiSelectForm } from '@/components/forms/RoleSelect';
 import { useFormText } from '@/config/translations/form-text';
 import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
 const schema = z.object({
   dryRun: z.boolean(),
+  ignoredChannels: z.array(z.string()),
+  ignoredRoles: z.array(z.string()),
   blockInvites: z.boolean(),
   blockLinks: z.boolean(),
   allowedDomains: z.array(z.string()),
@@ -200,6 +204,8 @@ function NumberRule({
 function defaultsFrom(data: Partial<AutomodFeature>): Input {
   return {
     dryRun: data.dryRun ?? false,
+    ignoredChannels: data.ignoredChannels ?? [],
+    ignoredRoles: data.ignoredRoles ?? [],
     blockInvites: data.blockInvites ?? false,
     blockLinks: data.blockLinks ?? false,
     allowedDomains: (data.allowedDomains ?? []).slice().sort(),
@@ -264,6 +270,27 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             </Text>
           </Flex>
         )}
+
+        <Divider my={1} />
+
+        <Text fontWeight="600">{ft('Exemptions')}</Text>
+        <Text fontSize="sm" color="TextSecondary">
+          {ft('Channels and roles listed here are ignored by AutoMod entirely.')}
+        </Text>
+        <ChannelMultiSelectForm
+          control={{
+            label: ft('Ignored channels'),
+            description: ft('AutoMod skips messages in these channels (and their categories).'),
+          }}
+          controller={{ control, name: 'ignoredChannels' }}
+        />
+        <RoleMultiSelectForm
+          control={{
+            label: ft('Ignored roles'),
+            description: ft('Members with any of these roles bypass AutoMod.'),
+          }}
+          controller={{ control, name: 'ignoredRoles' }}
+        />
 
         <Divider my={1} />
 
@@ -473,6 +500,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
       const result = await onSubmit(
         JSON.stringify({
           dryRun: e.dryRun,
+          ignoredChannels: e.ignoredChannels,
+          ignoredRoles: e.ignoredRoles,
           blockInvites: e.blockInvites,
           blockLinks: e.blockLinks,
           allowedDomains: e.allowedDomains,

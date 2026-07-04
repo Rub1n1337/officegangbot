@@ -173,6 +173,16 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
 
         # --- Content filter (invite / link blocking) ---
         config = await self.bot.db.get_automod_config(guild_id)
+
+        # Exemptions: skip AutoMod entirely in opted-out channels (or their
+        # category) and for members holding an exempt role.
+        ignored_channels = config.get("ignored_channels") or []
+        if message.channel.id in ignored_channels or getattr(message.channel, "category_id", None) in ignored_channels:
+            return
+        ignored_roles = config.get("ignored_roles") or []
+        if ignored_roles and any(r.id in ignored_roles for r in getattr(message.author, "roles", [])):
+            return
+
         # In dry-run mode we still run every detection below, but log what *would*
         # have happened instead of deleting/timing-out/striking.
         dry_run = config["dry_run"]
