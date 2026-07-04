@@ -1,25 +1,26 @@
 import { deleteCookie, setCookie } from 'cookies-next';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NextApiRequestCookies } from 'next/dist/server/api-utils';
-import { NextRequest } from 'next/server';
-import { z } from 'zod';
 import type { OptionsType } from 'cookies-next/lib/types';
 import type { IncomingMessage } from 'http';
+import {
+  TokenCookie,
+  tokenSchema,
+  safeJsonParse,
+} from './session-edge';
+import { encryptSession, decryptSession } from './crypto';
 
 export const API_ENDPOINT = 'https://discord.com/api/v10';
 export const CLIENT_ID = process.env.BOT_CLIENT_ID ?? '';
 export const CLIENT_SECRET = process.env.BOT_CLIENT_SECRET ?? '';
 
-const TokenCookie = 'ts-token';
-const OAuthStateCookie = 'ts-oauth-state';
+// Re-exported so existing importers of these from '@/utils/auth/server' keep
+// working; the definitions live in the edge-safe module.
+export type { AccessToken } from './session-edge';
+export { middleware_hasServerSession } from './session-edge';
+import type { AccessToken } from './session-edge';
 
-const tokenSchema = z.object({
-  access_token: z.string(),
-  token_type: z.literal('Bearer'),
-  expires_in: z.number(),
-  refresh_token: z.string(),
-  scope: z.string(),
-});
+const OAuthStateCookie = 'ts-oauth-state';
 
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -32,31 +33,14 @@ const options: OptionsType = {
   maxAge: DEFAULT_MAX_AGE,
 };
 
-export type AccessToken = z.infer<typeof tokenSchema>;
-
-// A malformed cookie (truncated / tampered) must be treated as "no session",
-// not crash the handler with a JSON.parse error.
-function safeJsonParse(raw: string | undefined): unknown {
-  if (raw == null) return undefined;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-}
-
-export function middleware_hasServerSession(req: NextRequest) {
-  const raw = req.cookies.get(TokenCookie)?.value;
-
-  return raw != null && tokenSchema.safeParse(safeJsonParse(raw)).success;
-}
-
 export function getServerSession(
   req: IncomingMessage & {
     cookies: NextApiRequestCookies;
   }
 ) {
-  return tokenSchema.safeParse(safeJsonParse(req.cookies[TokenCookie]));
+  const raw = req.cookies[TokenCookie];
+  const plain = raw != null ? decryptSession(raw) : undefined;
+  return tokenSchema.safeParse(safeJsonParse(plain ?? undefined));
 }
 
 export function setServerSession(req: NextApiRequest, res: NextApiResponse, data: AccessToken) {
@@ -64,7 +48,8 @@ export function setServerSession(req: NextApiRequest, res: NextApiResponse, data
   // outlive a token we don't refresh (a stale token otherwise fails the guild
   // permission lookup and surfaces as a 502 on every dashboard call).
   const maxAge = data.expires_in > 0 ? data.expires_in : DEFAULT_MAX_AGE;
-  setCookie(TokenCookie, data, { req, res, ...options, maxAge });
+  // Encrypt at rest when SESSION_SECRET is configured (no-op otherwise).
+  setCookie(TokenCookie, encryptSession(JSON.stringify(data)), { req, res, ...options, maxAge });
 }
 
 // --- OAuth CSRF state ---

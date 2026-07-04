@@ -1,5 +1,5 @@
 import { NextMiddleware, NextResponse } from 'next/server';
-import { middleware_hasServerSession } from './server';
+import { middleware_hasServerSession } from './session-edge';
 
 export const withAuth = (authUrl: string, middleware: NextMiddleware): NextMiddleware => {
   return (req, evt) => {

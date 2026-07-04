@@ -1,5 +1,5 @@
 import { deepmerge } from 'deepmerge-ts';
-import { AccessToken } from '@/utils/auth/server';
+import type { AccessToken } from '@/utils/auth/server';
 import { Options } from './core';
 
 const bot_api_endpoint = '/api/bot';

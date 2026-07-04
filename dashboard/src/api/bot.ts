@@ -10,7 +10,7 @@ import {
   Ticket,
   TicketDetail,
 } from '@/config/types/custom-types';
-import { AccessToken } from '@/utils/auth/server';
+import type { AccessToken } from '@/utils/auth/server';
 import { callDefault, callReturn } from '@/utils/fetch/core';
 import { botRequest } from '@/utils/fetch/requests';
 import { ChannelTypes } from './discord';
