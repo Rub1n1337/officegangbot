@@ -657,12 +657,19 @@ class MyBot(commands.Bot):
             m = guild.get_member(int(uid)) if guild else None
             return m.display_name if m else f"User {uid}"
 
-        warnings = await self.db.get_recent_warnings(guild_id, 50)
-        punishments = await self.db.get_timed_punishments(guild_id)
-        leaderboard = await self.db.get_leaderboard(guild_id, 25)
-        strikes = await self.db.get_active_strikes(guild_id)
-        appeals = await self.db.get_ban_appeals(guild_id, 50)
-        appeals_enabled = bool(await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"))
+        # These reads are independent — run them concurrently (like
+        # _get_feature_payload) instead of six sequential round-trips.
+        (
+            warnings, punishments, leaderboard, strikes, appeals, appeals_enabled_raw,
+        ) = await asyncio.gather(
+            self.db.get_recent_warnings(guild_id, 50),
+            self.db.get_timed_punishments(guild_id),
+            self.db.get_leaderboard(guild_id, 25),
+            self.db.get_active_strikes(guild_id),
+            self.db.get_ban_appeals(guild_id, 50),
+            self.db.get_guild_setting(guild_id, "ban_appeals_enabled"),
+        )
+        appeals_enabled = bool(appeals_enabled_raw)
         return {
             "warnings": [
                 {

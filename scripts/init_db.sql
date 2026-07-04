@@ -183,6 +183,8 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tickets_guild ON tickets(guild_id, status);
+-- Hot lookup: get/close/set-priority all resolve the open ticket by channel id.
+CREATE INDEX IF NOT EXISTS idx_tickets_channel ON tickets(channel_id);
 -- At most one open ticket record per channel.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_open_channel ON tickets(channel_id) WHERE status = 'open';
 
