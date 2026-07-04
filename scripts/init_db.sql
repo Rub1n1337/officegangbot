@@ -382,6 +382,8 @@ ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT FA
 -- Tickets: auto-close open tickets after this many hours of inactivity
 -- (0 = disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ticket_auto_close_hours INTEGER DEFAULT 0;
+-- Verification gate: the role granted when a member clicks the Verify button.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS verification_role_id BIGINT;
 -- Ban appeals: when on, ban DMs include an "Appeal" button (opt-in per guild).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ban_appeals_enabled BOOLEAN DEFAULT FALSE;
 

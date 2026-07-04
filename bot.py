@@ -357,6 +357,9 @@ class MyBot(commands.Bot):
                 "category": self._snowflake_or_none(settings.get("ticket_category_id")),
                 "autoCloseHours": int(settings.get("ticket_auto_close_hours") or 0),
             },
+            "verification": {
+                "role": self._snowflake_or_none(settings.get("verification_role_id")),
+            },
             "automod": {
                 "blockInvites": bool(settings.get("automod_block_invites")),
                 "blockLinks": bool(settings.get("automod_block_links")),
@@ -1378,6 +1381,7 @@ class MyBot(commands.Bot):
             "rules_channel_id", "rules_message_id", "welcome_channel_id",
             "autorole_id", "level_up_channel_id",
             "ticket_support_role_id", "ticket_category_id",
+            "verification_role_id",
             "reaction_role_id", "punishment_log_id",
             "usage_log_id", "audit_log_id", "leave_log_id",
             "config_role_id", "kick_role_id", "ban_role_id",
@@ -1405,6 +1409,9 @@ class MyBot(commands.Bot):
                 "supportRole": "ticket_support_role_id",
                 "category": "ticket_category_id",
             },
+            "verification": {
+                "role": "verification_role_id",
+            },
         }
 
         # The welcome autorole is granted to every new member, so reject one
@@ -1415,6 +1422,14 @@ class MyBot(commands.Bot):
             if bad:
                 labels = ", ".join(label for _, label in bad)
                 return {"error": f"I can't grant {labels} as the autorole — move my role above it (and it can't be a managed role)."}
+
+        # Same guard for the verification role — it's granted on every button
+        # click, so reject one the bot can't assign up front.
+        if feature == "verification" and options.get("role"):
+            bad = self._unassignable_roles(self.get_guild(guild_id), [options["role"]])
+            if bad:
+                labels = ", ".join(label for _, label in bad)
+                return {"error": f"I can't grant {labels} as the verified role — move my role above it (and it can't be a managed role)."}
 
         if feature in mapping:
             for option_key, setting_key in mapping[feature].items():

@@ -180,6 +180,11 @@ export type CustomFeatures = {
   'scheduled-messages': ScheduledMessagesFeature;
   'reaction-menus': ReactionMenusFeature;
   'anti-raid': AntiRaidFeature;
+  'verification': VerificationFeature;
+};
+
+export type VerificationFeature = {
+  role?: string | null;
 };
 
 export type AntiRaidFeature = {
