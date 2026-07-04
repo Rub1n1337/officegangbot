@@ -22,7 +22,7 @@ import {
   Wrap,
   WrapItem,
 } from '@chakra-ui/react';
-import { IoSearch, IoArrowBack, IoWarning } from 'react-icons/io5';
+import { IoSearch, IoArrowBack, IoWarning, IoDocumentText } from 'react-icons/io5';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
@@ -264,6 +264,31 @@ function DetailCard({
                 <Text fontSize="sm">{w.reason}</Text>
                 <Text fontSize="xs" color="TextSecondary">
                   by {w.moderatorName} · {fmtDate(w.createdAt)}
+                </Text>
+              </Box>
+            ))}
+          </Flex>
+        )}
+      </Box>
+
+      <Box>
+        <Flex align="center" gap={2} mb={2}>
+          <Icon as={IoDocumentText} color="Brand" />
+          <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary">
+            Mod notes ({data.notes?.length ?? 0})
+          </Text>
+        </Flex>
+        {!data.notes || data.notes.length === 0 ? (
+          <Text fontSize="sm" color="TextSecondary">
+            No notes. Add one with /note in Discord — the member never sees them.
+          </Text>
+        ) : (
+          <Flex direction="column" gap={2}>
+            {data.notes.map((n) => (
+              <Box key={n.id} p={3} rounded="xl" bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.50' }}>
+                <Text fontSize="sm" whiteSpace="pre-wrap">{n.note}</Text>
+                <Text fontSize="xs" color="TextSecondary">
+                  #{n.id} · by {n.authorName ?? '—'} · {fmtDate(n.createdAt)}
                 </Text>
               </Box>
             ))}
