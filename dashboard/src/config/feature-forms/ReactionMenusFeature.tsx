@@ -1,7 +1,7 @@
 import { useForm, useFieldArray, Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Divider, Flex, IconButton, SimpleGrid, Text } from '@chakra-ui/react';
+import { Box, Button, Divider, Flex, IconButton, SimpleGrid, Switch, Text } from '@chakra-ui/react';
 import { MdAdd, MdDelete } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
@@ -22,6 +22,7 @@ const menuSchema = z.object({
   channelId: z.string().optional(),
   title: z.string().min(1, 'Give the menu a title').max(256, 'Title is too long'),
   description: z.string().max(2000, 'Description is too long'),
+  exclusive: z.boolean(),
   items: z.array(itemSchema),
 });
 
@@ -35,6 +36,7 @@ function toFormMenus(menus: ReactionMenuConfig[] | undefined) {
     channelId: m.channelId ?? undefined,
     title: m.title ?? 'Role Menu',
     description: m.description ?? '',
+    exclusive: m.exclusive ?? false,
     items: (m.items ?? []).map((it) => ({ emoji: it.emoji || '✅', roleId: it.roleId ?? undefined })),
   }));
 }
@@ -96,7 +98,7 @@ function MenuRoles({ control, menuIndex }: { control: Control<Input>; menuIndex:
 
 export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (data, onSubmit) => {
   const ft = useFormText();
-  const { register, reset, handleSubmit, formState, control } = useForm<Input>({
+  const { register, reset, handleSubmit, formState, control, watch, setValue } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
     defaultValues: { menus: toFormMenus(data.menus) },
@@ -157,6 +159,21 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
                 {...register(`menus.${index}.description`)}
               />
             </Box>
+            <Flex align="center" gap={3} mt={3} justify="space-between">
+              <Box>
+                <Text fontSize="sm" fontWeight="600">
+                  {ft('Single-select (exclusive)')}
+                </Text>
+                <Text fontSize="xs" color="TextSecondary">
+                  {ft('Members can hold only one role from this menu — picking another swaps it.')}
+                </Text>
+              </Box>
+              <Switch
+                isChecked={watch(`menus.${index}.exclusive`)}
+                onChange={(e) => setValue(`menus.${index}.exclusive`, e.target.checked, { shouldDirty: true })}
+                flexShrink={0}
+              />
+            </Flex>
             <Divider my={3} />
             <MenuRoles control={control} menuIndex={index} />
           </Box>
@@ -166,7 +183,7 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
           variant="action"
           alignSelf="flex-start"
           onClick={() =>
-            append({ id: null, channelId: undefined, title: 'Role Menu', description: '', items: [] })
+            append({ id: null, channelId: undefined, title: 'Role Menu', description: '', exclusive: false, items: [] })
           }
         >
           {ft('Add menu')}

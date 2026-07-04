@@ -320,6 +320,9 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_prestige_level INTEGER DEFAUL
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_season INTEGER DEFAULT 1;
 -- Levels: lifetime prestige count per member (survives season/prestige resets).
 ALTER TABLE users_xp ADD COLUMN IF NOT EXISTS prestige INTEGER DEFAULT 0;
+-- Reaction menus: exclusive (single-select) mode — picking a role in the menu
+-- removes the member's other roles from the same menu.
+ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT FALSE;
 
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')

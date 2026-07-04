@@ -46,6 +46,9 @@ const RU: Record<string, string> = {
     'Находит и записывает нарушения в лог-канал, но не удаляет сообщения, не выдаёт таймауты и не начисляет страйки. Удобно, чтобы безопасно настроить правила перед включением.',
   'Dry-run is on — AutoMod will only log what it would do (needs the Logging feature and a punishment log channel). No messages are deleted and no strikes are added.':
     'Пробный режим включён — AutoMod только записывает, что сделал бы (нужны функция «Логирование» и канал лога наказаний). Сообщения не удаляются, страйки не начисляются.',
+  'Single-select (exclusive)': 'Только один вариант (эксклюзивно)',
+  'Members can hold only one role from this menu — picking another swaps it.':
+    'Из этого меню участник может держать только одну роль — выбор другой заменит текущую.',
   'Strike system': 'Система страйков',
   'Enable strikes': 'Включить страйки',
   'Every AutoMod violation adds a strike; crossing a threshold escalates the punishment.':

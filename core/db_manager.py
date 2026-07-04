@@ -646,11 +646,18 @@ class DatabaseManager:
             return [dict(r) for r in rows]
 
     async def get_message_reaction_roles(self, guild_id: int, message_id: int) -> List[Dict[str, Any]]:
-        """Returns reaction-role mappings on a specific message (emoji matched in Python)."""
+        """Returns reaction-role mappings on a specific message (emoji matched in
+        Python). For role-menu messages, `exclusive` reflects whether the menu is
+        single-select."""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT emoji, role_id, source FROM reaction_roles "
-                "WHERE guild_id = $1 AND message_id = $2",
+                "SELECT rr.emoji, rr.role_id, rr.source, "
+                "COALESCE(rm.exclusive, FALSE) AS exclusive "
+                "FROM reaction_roles rr "
+                "LEFT JOIN reaction_menus rm "
+                "  ON rm.guild_id = rr.guild_id AND rm.message_id = rr.message_id "
+                "  AND rr.source = 'menu' "
+                "WHERE rr.guild_id = $1 AND rr.message_id = $2",
                 guild_id, message_id
             )
             return [dict(r) for r in rows]
@@ -914,7 +921,7 @@ class DatabaseManager:
         (resolved from reaction_roles where source='menu')."""
         async with self.pool.acquire() as conn:
             menus = await conn.fetch(
-                "SELECT id, channel_id, message_id, title, description "
+                "SELECT id, channel_id, message_id, title, description, exclusive "
                 "FROM reaction_menus WHERE guild_id = $1 ORDER BY id",
                 guild_id,
             )
@@ -935,24 +942,31 @@ class DatabaseManager:
             result.append(md)
         return result
 
-    async def create_reaction_menu(self, guild_id: int, channel_id: int, title: str, description: str) -> int:
+    async def create_reaction_menu(
+        self, guild_id: int, channel_id: int, title: str, description: str, exclusive: bool = False
+    ) -> int:
         """Inserts a role menu (message not posted yet) and returns its id."""
         await self.ensure_guild(guild_id)
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
-                "INSERT INTO reaction_menus (guild_id, channel_id, title, description) "
-                "VALUES ($1, $2, $3, $4) RETURNING id",
-                guild_id, int(channel_id), str(title)[:256], str(description),
+                "INSERT INTO reaction_menus (guild_id, channel_id, title, description, exclusive) "
+                "VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                guild_id, int(channel_id), str(title)[:256], str(description), bool(exclusive),
             )
         return row["id"]
 
-    async def update_reaction_menu(self, menu_id: int, channel_id: int, title: str, description: str, message_id) -> None:
-        """Updates a role menu's channel/title/description and posted message id."""
+    async def update_reaction_menu(
+        self, menu_id: int, channel_id: int, title: str, description: str, message_id,
+        exclusive: bool = False,
+    ) -> None:
+        """Updates a role menu's channel/title/description, exclusive flag and
+        posted message id."""
         async with self.pool.acquire() as conn:
             await conn.execute(
-                "UPDATE reaction_menus SET channel_id = $1, title = $2, description = $3, message_id = $4 WHERE id = $5",
+                "UPDATE reaction_menus SET channel_id = $1, title = $2, description = $3, "
+                "message_id = $4, exclusive = $5 WHERE id = $6",
                 int(channel_id), str(title)[:256], str(description),
-                int(message_id) if message_id else None, menu_id,
+                int(message_id) if message_id else None, bool(exclusive), menu_id,
             )
 
     async def delete_reaction_menu(self, menu_id: int) -> None:
