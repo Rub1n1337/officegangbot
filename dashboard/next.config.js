@@ -16,6 +16,30 @@ const nextConfig = {
       { source: '/', destination: '/user/home', permanent: false },
     ];
   },
+  // Baseline security headers, applied to every route. Deliberately excludes a
+  // full Content-Security-Policy — Chakra/emotion inline styles, Next's own
+  // scripts and the charting/emoji libraries need a carefully tuned allow-list,
+  // which is a separate, browser-tested change.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // Disallow framing the dashboard (clickjacking).
+          { key: 'X-Frame-Options', value: 'DENY' },
+          // Don't let browsers MIME-sniff responses into a different type.
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Send the origin (not the full path/query) on cross-origin navigations.
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // The dashboard uses none of these device features — deny them.
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
