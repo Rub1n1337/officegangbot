@@ -53,7 +53,8 @@ class _BaseDB:
 
     async def _init_schema(self) -> None:
         """Runs the SQL schema initialization script."""
-        schema_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'init_db.sql')
+        # This module lives in core/db/, so the repo root is two levels up.
+        schema_path = os.path.join(os.path.dirname(__file__), '..', '..', 'scripts', 'init_db.sql')
         with open(schema_path, 'r', encoding='utf-8') as f:
             schema_sql = f.read()
         async with self._pool.acquire() as conn:
