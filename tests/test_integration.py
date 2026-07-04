@@ -59,6 +59,20 @@ async def _db_roundtrips():
         assert len(warns) == 1 and warns[0]["reason"] == "spam"
         assert await db.clear_warnings(gid, 111) == 1
         assert await db.get_warnings(gid, 111) == []
+
+        # Analytics aggregation. Regression: the window parameter is bound to a
+        # $2::interval cast, so asyncpg requires a timedelta — a plain
+        # '30 days' string raised DataError in production (only reproducible
+        # against a live PG, since it's prepared-statement type inference).
+        await db.bulk_add_activity([{"guild_id": gid, "weekday": 0, "hour": 12, "delta": 3}])
+        await db.bulk_add_activity([{"guild_id": gid, "weekday": 0, "hour": 12, "delta": 2}])
+        case_no = await db.add_mod_case(gid, "warn", 111, "user", 222, "Mod#0001", "spam")
+        assert case_no == 1
+        analytics = await db.get_analytics(gid, 30)
+        assert analytics["days"] == 30
+        assert {"weekday": 0, "hour": 12, "count": 5} in analytics["heatmap"]
+        assert sum(r["count"] for r in analytics["modActionsByDay"]) == 1
+        assert analytics["topModerators"][0]["name"] == "Mod#0001"
     finally:
         try:
             await db.pool.execute("DELETE FROM guilds WHERE guild_id = $1", TEST_GUILD)

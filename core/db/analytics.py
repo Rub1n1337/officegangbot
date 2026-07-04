@@ -1,5 +1,6 @@
 # core/db/analytics.py
 """Activity buckets and analytics aggregation (mixin for DatabaseManager)."""
+import datetime
 from typing import List, Dict, Any
 
 
@@ -31,7 +32,10 @@ class _AnalyticsMixin:
         existing dated tables (mod_cases, automod_strikes, tickets). No new data
         is collected for the trends — they are pure aggregations."""
         days = max(1, min(int(days), 365))
-        window = f"{days} days"
+        # $2 is cast to ::interval in the queries below, so asyncpg infers the
+        # parameter type as interval — which its codec encodes from a timedelta,
+        # not a string ('30 days' raised DataError in production).
+        window = datetime.timedelta(days=days)
         async with self.pool.acquire() as conn:
             heatmap = await conn.fetch(
                 "SELECT weekday, hour, count FROM activity_buckets WHERE guild_id = $1",
