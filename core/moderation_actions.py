@@ -6,6 +6,7 @@ import datetime
 import discord
 
 from core.permissions import bot_can_act_on, clamp_mute_minutes
+from core.warn_escalation import maybe_escalate_warning
 
 HIERARCHY_ERROR = "I can't moderate this member — they're higher than me in the role hierarchy."
 VALID_ACTIONS = {"warn", "mute", "unmute", "kick", "ban"}
@@ -59,7 +60,9 @@ async def perform_moderation(
                 return {"error": "Member is not in the server"}
             wid = await db.add_warning(guild.id, user_id, reason, mod_id, mod_name)
             await _log("Member Warned")
-            return {"success": True, "message": "Warning added", "warningId": wid}
+            escalated = await maybe_escalate_warning(db, guild, member)
+            msg = f"Warning added — escalated ({escalated})" if escalated else "Warning added"
+            return {"success": True, "message": msg, "warningId": wid, "escalated": escalated}
 
         if act == "unmute":
             if member is None:

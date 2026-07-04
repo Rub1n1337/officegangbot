@@ -40,6 +40,50 @@ class _ModerationMixin:
             )
             return [dict(r) for r in rows]
 
+    async def count_active_warnings(self, guild_id: int, user_id: int, expiry_hours: int = 0) -> int:
+        """Counts a user's warnings, honouring the decay window (0 = never decay)."""
+        async with self.pool.acquire() as conn:
+            if expiry_hours and int(expiry_hours) > 0:
+                return int(await conn.fetchval(
+                    "SELECT COUNT(*) FROM warnings WHERE guild_id = $1 AND user_id = $2 "
+                    "AND created_at > NOW() - ($3 || ' hours')::interval",
+                    guild_id, user_id, str(int(expiry_hours)),
+                ))
+            return int(await conn.fetchval(
+                "SELECT COUNT(*) FROM warnings WHERE guild_id = $1 AND user_id = $2",
+                guild_id, user_id,
+            ))
+
+    async def get_warn_escalation(self, guild_id: int) -> Dict[str, Any]:
+        """Returns the manual-warning escalation config for a guild."""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT warn_escalation_enabled, warn_expiry_hours, warn_mute_at, "
+                "warn_kick_at, warn_ban_at FROM guilds WHERE guild_id = $1",
+                guild_id,
+            )
+        return {
+            "enabled": bool(row["warn_escalation_enabled"]) if row else False,
+            "expiry_hours": int(row["warn_expiry_hours"]) if row and row["warn_expiry_hours"] is not None else 0,
+            "mute_at": int(row["warn_mute_at"]) if row and row["warn_mute_at"] is not None else 0,
+            "kick_at": int(row["warn_kick_at"]) if row and row["warn_kick_at"] is not None else 0,
+            "ban_at": int(row["warn_ban_at"]) if row and row["warn_ban_at"] is not None else 0,
+        }
+
+    async def set_warn_escalation(
+        self, guild_id: int, enabled: bool, expiry_hours: int,
+        mute_at: int, kick_at: int, ban_at: int,
+    ) -> None:
+        """Persists the manual-warning escalation config."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE guilds SET warn_escalation_enabled = $1, warn_expiry_hours = $2, "
+                "warn_mute_at = $3, warn_kick_at = $4, warn_ban_at = $5, updated_at = NOW() "
+                "WHERE guild_id = $6",
+                bool(enabled), int(expiry_hours), int(mute_at), int(kick_at), int(ban_at), guild_id,
+            )
+
     async def clear_warnings(self, guild_id: int, user_id: int) -> int:
         """Clears all warnings for a user. Returns count deleted."""
         async with self.pool.acquire() as conn:

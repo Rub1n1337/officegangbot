@@ -30,9 +30,19 @@ def _guild(member=None, bot_pos=5, owner_id=999):
     )
 
 
+def _db(**kw):
+    d = dict(
+        add_warning=AsyncMock(return_value=7),
+        # Warn escalation defaults to off, so the warn path is a no-op here.
+        get_warn_escalation=AsyncMock(return_value={"enabled": False}),
+    )
+    d.update(kw)
+    return SimpleNamespace(**d)
+
+
 def _run(**kw):
     defaults = dict(
-        db=SimpleNamespace(add_warning=AsyncMock(return_value=7)),
+        db=_db(),
         bot_user_id=1,
         user_id=2,
         reason="x",
@@ -46,12 +56,26 @@ def _run(**kw):
 
 
 def test_warn_adds_warning_and_logs():
-    db = SimpleNamespace(add_warning=AsyncMock(return_value=7))
+    db = _db()
     log = AsyncMock()
     res = _run(db=db, guild=_guild(_member()), act="warn", log_action=log)
     assert res["success"] and res["warningId"] == 7
     db.add_warning.assert_awaited_once()
     log.assert_awaited_once()
+
+
+def test_warn_escalates_to_ban_at_threshold():
+    m = _member(pos=1)
+    g = _guild(m, bot_pos=5)
+    db = _db(
+        get_warn_escalation=AsyncMock(
+            return_value={"enabled": True, "expiry_hours": 0, "mute_at": 0, "kick_at": 0, "ban_at": 1}
+        ),
+        count_active_warnings=AsyncMock(return_value=1),
+    )
+    res = _run(db=db, guild=g, act="warn")
+    assert res["success"] and res["escalated"] == "banned"
+    g.ban.assert_awaited_once()
 
 
 def test_unknown_action_errors():
