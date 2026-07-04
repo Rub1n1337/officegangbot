@@ -258,8 +258,10 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
                     await self.bot.db.add_mod_case(
                         ctx.guild.id, "🔨 Mass Ban", uid, str(uid), ctx.author.id, str(ctx.author), reason
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    # The ban went through; don't fail the batch if only the
+                    # case record didn't persist — but don't hide it either.
+                    logger.warning(f"Mass ban: failed to record case for {uid}: {e}")
             except (discord.Forbidden, discord.HTTPException):
                 failed += 1
 
