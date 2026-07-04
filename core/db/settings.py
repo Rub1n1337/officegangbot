@@ -15,7 +15,7 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'reaction_emoji', 'reaction_role_id', 'setup_complete', 'levels_enabled',
     'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
     'ticket_support_role_id', 'ticket_category_id', 'ticket_auto_close_hours',
-    'ban_appeals_enabled', 'enabled_features',
+    'verification_role_id', 'ban_appeals_enabled', 'enabled_features',
     'locale', 'automod_block_invites', 'automod_block_links',
     'automod_allowed_domains', 'automod_spam_count', 'automod_spam_window',
     'automod_mention_limit', 'automod_block_mass_mentions',

@@ -20,6 +20,7 @@ const RU_FEATURES: Record<string, Meta> = {
   automod: { name: 'Авто-модерация', description: 'Анти-спам, анти-меншен и блокировка инвайтов/ссылок' },
   tickets: { name: 'Тикеты', description: 'Система тикетов поддержки с кнопкой «Открыть тикет»' },
   'anti-raid': { name: 'Анти-рейд', description: 'Обнаружение всплеска заходов и автоматические меры против рейдеров' },
+  verification: { name: 'Верификация', description: 'Кнопка «Верифицироваться», выдающая новым участникам роль' },
 };
 
 const RU_CATEGORIES: Record<string, string> = {

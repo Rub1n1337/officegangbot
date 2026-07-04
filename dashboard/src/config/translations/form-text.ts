@@ -61,6 +61,14 @@ const RU: Record<string, string> = {
     'Сколько режим рейда остаётся активным после срабатывания.',
   'Raid alerts require the Logging feature with a punishment log channel. Timeout is the safest default — bans and kicks can hit legitimate newcomers during false positives.':
     'Для алертов нужна функция «Логирование» и канал лога наказаний. Таймаут — самый безопасный вариант: бан и кик при ложном срабатывании заденут обычных новичков.',
+  'New members click a Verify button and receive the role below — gate your channels on that role so unverified accounts can’t post.':
+    'Новые участники нажимают кнопку «Верифицироваться» и получают роль ниже — ограничьте каналы этой ролью, чтобы неверифицированные не могли писать.',
+  'Verified role': 'Роль верифицированного',
+  'Granted when a member clicks the Verify button.':
+    'Выдаётся, когда участник нажимает кнопку «Верифицироваться».',
+  'After saving, run': 'После сохранения выполните',
+  'in Discord to post the Verify panel in the channel of your choice.':
+    'в Discord, чтобы отправить панель верификации в нужный канал.',
   'Warning auto-escalation': 'Авто-эскалация предупреждений',
   'Automatically mute/kick/ban a member once their warnings reach a threshold.':
     'Автоматически мут/кик/бан участнику при достижении порога предупреждений.',

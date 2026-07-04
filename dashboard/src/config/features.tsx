@@ -12,6 +12,7 @@ import {
   MdSchedule,
   MdList,
   MdCrisisAlert,
+  MdVerifiedUser,
 } from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
@@ -26,6 +27,7 @@ import { useTicketsFeature } from './feature-forms/TicketsFeature';
 import { useScheduledMessagesFeature } from './feature-forms/ScheduledMessagesFeature';
 import { useReactionMenusFeature } from './feature-forms/ReactionMenusFeature';
 import { useAntiRaidFeature } from './feature-forms/AntiRaidFeature';
+import { useVerificationFeature } from './feature-forms/VerificationFeature';
 
 // Ordered feature categories, used to group the feature grid and the sidebar.
 export const featureCategories: { id: string; label: string }[] = [
@@ -117,5 +119,12 @@ export const features: FeaturesConfig = {
     icon: <Icon as={MdCrisisAlert} />,
     category: 'safety',
     useRender: useAntiRaidFeature,
+  },
+  'verification': {
+    name: 'Verification',
+    description: 'A Verify button that grants new members a role',
+    icon: <Icon as={MdVerifiedUser} />,
+    category: 'safety',
+    useRender: useVerificationFeature,
   },
 };
