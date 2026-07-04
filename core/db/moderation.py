@@ -84,6 +84,35 @@ class _ModerationMixin:
                 bool(enabled), int(expiry_hours), int(mute_at), int(kick_at), int(ban_at), guild_id,
             )
 
+    async def get_antiraid_config(self, guild_id: int) -> Dict[str, Any]:
+        """Returns the guild's anti-raid config (join-spike thresholds + action)."""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT antiraid_join_count, antiraid_join_window, antiraid_action, "
+                "antiraid_duration FROM guilds WHERE guild_id = $1",
+                guild_id,
+            )
+        return {
+            "join_count": int(row["antiraid_join_count"]) if row and row["antiraid_join_count"] else 8,
+            "join_window": int(row["antiraid_join_window"]) if row and row["antiraid_join_window"] else 10,
+            "action": (row["antiraid_action"] if row and row["antiraid_action"] else "timeout"),
+            "duration": int(row["antiraid_duration"]) if row and row["antiraid_duration"] else 300,
+        }
+
+    async def set_antiraid_config(
+        self, guild_id: int, join_count: int, join_window: int, action: str, duration: int
+    ) -> None:
+        """Persists the guild's anti-raid config."""
+        await self.ensure_guild(guild_id)
+        if action not in ("timeout", "kick", "ban", "notify"):
+            action = "timeout"
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE guilds SET antiraid_join_count = $1, antiraid_join_window = $2, "
+                "antiraid_action = $3, antiraid_duration = $4, updated_at = NOW() WHERE guild_id = $5",
+                int(join_count), int(join_window), action, int(duration), guild_id,
+            )
+
     async def clear_warnings(self, guild_id: int, user_id: int) -> int:
         """Clears all warnings for a user. Returns count deleted."""
         async with self.pool.acquire() as conn:

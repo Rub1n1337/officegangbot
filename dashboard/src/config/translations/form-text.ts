@@ -41,6 +41,26 @@ const RU: Record<string, string> = {
   'Mention limit': 'Лимит упоминаний',
   'Delete a message with more than this many user/role mentions.':
     'Удалять сообщение, где упоминаний пользователей/ролей больше этого числа.',
+  'When this many members join within the time window, raid mode activates: everyone in the wave (and anyone joining while it lasts) gets the chosen action. A raid alert is posted to your punishment log channel.':
+    'Когда за окно времени заходит столько участников, включается режим рейда: ко всей волне (и к каждому, кто зайдёт, пока он активен) применяется выбранное действие. Оповещение о рейде публикуется в канал лога наказаний.',
+  'Join threshold': 'Порог заходов',
+  'This many joins inside the window triggers raid mode.':
+    'Столько заходов за окно включает режим рейда.',
+  'Join window (seconds)': 'Окно заходов (секунды)',
+  'Time window the join threshold is measured over.':
+    'Промежуток времени, за который считается порог заходов.',
+  'Action on raiders': 'Действие к рейдерам',
+  'Applied to everyone in the join wave. “Notify only” just posts the alert.':
+    'Применяется ко всем в волне заходов. «Только оповестить» — просто публикует алерт.',
+  'Timeout': 'Таймаут',
+  'Notify only': 'Только оповестить',
+  'Raid mode duration (seconds)': 'Длительность режима рейда (секунды)',
+  'How long raid mode stays active — also used as the timeout length.':
+    'Сколько действует режим рейда — это же время используется как длительность таймаута.',
+  'How long raid mode stays active after triggering.':
+    'Сколько режим рейда остаётся активным после срабатывания.',
+  'Raid alerts require the Logging feature with a punishment log channel. Timeout is the safest default — bans and kicks can hit legitimate newcomers during false positives.':
+    'Для алертов нужна функция «Логирование» и канал лога наказаний. Таймаут — самый безопасный вариант: бан и кик при ложном срабатывании заденут обычных новичков.',
   'Warning auto-escalation': 'Авто-эскалация предупреждений',
   'Automatically mute/kick/ban a member once their warnings reach a threshold.':
     'Автоматически мут/кик/бан участнику при достижении порога предупреждений.',
