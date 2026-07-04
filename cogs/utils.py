@@ -27,7 +27,7 @@ async def reply(
         try:
             await ctx.channel.send(content=content, embed=embed, **extra)
         except discord.errors.HTTPException as e:
-            logger.error(f"Failed to send prefix command reply: {e}")
+            logger.exception(f"Failed to send prefix command reply: {e}")
         return
 
     # For slash commands, we must handle the interaction state carefully.
@@ -50,7 +50,7 @@ async def reply(
     except discord.errors.HTTPException as e:
         # This typically happens if the interaction token expires (e.g., > 15 mins have passed)
         # or if there's another underlying Discord issue.
-        logger.error(f"Failed to send interaction followup: {e}. Attempting fallback.")
+        logger.exception(f"Failed to send interaction followup: {e}. Attempting fallback.")
         try:
             # As a last resort, send a regular message to the channel.
             # This message will not be ephemeral.

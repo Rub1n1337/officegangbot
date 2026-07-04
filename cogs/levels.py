@@ -226,7 +226,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                                 continue
                             await self._grant_xp(guild, m, lc["voice_xp_per_min"], notify_channel=None)
                 except Exception as e:
-                    logger.error(f"Voice XP for guild {guild.id} failed: {e}")
+                    logger.exception(f"Voice XP for guild {guild.id} failed: {e}")
         except Exception as e:
             logger.error(f"award_voice_xp crashed: {e}", exc_info=True)
 

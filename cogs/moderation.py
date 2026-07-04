@@ -144,7 +144,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
                 ctx.author.id, str(ctx.author), reason,
             )
         except Exception as e:
-            logger.error(f"Failed to record mod case for {action}: {e}")
+            logger.exception(f"Failed to record mod case for {action}: {e}")
 
         # Check if logging feature is enabled
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)

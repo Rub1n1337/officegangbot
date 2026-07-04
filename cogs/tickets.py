@@ -266,7 +266,7 @@ class OpenTicketView(discord.ui.View):
         try:
             await bot.db.create_ticket(guild.id, channel.id, member.id, str(member))
         except Exception as e:
-            logger.error(f"Failed to record ticket for {member} in {guild.name}: {e}")
+            logger.exception(f"Failed to record ticket for {member} in {guild.name}: {e}")
 
         # Send ticket message
         embed = discord.Embed(

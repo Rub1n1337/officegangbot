@@ -58,7 +58,7 @@ class AuditLogCog(commands.Cog):
         except discord.Forbidden:
             pass
         except Exception as e:
-            logger.error(f"Error sending delete log: {e}")
+            logger.exception(f"Error sending delete log: {e}")
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
@@ -85,7 +85,7 @@ class AuditLogCog(commands.Cog):
         except discord.Forbidden:
             pass
         except Exception as e:
-            logger.error(f"Error sending edit log: {e}")
+            logger.exception(f"Error sending edit log: {e}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AuditLogCog(bot))
