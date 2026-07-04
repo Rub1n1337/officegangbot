@@ -330,6 +330,12 @@ class MyBot(commands.Bot):
             "filter": {
                 "words": settings.get("filter_words") or [],
             },
+            "anti-raid": {
+                "joinCount": int(settings.get("antiraid_join_count") or 8),
+                "joinWindow": int(settings.get("antiraid_join_window") or 10),
+                "action": settings.get("antiraid_action") or "timeout",
+                "duration": int(settings.get("antiraid_duration") or 300),
+            },
             "levels": {
                 "channel": self._snowflake_or_none(settings.get("level_up_channel_id")),
                 "rewards": [
@@ -1038,6 +1044,20 @@ class MyBot(commands.Bot):
                     self._clamp_int(options.get("warnKickAt"), 0, 0, 50),
                     self._clamp_int(options.get("warnBanAt"), 0, 0, 50),
                 )
+            return await self._get_feature_payload(guild_id, feature)
+
+        # Anti-raid: join-spike thresholds + the action to take on the raiders.
+        if feature == "anti-raid":
+            action = options.get("action")
+            if action not in ("timeout", "kick", "ban", "notify"):
+                action = "timeout"
+            await self.db.set_antiraid_config(
+                guild_id,
+                self._clamp_int(options.get("joinCount"), 8, 3, 100),
+                self._clamp_int(options.get("joinWindow"), 10, 3, 300),
+                action,
+                self._clamp_int(options.get("duration"), 300, 60, 86400),
+            )
             return await self._get_feature_payload(guild_id, feature)
 
         # Level role rewards live in the level_roles table (one role per

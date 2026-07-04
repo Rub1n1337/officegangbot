@@ -339,6 +339,13 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_expiry_hours INTEGER DEFAULT 0;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_mute_at INTEGER DEFAULT 0;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_kick_at INTEGER DEFAULT 0;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS warn_ban_at INTEGER DEFAULT 0;
+-- Anti-raid: when the 'anti-raid' feature is enabled, a spike of joins
+-- (join_count within join_window seconds) triggers raid mode for `duration`
+-- seconds, applying `action` (timeout/kick/ban/notify) to the raiders.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_join_count INTEGER DEFAULT 8;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_join_window INTEGER DEFAULT 10;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_action VARCHAR(20) DEFAULT 'timeout';
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_duration INTEGER DEFAULT 300;
 -- AutoMod strike escalation: each violation records a strike; at the configured
 -- thresholds the member is muted / kicked / banned (0 = that tier disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strikes_enabled BOOLEAN DEFAULT FALSE;

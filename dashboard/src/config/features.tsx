@@ -11,6 +11,7 @@ import {
   MdConfirmationNumber,
   MdSchedule,
   MdList,
+  MdCrisisAlert,
 } from 'react-icons/md';
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
@@ -24,6 +25,7 @@ import { useAutomodFeature } from './feature-forms/AutomodFeature';
 import { useTicketsFeature } from './feature-forms/TicketsFeature';
 import { useScheduledMessagesFeature } from './feature-forms/ScheduledMessagesFeature';
 import { useReactionMenusFeature } from './feature-forms/ReactionMenusFeature';
+import { useAntiRaidFeature } from './feature-forms/AntiRaidFeature';
 
 // Ordered feature categories, used to group the feature grid and the sidebar.
 export const featureCategories: { id: string; label: string }[] = [
@@ -108,5 +110,12 @@ export const features: FeaturesConfig = {
     icon: <Icon as={MdConfirmationNumber} />,
     category: 'safety',
     useRender: useTicketsFeature,
+  },
+  'anti-raid': {
+    name: 'Anti-Raid',
+    description: 'Detect join spikes and act on the raiders automatically',
+    icon: <Icon as={MdCrisisAlert} />,
+    category: 'safety',
+    useRender: useAntiRaidFeature,
   },
 };

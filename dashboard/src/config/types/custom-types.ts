@@ -171,6 +171,14 @@ export type CustomFeatures = {
   'tickets': TicketsFeature;
   'scheduled-messages': ScheduledMessagesFeature;
   'reaction-menus': ReactionMenusFeature;
+  'anti-raid': AntiRaidFeature;
+};
+
+export type AntiRaidFeature = {
+  joinCount: number;
+  joinWindow: number;
+  action: 'timeout' | 'kick' | 'ban' | 'notify';
+  duration: number;
 };
 
 export type ReactionMenuItemConfig = {

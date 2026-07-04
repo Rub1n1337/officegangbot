@@ -19,6 +19,7 @@ const RU_FEATURES: Record<string, Meta> = {
   filter: { name: 'Фильтр слов', description: 'Автоудаление сообщений с запрещёнными словами' },
   automod: { name: 'Авто-модерация', description: 'Анти-спам, анти-меншен и блокировка инвайтов/ссылок' },
   tickets: { name: 'Тикеты', description: 'Система тикетов поддержки с кнопкой «Открыть тикет»' },
+  'anti-raid': { name: 'Анти-рейд', description: 'Обнаружение всплеска заходов и автоматические меры против рейдеров' },
 };
 
 const RU_CATEGORIES: Record<string, string> = {
