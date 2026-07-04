@@ -165,6 +165,54 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
             )
         await reply(ctx, embed=embed, ephemeral=True)
 
+    # -- Moderator notes ------------------------------------------------------
+
+    @commands.hybrid_command(name="note", description="Add a moderator note to a member (never shown to them).")
+    @app_commands.describe(member="Member the note is about.", text="The note (mods-only context, max 1000 chars).")
+    @has_permission("warn")
+    async def note(self, ctx: commands.Context, member: discord.Member, *, text: str):
+        text = text.strip()
+        if not text:
+            return await reply(ctx, "❌ The note can't be empty.", ephemeral=True)
+        note_id = await self.bot.db.add_mod_note(
+            ctx.guild.id, member.id, text, ctx.author.id, str(ctx.author)
+        )
+        await reply(ctx, f"📝 Note **#{note_id}** added for {member.mention}.", ephemeral=True)
+        logger.info(f"Mod note #{note_id} added for {member} in {ctx.guild.name} by {ctx.author}")
+
+    @commands.hybrid_command(name="notes", description="Show a member's moderator notes.")
+    @app_commands.describe(member="Member whose notes to view.")
+    @has_permission("warn")
+    async def notes(self, ctx: commands.Context, member: discord.Member):
+        rows = await self.bot.db.get_mod_notes(ctx.guild.id, member.id)
+        if not rows:
+            return await reply(ctx, f"No notes for {member.mention}.", ephemeral=True)
+        embed = discord.Embed(
+            title=f"📝 Notes for {member.display_name}",
+            color=discord.Color.blurple(),
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        for r in rows[:15]:
+            when = f"<t:{int(r['created_at'].timestamp())}:R>" if r["created_at"] else ""
+            embed.add_field(
+                name=f"#{r['id']} · {r['author_name'] or '—'} {when}",
+                value=r["note"][:1024],
+                inline=False,
+            )
+        if len(rows) > 15:
+            embed.set_footer(text=f"Showing 15 of {len(rows)} notes.")
+        await reply(ctx, embed=embed, ephemeral=True)
+
+    @commands.hybrid_command(name="delnote", description="Delete a moderator note by its id.")
+    @app_commands.describe(note_id="The note id (shown in /notes).")
+    @has_permission("warn")
+    async def delnote(self, ctx: commands.Context, note_id: int):
+        removed = await self.bot.db.delete_mod_note(ctx.guild.id, note_id)
+        if not removed:
+            return await reply(ctx, f"❌ Note #{note_id} was not found.", ephemeral=True)
+        await reply(ctx, f"🗑️ Note #{note_id} deleted.", ephemeral=True)
+        logger.info(f"Mod note #{note_id} deleted in {ctx.guild.name} by {ctx.author}")
+
     # -- Temporary roles ----------------------------------------------------
 
     def _role_guard(self, ctx: commands.Context, role: discord.Role) -> Optional[str]:

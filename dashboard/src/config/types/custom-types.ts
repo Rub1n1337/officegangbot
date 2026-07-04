@@ -131,6 +131,13 @@ export type MemberWarning = {
   createdAt: string | null;
 };
 
+export type MemberNote = {
+  id: number;
+  note: string;
+  authorName: string | null;
+  createdAt: string | null;
+};
+
 export type MemberDetail = {
   id: string;
   name: string;
@@ -142,6 +149,7 @@ export type MemberDetail = {
   level: number;
   xp: number;
   warnings: MemberWarning[];
+  notes: MemberNote[];
 };
 
 export type GuildStats = {

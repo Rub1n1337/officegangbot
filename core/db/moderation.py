@@ -84,6 +84,43 @@ class _ModerationMixin:
                 bool(enabled), int(expiry_hours), int(mute_at), int(kick_at), int(ban_at), guild_id,
             )
 
+    # -------------------------
+    # Moderator notes
+    # -------------------------
+
+    async def add_mod_note(self, guild_id: int, user_id: int, note: str,
+                           author_id: Optional[int], author_name: Optional[str]) -> int:
+        """Adds a non-punitive moderator note for a member and returns its id."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "INSERT INTO mod_notes (guild_id, user_id, note, author_id, author_name) "
+                "VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                guild_id, int(user_id), str(note)[:1000],
+                int(author_id) if author_id else None,
+                str(author_name)[:100] if author_name else None,
+            )
+        return row["id"]
+
+    async def get_mod_notes(self, guild_id: int, user_id: int) -> List[Dict[str, Any]]:
+        """Returns a member's moderator notes, newest first."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, note, author_id, author_name, created_at FROM mod_notes "
+                "WHERE guild_id = $1 AND user_id = $2 ORDER BY created_at DESC",
+                guild_id, int(user_id),
+            )
+        return [dict(r) for r in rows]
+
+    async def delete_mod_note(self, guild_id: int, note_id: int) -> bool:
+        """Deletes a note by id (guild-scoped). Returns True if a row was removed."""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM mod_notes WHERE guild_id = $1 AND id = $2",
+                guild_id, int(note_id),
+            )
+        return result.endswith("1")
+
     async def get_antiraid_config(self, guild_id: int) -> Dict[str, Any]:
         """Returns the guild's anti-raid config (join-spike thresholds + action)."""
         async with self.pool.acquire() as conn:

@@ -28,12 +28,13 @@ def search_guild_members(guild, query: str, limit: int = 25) -> dict:
 
 
 async def build_member_profile(guild, db, guild_id: int, user_id: int) -> dict:
-    """A member's dashboard profile: level/XP and warnings always, plus roles +
-    join date when they're still in the server. Falls back to the stored display
-    name for members who've left."""
+    """A member's dashboard profile: level/XP, warnings and moderator notes
+    always, plus roles + join date when they're still in the server. Falls back
+    to the stored display name for members who've left."""
     member = guild.get_member(user_id) if guild else None
     xp = await db.get_user_xp(guild_id, user_id)
     warnings = await db.get_warnings(guild_id, user_id)
+    notes = await db.get_mod_notes(guild_id, user_id)
     result = {
         "id": str(user_id),
         "level": xp.get("level", 0),
@@ -46,6 +47,15 @@ async def build_member_profile(guild, db, guild_id: int, user_id: int) -> dict:
                 "createdAt": w["created_at"].isoformat() if w["created_at"] else None,
             }
             for w in warnings
+        ],
+        "notes": [
+            {
+                "id": n["id"],
+                "note": n["note"],
+                "authorName": n["author_name"],
+                "createdAt": n["created_at"].isoformat() if n["created_at"] else None,
+            }
+            for n in notes
         ],
     }
     if member:

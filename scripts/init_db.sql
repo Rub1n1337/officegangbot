@@ -311,6 +311,21 @@ CREATE TABLE IF NOT EXISTS ban_appeals (
 
 CREATE INDEX IF NOT EXISTS idx_ban_appeals_guild ON ban_appeals(guild_id, status, created_at DESC);
 
+-- Moderator notes: non-punitive per-member notes, visible to moderators only
+-- (never to the member). Unlike warnings, they carry no count or escalation.
+CREATE TABLE IF NOT EXISTS mod_notes (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    author_id BIGINT,
+    author_name VARCHAR(100),
+    note TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_mod_notes_member ON mod_notes(guild_id, user_id, created_at DESC);
+
 -- Migration: Add missing columns if they don't exist (for existing databases)
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
