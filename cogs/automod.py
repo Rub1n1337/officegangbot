@@ -117,7 +117,7 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             # Try to fetch if not in cache
             try:
                 channel = await guild.fetch_channel(int(log_channel_id))
-            except Exception:
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 return
 
         embed = discord.Embed(
