@@ -31,6 +31,7 @@ from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from core.observability import init_sentry
 from core.appeals import AppealButton, send_ban_appeal_dm
+from core.menu_components import RoleMenuButton, RoleMenuSelect, build_menu_view
 from core.i18n import t
 from api_server import app as fastapi_app, set_bot_instance
 
@@ -169,9 +170,9 @@ class MyBot(commands.Bot):
         self.health_monitor.start()
         logger.info("Health monitor started.")
 
-        # Persistent 'Appeal this ban' buttons (in ban DMs) — registered so they
-        # keep working after a restart.
-        self.add_dynamic_items(AppealButton)
+        # Persistent 'Appeal this ban' buttons (in ban DMs) and component-style
+        # role-menu items — registered so they keep working after a restart.
+        self.add_dynamic_items(AppealButton, RoleMenuButton, RoleMenuSelect)
 
         logger.info("--- Loading Cogs ---")
         cogs_dir = Path(__file__).parent / "cogs"
@@ -389,6 +390,7 @@ class MyBot(commands.Bot):
                         "title": m["title"],
                         "description": m["description"],
                         "exclusive": bool(m.get("exclusive")),
+                        "style": m.get("style") or "reactions",
                         "items": [
                             {"emoji": it["emoji"], "roleId": str(it["role_id"])}
                             for it in m["items"]
@@ -1317,6 +1319,7 @@ class MyBot(commands.Bot):
                     title = (d.get("title") or "Role Menu").strip()[:256]
                     description = (d.get("description") or "").strip()[:2000]
                     exclusive = bool(d.get("exclusive", False))
+                    style = d.get("style") if d.get("style") in ("reactions", "buttons", "dropdown") else "reactions"
                     items_in = d.get("items") or []
                     if not (ch and items_in):
                         continue
@@ -1342,27 +1345,37 @@ class MyBot(commands.Bot):
                         labels = ", ".join(label for _, label in bad)
                         return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
                     item_lines = []
+                    view_items = []
                     for r in item_rows_partial:
                         role_obj = guild.get_role(r["role_id"])
                         item_lines.append((r["emoji"], role_obj.mention if role_obj else f"<@&{r['role_id']}>"))
+                        view_items.append({
+                            "emoji": r["emoji"],
+                            "role_id": r["role_id"],
+                            "label": role_obj.name if role_obj else str(r["role_id"]),
+                        })
 
                     menu_id = int(d["id"]) if (d.get("id") and int(d["id"]) in current_by_id) else None
                     existing = current_by_id.get(menu_id) if menu_id else None
                     old_message_id = existing["message_id"] if existing else None
                     old_channel_id = existing["channel_id"] if existing else None
                     old_items = existing["items"] if existing else []
+                    if menu_id is None:
+                        menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description, exclusive, style)
+                    # Component styles carry a persistent view; the legacy style
+                    # passes view=None, which also clears components on an edit
+                    # when a menu is switched back to reactions.
+                    view = build_menu_view(style, menu_id, view_items, exclusive)
                     # Only edit the existing message if it's in the same channel.
                     edit_id = old_message_id if (old_message_id and old_channel_id == channel_id) else None
-                    new_message_id = await self._render_menu(guild, channel_id, title, description, item_lines, edit_id)
+                    new_message_id = await self._render_menu(guild, channel_id, title, description, item_lines, edit_id, view)
                     if new_message_id is None:
                         return {"error": "I couldn't post the role menu — check I can see and post in that channel."}
                     # If the menu moved channels, remove the old message + mappings.
                     if old_message_id and old_message_id != new_message_id:
                         await self._delete_menu_message(guild, old_channel_id, old_message_id)
                         await self.db.replace_message_reaction_roles(guild_id, old_message_id, "menu", [])
-                    if menu_id is None:
-                        menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description, exclusive)
-                    await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id, exclusive)
+                    await self.db.update_reaction_menu(menu_id, channel_id, title, description, new_message_id, exclusive, style)
 
                     new_rows = [
                         {"channel_id": channel_id, "message_id": new_message_id, "emoji": r["emoji"], "role_id": r["role_id"]}
@@ -1373,7 +1386,11 @@ class MyBot(commands.Bot):
                         [{"channel_id": old_channel_id or channel_id, "message_id": old_message_id, "emoji": it["emoji"]} for it in old_items]
                         if old_message_id else []
                     )
-                    await self._sync_reactions(guild_id, new_rows, old_rows)
+                    # Reactions are only synced for the legacy style; for component
+                    # styles an empty desired set strips the bot's stale reactions
+                    # when a menu is switched over.
+                    desired_reactions = new_rows if style == "reactions" else []
+                    await self._sync_reactions(guild_id, desired_reactions, old_rows)
             return await self._get_feature_payload(guild_id, feature)
 
         # Settings keys that map to BIGINT columns in Postgres and need int conversion
@@ -1560,10 +1577,12 @@ class MyBot(commands.Bot):
                 except Exception as e:
                     logger.warning(f"Could not add reaction {emoji} to message {mid}: {e}")
 
-    async def _render_menu(self, guild, channel_id: int, title: str, description: str, item_lines: list, message_id) -> Optional[int]:
+    async def _render_menu(self, guild, channel_id: int, title: str, description: str, item_lines: list, message_id, view=None) -> Optional[int]:
         """Post a new role-menu embed or edit the existing one. Returns the
         message id, or None if it couldn't be posted (channel missing / no perms).
-        `item_lines` is a list of (emoji, role_mention)."""
+        `item_lines` is a list of (emoji, role_mention). `view` carries the
+        button/dropdown components for component-style menus; passing None
+        explicitly clears components (e.g. after switching back to reactions)."""
         if not guild:
             return None
         try:
@@ -1580,12 +1599,14 @@ class MyBot(commands.Bot):
         if message_id:
             try:
                 msg = await channel.fetch_message(int(message_id))
-                await msg.edit(embed=embed)
+                await msg.edit(embed=embed, view=view)
                 return msg.id
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass  # fall through and post a fresh one
         try:
-            msg = await channel.send(embed=embed)
+            # send() rejects view=None (unlike edit(), where None clears the
+            # components) — only pass the kwarg when there is a view.
+            msg = await channel.send(embed=embed, **({"view": view} if view is not None else {}))
             return msg.id
         except (discord.Forbidden, discord.HTTPException) as e:
             logger.warning(f"Could not post role menu to channel {channel_id}: {e}")

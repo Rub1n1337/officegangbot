@@ -199,12 +199,15 @@ export type ReactionMenuItemConfig = {
   roleId?: string | null;
 };
 
+export type ReactionMenuStyle = 'reactions' | 'buttons' | 'dropdown';
+
 export type ReactionMenuConfig = {
   id?: number | null;
   channelId?: string | null;
   title: string;
   description: string;
   exclusive?: boolean;
+  style?: ReactionMenuStyle;
   items: ReactionMenuItemConfig[];
 };
 
