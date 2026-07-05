@@ -15,6 +15,7 @@ import { useRouter } from 'next/router';
 import { useGuilds } from '@/api/hooks';
 import { getFeatures } from '@/utils/common';
 import { config } from '@/config/common';
+import { searchSettings } from '@/config/settings-index';
 
 /** Custom event other components can dispatch to open the command palette. */
 export const OPEN_COMMAND_PALETTE = 'open-command-palette';
@@ -106,7 +107,21 @@ function CommandPalette() {
   }, [guildId, guilds.data]);
 
   const needle = q.trim().toLowerCase();
-  const filtered = needle ? commands.filter((c) => c.label.toLowerCase().includes(needle)) : commands;
+  // Individual settings only surface when the admin is typing — they'd clutter
+  // the default list. Deduped so a settings hit doesn't repeat a feature link
+  // already matched by name.
+  const settingHits = useMemo<Command[]>(() => {
+    if (!guildId || !needle) return [];
+    return searchSettings(needle).map((s, i) => ({
+      id: `s-${s.feature}-${i}`,
+      label: s.label,
+      hint: 'Setting',
+      href: `/guilds/${guildId}/features/${s.feature}`,
+    }));
+  }, [guildId, needle]);
+  const filtered = needle
+    ? [...commands.filter((c) => c.label.toLowerCase().includes(needle)), ...settingHits]
+    : commands;
 
   // Open on ⌘K / Ctrl+K, or on the custom event.
   useEffect(() => {
