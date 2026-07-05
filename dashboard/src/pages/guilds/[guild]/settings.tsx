@@ -13,6 +13,7 @@ import {
   Spacer,
   Text,
   usePrefersReducedMotion,
+  useToast,
   useToken,
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
@@ -24,19 +25,24 @@ import {
   MdShield,
   MdSpeed,
   MdToggleOn,
+  MdDownload,
+  MdUpload,
 } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { IoCheckmarkCircle, IoArrowForward } from 'react-icons/io5';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation } from '@/api/hooks';
+import { getFeature, updateFeature } from '@/api/bot';
+import { useSession } from '@/utils/auth/hooks';
+import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
 import { getFeatures } from '@/utils/common';
-import type { GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
+import type { CustomFeatures, GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 
 function StatCard({
   icon,
@@ -302,6 +308,128 @@ function BotLanguage({ guild, locale }: { guild: string; locale: string }) {
   );
 }
 
+// Export / import of *portable* settings (texts, thresholds, toggles, AutoMod
+// rules). Channel/role assignments never transfer — on import the portable
+// subset is merged over this guild's current config and saved through the
+// normal validated update path, so ids stay untouched.
+function ConfigTransfer({ guild }: { guild: string }) {
+  const { session } = useSession();
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<'export' | 'import' | null>(null);
+
+  const notify = (title: string, status: 'success' | 'error' | 'warning') =>
+    toast({ title, status, duration: 5000, isClosable: true, position: 'bottom-right' });
+
+  const doExport = async () => {
+    if (!session) return;
+    setBusy('export');
+    try {
+      const entries = await Promise.all(
+        TRANSFER_FEATURES.map(async (f) => [
+          f,
+          await getFeature(session, guild, f as keyof CustomFeatures),
+        ] as const)
+      );
+      const payloads = Object.fromEntries(entries) as Record<string, Record<string, unknown>>;
+      const file = buildExport(payloads);
+      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `officegangbot-config-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      notify('Export failed — try again.', 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doImport = async (text: string) => {
+    if (!session) return;
+    const parsed = parseImport(text);
+    if (!parsed.ok) {
+      notify(parsed.error, 'error');
+      return;
+    }
+    const names = Object.keys(parsed.features).join(', ');
+    if (!window.confirm(`Import settings for: ${names}?\nChannel/role assignments are not affected.`)) {
+      return;
+    }
+    setBusy('import');
+    const failed: string[] = [];
+    for (const [feature, subset] of Object.entries(parsed.features)) {
+      try {
+        // Merge over the guild's current payload so id fields (channels, roles,
+        // exemptions) are preserved exactly as they are.
+        const current = await getFeature(session, guild, feature as keyof CustomFeatures);
+        await updateFeature(
+          session,
+          guild,
+          feature as keyof CustomFeatures,
+          JSON.stringify({ ...(current as Record<string, unknown>), ...subset })
+        );
+      } catch {
+        failed.push(feature);
+      }
+    }
+    client.invalidateQueries(['feature', guild]);
+    if (failed.length === 0) {
+      notify(`Imported: ${names}.`, 'success');
+    } else {
+      notify(`Imported with errors — failed: ${failed.join(', ')}.`, 'warning');
+    }
+    setBusy(null);
+  };
+
+  return (
+    <Box bg="CardBackground" rounded="2xl" p={5}>
+      <Heading size="sm">Config export / import</Heading>
+      <Text fontSize="sm" color="TextSecondary" mt={1} mb={4}>
+        Transfers texts, thresholds, toggles and AutoMod rules between servers. Channel and role
+        assignments are never included — they don’t exist on another server.
+      </Text>
+      <Flex gap={3} wrap="wrap">
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={<Icon as={MdDownload} />}
+          isLoading={busy === 'export'}
+          isDisabled={busy != null}
+          onClick={doExport}
+        >
+          Export JSON
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={<Icon as={MdUpload} />}
+          isLoading={busy === 'import'}
+          isDisabled={busy != null}
+          onClick={() => fileRef.current?.click()}
+        >
+          Import JSON
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f) await doImport(await f.text());
+          }}
+        />
+      </Flex>
+    </Box>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -338,6 +466,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
       <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error="Failed to load guild stats.">
         {statsQuery.data && <Overview stats={statsQuery.data} />}
       </QueryStatus>
+      <ConfigTransfer guild={guild} />
     </Flex>
   );
 };
