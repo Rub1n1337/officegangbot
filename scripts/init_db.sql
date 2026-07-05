@@ -379,6 +379,10 @@ ALTER TABLE users_xp ADD COLUMN IF NOT EXISTS prestige INTEGER DEFAULT 0;
 -- Reaction menus: exclusive (single-select) mode — picking a role in the menu
 -- removes the member's other roles from the same menu.
 ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT FALSE;
+-- Reaction menus: presentation style — 'reactions' (legacy emoji reactions),
+-- 'buttons', or 'dropdown' (select menu). Components are stateless (role ids
+-- ride in the custom_id), so restarts don't orphan them.
+ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS style VARCHAR(10) DEFAULT 'reactions';
 -- Tickets: auto-close open tickets after this many hours of inactivity
 -- (0 = disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ticket_auto_close_hours INTEGER DEFAULT 0;

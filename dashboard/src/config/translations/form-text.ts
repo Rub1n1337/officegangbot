@@ -102,6 +102,12 @@ const RU: Record<string, string> = {
   'Idle tickets close automatically after this many hours.':
     'Неактивные тикеты закрываются автоматически через столько часов.',
   '0 = never auto-close.': '0 = не закрывать автоматически.',
+  'Menu style': 'Стиль меню',
+  'Buttons and dropdown are modern components — better on mobile than emoji reactions.':
+    'Кнопки и дропдаун — современные компоненты, на мобильных удобнее эмодзи-реакций.',
+  'Reactions': 'Реакции',
+  'Buttons': 'Кнопки',
+  'Dropdown': 'Дропдаун',
   'Single-select (exclusive)': 'Только один вариант (эксклюзивно)',
   'Members can hold only one role from this menu — picking another swaps it.':
     'Из этого меню участник может держать только одну роль — выбор другой заменит текущую.',

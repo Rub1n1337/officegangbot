@@ -1,7 +1,7 @@
 import { useForm, useFieldArray, Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Divider, Flex, IconButton, SimpleGrid, Switch, Text } from '@chakra-ui/react';
+import { Box, Button, Divider, Flex, IconButton, Select, SimpleGrid, Switch, Text } from '@chakra-ui/react';
 import { MdAdd, MdDelete } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
@@ -23,6 +23,7 @@ const menuSchema = z.object({
   title: z.string().min(1, 'Give the menu a title').max(256, 'Title is too long'),
   description: z.string().max(2000, 'Description is too long'),
   exclusive: z.boolean(),
+  style: z.enum(['reactions', 'buttons', 'dropdown']),
   items: z.array(itemSchema),
 });
 
@@ -37,6 +38,7 @@ function toFormMenus(menus: ReactionMenuConfig[] | undefined) {
     title: m.title ?? 'Role Menu',
     description: m.description ?? '',
     exclusive: m.exclusive ?? false,
+    style: m.style ?? ('reactions' as const),
     items: (m.items ?? []).map((it) => ({ emoji: it.emoji || '✅', roleId: it.roleId ?? undefined })),
   }));
 }
@@ -162,6 +164,21 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
             <Flex align="center" gap={3} mt={3} justify="space-between">
               <Box>
                 <Text fontSize="sm" fontWeight="600">
+                  {ft('Menu style')}
+                </Text>
+                <Text fontSize="xs" color="TextSecondary">
+                  {ft('Buttons and dropdown are modern components — better on mobile than emoji reactions.')}
+                </Text>
+              </Box>
+              <Select w="170px" flexShrink={0} {...register(`menus.${index}.style`)}>
+                <option value="reactions">{ft('Reactions')}</option>
+                <option value="buttons">{ft('Buttons')}</option>
+                <option value="dropdown">{ft('Dropdown')}</option>
+              </Select>
+            </Flex>
+            <Flex align="center" gap={3} mt={3} justify="space-between">
+              <Box>
+                <Text fontSize="sm" fontWeight="600">
                   {ft('Single-select (exclusive)')}
                 </Text>
                 <Text fontSize="xs" color="TextSecondary">
@@ -183,7 +200,7 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
           variant="action"
           alignSelf="flex-start"
           onClick={() =>
-            append({ id: null, channelId: undefined, title: 'Role Menu', description: '', exclusive: false, items: [] })
+            append({ id: null, channelId: undefined, title: 'Role Menu', description: '', exclusive: false, style: 'reactions', items: [] })
           }
         >
           {ft('Add menu')}

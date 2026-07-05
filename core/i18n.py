@@ -281,6 +281,12 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tickets.closed_dm_desc": "Your support ticket in **{guild}** has been closed. A transcript is attached for your records.",
         "tickets.auto_closed_notice": "🔒 This ticket has been inactive for over **{hours}h** and will be closed automatically.",
         "tickets.auto_close_comment": "Automatically closed after {hours}h of inactivity.",
+        # --- role menus (component style) ---
+        "rolemenu.granted": "✅ Role **{role}** added.",
+        "rolemenu.removed": "✅ Role **{role}** removed.",
+        "rolemenu.updated": "✅ Your roles have been updated.",
+        "rolemenu.disabled": "❌ Role menus are currently disabled.",
+        "rolemenu.error": "❌ I couldn't update your roles — ask an admin to check my permissions.",
         # --- verification gate ---
         "verify.panel_title": "✅ Verification",
         "verify.panel_desc": "Click the button below to verify yourself and unlock the server.",
@@ -577,6 +583,12 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tickets.closed_dm_desc": "Ваш тикет поддержки в **{guild}** был закрыт. Транскрипт прилагается.",
         "tickets.auto_closed_notice": "🔒 Тикет неактивен более **{hours}ч** и будет закрыт автоматически.",
         "tickets.auto_close_comment": "Автоматически закрыт после {hours}ч без активности.",
+        # --- role menus (component style) ---
+        "rolemenu.granted": "✅ Роль **{role}** выдана.",
+        "rolemenu.removed": "✅ Роль **{role}** снята.",
+        "rolemenu.updated": "✅ Ваши роли обновлены.",
+        "rolemenu.disabled": "❌ Меню ролей сейчас отключены.",
+        "rolemenu.error": "❌ Не удалось обновить роли — попросите админа проверить мои права.",
         # --- verification gate ---
         "verify.panel_title": "✅ Верификация",
         "verify.panel_desc": "Нажмите кнопку ниже, чтобы пройти верификацию и открыть сервер.",
