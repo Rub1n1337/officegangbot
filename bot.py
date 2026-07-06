@@ -669,13 +669,14 @@ class MyBot(commands.Bot):
             return m.display_name if m else f"User {uid}"
 
         # These reads are independent — run them concurrently (like
-        # _get_feature_payload) instead of six sequential round-trips.
+        # _get_feature_payload) instead of sequential round-trips. (The XP
+        # leaderboard moved off the Moderation page — it lives on Overview
+        # and /leaderboard.)
         (
-            warnings, punishments, leaderboard, strikes, appeals, appeals_enabled_raw,
+            warnings, punishments, strikes, appeals, appeals_enabled_raw,
         ) = await asyncio.gather(
             self.db.get_recent_warnings(guild_id, 50),
             self.db.get_timed_punishments(guild_id),
-            self.db.get_leaderboard(guild_id, 25),
             self.db.get_active_strikes(guild_id),
             self.db.get_ban_appeals(guild_id, 50),
             self.db.get_guild_setting(guild_id, "ban_appeals_enabled"),
@@ -702,15 +703,6 @@ class MyBot(commands.Bot):
                     "expiresAt": p["expires_at"].isoformat() if p["expires_at"] else None,
                 }
                 for p in punishments
-            ],
-            "leaderboard": [
-                {
-                    "userId": str(r["user_id"]),
-                    "name": r["display_name"] or _member_name(r["user_id"]),
-                    "level": r["level"],
-                    "xp": r["xp"],
-                }
-                for r in leaderboard
             ],
             "strikes": {
                 "enabled": strikes["enabled"],

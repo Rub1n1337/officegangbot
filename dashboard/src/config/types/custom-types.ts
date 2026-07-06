@@ -37,13 +37,6 @@ export type ModerationPunishment = {
   expiresAt: string | null;
 };
 
-export type ModerationLeaderItem = {
-  userId: string;
-  name: string;
-  level: number;
-  xp: number;
-};
-
 export type ModerationStrikeUser = {
   userId: string;
   userName: string;
@@ -80,7 +73,6 @@ export type ModerationAppeals = {
 export type ModerationData = {
   warnings: ModerationWarning[];
   punishments: ModerationPunishment[];
-  leaderboard: ModerationLeaderItem[];
   strikes: ModerationStrikes;
   appeals: ModerationAppeals;
 };
@@ -138,6 +130,14 @@ export type MemberNote = {
   createdAt: string | null;
 };
 
+export type MemberCase = {
+  caseNumber: number;
+  action: string;
+  moderatorName: string | null;
+  reason: string | null;
+  createdAt: string | null;
+};
+
 export type MemberDetail = {
   id: string;
   name: string;
@@ -148,8 +148,10 @@ export type MemberDetail = {
   roles: MemberRole[];
   level: number;
   xp: number;
+  activeStrikes: number;
   warnings: MemberWarning[];
   notes: MemberNote[];
+  cases: MemberCase[];
 };
 
 export type GuildStats = {

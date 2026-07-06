@@ -46,11 +46,13 @@ def test_search_sorts_and_caps():
     assert displays == sorted(displays, key=str.lower)
 
 
-def _db(level=3, xp=120, warnings=None, display_name=None, notes=None):
+def _db(level=3, xp=120, warnings=None, display_name=None, notes=None, strikes=0, cases=None):
     return SimpleNamespace(
         get_user_xp=AsyncMock(return_value={"level": level, "xp": xp, "display_name": display_name}),
         get_warnings=AsyncMock(return_value=warnings or []),
         get_mod_notes=AsyncMock(return_value=notes or []),
+        count_active_strikes_for=AsyncMock(return_value=strikes),
+        get_mod_cases=AsyncMock(return_value=cases or []),
     )
 
 
