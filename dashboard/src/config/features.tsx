@@ -68,8 +68,8 @@ export const features: FeaturesConfig = {
     useRender: useScheduledMessagesFeature,
   },
   'moderation': {
-    name: 'Moderator Roles',
-    description: 'Which roles can use each moderation command',
+    name: 'Moderation Settings',
+    description: 'Command permissions per role and warning auto-escalation',
     icon: <Icon as={MdSecurity} />,
     category: 'safety',
     useRender: useModerationFeature,

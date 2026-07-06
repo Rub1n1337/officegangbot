@@ -22,7 +22,7 @@ import {
   Wrap,
   WrapItem,
 } from '@chakra-ui/react';
-import { IoSearch, IoArrowBack, IoWarning, IoDocumentText } from 'react-icons/io5';
+import { IoSearch, IoArrowBack, IoWarning, IoDocumentText, IoFileTrayFull } from 'react-icons/io5';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
@@ -218,6 +218,11 @@ function DetailCard({
         <Badge colorScheme={data.inServer ? 'green' : 'gray'} rounded="md" px={2} py={1}>
           {data.inServer ? `Joined ${fmtDate(data.joinedAt)}` : 'Not in server'}
         </Badge>
+        {(data.activeStrikes ?? 0) > 0 && (
+          <Badge colorScheme="orange" rounded="md" px={2} py={1}>
+            {data.activeStrikes} active strike{data.activeStrikes === 1 ? '' : 's'}
+          </Badge>
+        )}
       </Flex>
 
       {data.roles.length > 0 && (
@@ -291,6 +296,47 @@ function DetailCard({
                   #{n.id} · by {n.authorName ?? '—'} · {fmtDate(n.createdAt)}
                 </Text>
               </Box>
+            ))}
+          </Flex>
+        )}
+      </Box>
+
+      <Box>
+        <Flex align="center" gap={2} mb={2}>
+          <Icon as={IoFileTrayFull} color="Brand" />
+          <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary">
+            Recent cases ({data.cases?.length ?? 0})
+          </Text>
+        </Flex>
+        {!data.cases || data.cases.length === 0 ? (
+          <Text fontSize="sm" color="TextSecondary">
+            No moderation cases on record.
+          </Text>
+        ) : (
+          <Flex direction="column" gap={2}>
+            {data.cases.map((c) => (
+              <Flex
+                key={c.caseNumber}
+                align="center"
+                justify="space-between"
+                gap={3}
+                p={3}
+                rounded="xl"
+                bg="blackAlpha.200"
+                _dark={{ bg: 'whiteAlpha.50' }}
+              >
+                <Box minW={0}>
+                  <Text fontSize="sm" fontWeight="600" isTruncated>
+                    #{c.caseNumber} · {c.action}
+                  </Text>
+                  <Text fontSize="xs" color="TextSecondary" noOfLines={1}>
+                    {c.reason ?? 'No reason provided'} · by {c.moderatorName ?? '—'}
+                  </Text>
+                </Box>
+                <Text fontSize="xs" color="TextSecondary" flexShrink={0}>
+                  {fmtDate(c.createdAt)}
+                </Text>
+              </Flex>
             ))}
           </Flex>
         )}

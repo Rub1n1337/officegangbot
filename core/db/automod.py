@@ -157,6 +157,25 @@ class _AutomodMixin:
                 )
         return int(count)
 
+    async def count_active_strikes_for(self, guild_id: int, user_id: int) -> int:
+        """A single member's active strike count, honouring the guild's decay
+        window (same counting rule as add_strike)."""
+        async with self.pool.acquire() as conn:
+            expiry = await conn.fetchval(
+                "SELECT automod_strike_expiry_hours FROM guilds WHERE guild_id = $1", guild_id
+            )
+            expiry = int(expiry) if expiry is not None else 24
+            if expiry > 0:
+                return int(await conn.fetchval(
+                    "SELECT COUNT(*) FROM automod_strikes WHERE guild_id = $1 AND user_id = $2 "
+                    "AND created_at > NOW() - ($3 || ' hours')::interval",
+                    guild_id, int(user_id), str(expiry),
+                ))
+            return int(await conn.fetchval(
+                "SELECT COUNT(*) FROM automod_strikes WHERE guild_id = $1 AND user_id = $2",
+                guild_id, int(user_id),
+            ))
+
     async def get_active_strikes(self, guild_id: int) -> Dict[str, Any]:
         """Summarises AutoMod strikes per user for the dashboard: how many are
         currently active (inside the decay window) and when each user's oldest

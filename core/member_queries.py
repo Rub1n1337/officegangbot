@@ -28,17 +28,21 @@ def search_guild_members(guild, query: str, limit: int = 25) -> dict:
 
 
 async def build_member_profile(guild, db, guild_id: int, user_id: int) -> dict:
-    """A member's dashboard profile: level/XP, warnings and moderator notes
-    always, plus roles + join date when they're still in the server. Falls back
-    to the stored display name for members who've left."""
+    """A member's dashboard profile: level/XP, warnings, moderator notes,
+    active AutoMod strikes and recent moderation cases — the full punitive
+    history in one place — plus roles + join date when they're still in the
+    server. Falls back to the stored display name for members who've left."""
     member = guild.get_member(user_id) if guild else None
     xp = await db.get_user_xp(guild_id, user_id)
     warnings = await db.get_warnings(guild_id, user_id)
     notes = await db.get_mod_notes(guild_id, user_id)
+    strikes = await db.count_active_strikes_for(guild_id, user_id)
+    cases = await db.get_mod_cases(guild_id, target_id=user_id, limit=10)
     result = {
         "id": str(user_id),
         "level": xp.get("level", 0),
         "xp": xp.get("xp", 0),
+        "activeStrikes": int(strikes),
         "warnings": [
             {
                 "id": w["id"],
@@ -56,6 +60,16 @@ async def build_member_profile(guild, db, guild_id: int, user_id: int) -> dict:
                 "createdAt": n["created_at"].isoformat() if n["created_at"] else None,
             }
             for n in notes
+        ],
+        "cases": [
+            {
+                "caseNumber": c["case_number"],
+                "action": c["action"],
+                "moderatorName": c["moderator_name"],
+                "reason": c["reason"],
+                "createdAt": c["created_at"].isoformat() if c["created_at"] else None,
+            }
+            for c in cases
         ],
     }
     if member:

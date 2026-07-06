@@ -12,7 +12,6 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { MdDelete, MdGavel, MdTimer, MdHistory, MdShield, MdOutlineHowToReg } from 'react-icons/md';
-import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
@@ -30,7 +29,6 @@ import { timeAgo, describeAudit, isModerationAction } from '@/utils/audit';
 import type {
   AuditEntry,
   ModerationAppeals,
-  ModerationLeaderItem,
   ModerationPunishment,
   ModerationStrikes,
   ModerationWarning,
@@ -107,7 +105,6 @@ function Section({
 }
 
 const INITIAL_WARNINGS = 12;
-const INITIAL_LEADERS = 10;
 
 function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string }) {
   const del = useDeleteWarningMutation();
@@ -418,53 +415,6 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
   );
 }
 
-function Leaderboard({ rows }: { rows: ModerationLeaderItem[] }) {
-  const medals = ['🥇', '🥈', '🥉'];
-  const [showAll, setShowAll] = useState(false);
-  const shown = showAll ? rows : rows.slice(0, INITIAL_LEADERS);
-  return (
-    <Section
-      icon={<Icon as={FaCrown} color="Brand" />}
-      title="XP leaderboard"
-      count={rows.length}
-    >
-      {rows.length === 0 ? (
-        <Text fontSize="sm" color="TextSecondary">
-          No XP data yet.
-        </Text>
-      ) : (
-        <Flex direction="column" gap={1}>
-          {shown.map((r, i) => (
-            <Flex key={r.userId} align="center" justify="space-between" gap={3} py={1.5}>
-              <Flex align="center" gap={3} minW={0}>
-                <Text fontSize="sm" w="1.8em" textAlign="center" color="TextSecondary">
-                  {medals[i] ?? `#${i + 1}`}
-                </Text>
-                <Text fontWeight="600" isTruncated>
-                  {r.name}
-                </Text>
-              </Flex>
-              <Flex align="center" gap={3} flexShrink={0}>
-                <Badge colorScheme="purple" rounded="md">
-                  Lvl {r.level}
-                </Badge>
-                <Text fontSize="sm" color="TextSecondary">
-                  {r.xp.toLocaleString()} XP
-                </Text>
-              </Flex>
-            </Flex>
-          ))}
-          {rows.length > INITIAL_LEADERS && (
-            <Button size="sm" variant="ghost" alignSelf="center" mt={1} onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Show less' : `Show all ${rows.length}`}
-            </Button>
-          )}
-        </Flex>
-      )}
-    </Section>
-  );
-}
-
 const INITIAL_AUDIT = 10;
 
 function AuditActivity({ rows }: { rows: AuditEntry[] }) {
@@ -558,7 +508,6 @@ const ModerationPage: NextPageWithLayout = () => {
             <Punishments rows={query.data.punishments} />
             <Strikes data={query.data.strikes} />
             <BanAppeals data={query.data.appeals} guild={guild} />
-            <Leaderboard rows={query.data.leaderboard} />
           </Flex>
         )}
       </QueryStatus>
