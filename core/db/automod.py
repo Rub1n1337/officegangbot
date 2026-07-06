@@ -19,7 +19,7 @@ class _AutomodMixin:
                 "automod_spam_count, automod_spam_window, automod_mention_limit, "
                 "automod_block_mass_mentions, automod_strikes_enabled, automod_strike_expiry_hours, "
                 "automod_strike_mute_at, automod_strike_kick_at, automod_strike_ban_at, automod_dry_run, "
-                "automod_ignored_channels, automod_ignored_roles "
+                "automod_ignored_channels, automod_ignored_roles, filter_words "
                 "FROM guilds WHERE guild_id = $1",
                 guild_id,
             )
@@ -43,6 +43,10 @@ class _AutomodMixin:
             "dry_run": bool(row["automod_dry_run"]) if row else False,
             "ignored_channels": [int(x) for x in row["automod_ignored_channels"]] if row and row["automod_ignored_channels"] else [],
             "ignored_roles": [int(x) for x in row["automod_ignored_roles"]] if row and row["automod_ignored_roles"] else [],
+            # The banned-words list lives in the legacy filter_words column (the
+            # standalone word filter merged into AutoMod), so existing lists
+            # carry over without a data migration.
+            "banned_words": list(row["filter_words"]) if row and row["filter_words"] else [],
             "rules": [
                 {"id": r["id"], "pattern": r["pattern"], "action": r["action"], "enabled": bool(r["enabled"])}
                 for r in rule_rows
@@ -80,6 +84,18 @@ class _AutomodMixin:
                 [int(c) for c in (ignored_channels or [])],
                 [int(r) for r in (ignored_roles or [])],
                 guild_id,
+            )
+        self._automod_cache.pop(guild_id, None)
+
+    async def set_filter_words(self, guild_id: int, words: List[str]) -> None:
+        """Persists the banned-words list (legacy filter_words column) and
+        invalidates the automod cache — the words are enforced by AutoMod, so a
+        plain set_guild_setting write would leave a stale compiled pattern."""
+        await self.ensure_guild(guild_id)
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE guilds SET filter_words = $1, updated_at = NOW() WHERE guild_id = $2",
+                [str(w) for w in (words or [])], guild_id,
             )
         self._automod_cache.pop(guild_id, None)
 

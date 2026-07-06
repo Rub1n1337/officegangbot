@@ -391,6 +391,20 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS verification_role_id BIGINT;
 -- Ban appeals: when on, ban DMs include an "Appeal" button (opt-in per guild).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS ban_appeals_enabled BOOLEAN DEFAULT FALSE;
 
+-- Migration: the standalone word filter merged into AutoMod (the word list
+-- stays in filter_words; enforcement moved to the AutoMod cog). Guilds that
+-- had the filter enabled with a word list but AutoMod off get AutoMod enabled,
+-- so their words keep being enforced. Note: this also activates AutoMod's
+-- default anti-spam / mention limits for those guilds.
+UPDATE guilds SET enabled_features = array_append(enabled_features, 'automod')
+WHERE 'filter' = ANY(enabled_features)
+  AND NOT ('automod' = ANY(enabled_features))
+  AND filter_words <> '{}';
+-- Drop the retired 'filter' flag (nothing reads it anymore) — also makes the
+-- statement above one-shot, so a later manual AutoMod-off isn't re-overridden.
+UPDATE guilds SET enabled_features = array_remove(enabled_features, 'filter')
+WHERE 'filter' = ANY(enabled_features);
+
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')
 -- and PK (guild_id, role_id), which rejected /config role assignments).

@@ -46,6 +46,7 @@ const schema = z.object({
   dryRun: z.boolean(),
   ignoredChannels: z.array(z.string()),
   ignoredRoles: z.array(z.string()),
+  bannedWords: z.array(z.string()).max(500),
   blockInvites: z.boolean(),
   blockLinks: z.boolean(),
   allowedDomains: z.array(z.string()),
@@ -130,6 +131,54 @@ function DomainsInput({ value, onChange }: { value: string[]; onChange: (next: s
   );
 }
 
+// Banned words: lowercase tags, split on space/comma/newline (pasting a list works).
+function WordsInput({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const ft = useFormText();
+  const [input, setInput] = useState('');
+  const add = (raw: string) => {
+    const words = raw
+      .split(/[\n,\s]+/)
+      .map((w) => w.trim().toLowerCase())
+      .filter(Boolean);
+    onChange(Array.from(new Set([...value, ...words])).sort());
+    setInput('');
+  };
+  const remove = (w: string) => onChange(value.filter((x) => x !== w));
+
+  return (
+    <Box>
+      {value.length > 0 && (
+        <Flex wrap="wrap" gap={2} mb={2}>
+          {value.map((w) => (
+            <Tag key={w} size="md" borderRadius="full" variant="subtle" colorScheme="red">
+              <TagLabel>{w}</TagLabel>
+              <TagCloseButton onClick={() => remove(w)} />
+            </Tag>
+          ))}
+        </Flex>
+      )}
+      <Input
+        variant="main"
+        value={input}
+        placeholder={ft('type a word — press Enter to add')}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            if (input.trim()) add(input);
+          } else if (e.key === 'Backspace' && !input && value.length) {
+            remove(value[value.length - 1]);
+          }
+        }}
+        onBlur={() => input.trim() && add(input)}
+      />
+      <Text fontSize="xs" color="TextSecondary" mt={1}>
+        {value.length} banned word{value.length === 1 ? '' : 's'}
+      </Text>
+    </Box>
+  );
+}
+
 function ToggleRule({
   icon,
   title,
@@ -206,6 +255,7 @@ function defaultsFrom(data: Partial<AutomodFeature>): Input {
     dryRun: data.dryRun ?? false,
     ignoredChannels: data.ignoredChannels ?? [],
     ignoredRoles: data.ignoredRoles ?? [],
+    bannedWords: (data.bannedWords ?? []).slice().sort(),
     blockInvites: data.blockInvites ?? false,
     blockLinks: data.blockLinks ?? false,
     allowedDomains: (data.allowedDomains ?? []).slice().sort(),
@@ -325,6 +375,16 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
           description={ft('Delete messages that mention @everyone or @here.')}
           checked={watch('blockMassMentions')}
           onChange={(v) => setValue('blockMassMentions', v, { shouldDirty: true })}
+        />
+        <FormCardController
+          control={{
+            label: ft('Banned words'),
+            description: ft(
+              'Messages containing any of these words are deleted (whole words, case-insensitive). Also editable with /filter in Discord.'
+            ),
+          }}
+          controller={{ control, name: 'bannedWords' }}
+          render={({ field }) => <WordsInput value={field.value ?? []} onChange={field.onChange} />}
         />
 
         <Divider my={1} />
@@ -502,6 +562,7 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
           dryRun: e.dryRun,
           ignoredChannels: e.ignoredChannels,
           ignoredRoles: e.ignoredRoles,
+          bannedWords: e.bannedWords,
           blockInvites: e.blockInvites,
           blockLinks: e.blockLinks,
           allowedDomains: e.allowedDomains,

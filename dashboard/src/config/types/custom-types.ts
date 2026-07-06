@@ -173,7 +173,6 @@ export type CustomFeatures = {
   'reaction-role': ReactionRoleFeature;
   'moderation': ModerationFeature;
   'logging': LoggingFeature;
-  'filter': FilterFeature;
   'levels': LevelsFeature;
   'automod': AutomodFeature;
   'tickets': TicketsFeature;
@@ -274,6 +273,7 @@ export type AutomodFeature = {
   dryRun: boolean;
   ignoredChannels: string[];
   ignoredRoles: string[];
+  bannedWords: string[];
   blockInvites: boolean;
   blockLinks: boolean;
   allowedDomains: string[];
@@ -354,10 +354,6 @@ export type LoggingFeature = {
   usageChannel?: string | null;
   messagesChannel?: string | null;
   leaveChannel?: string | null;
-};
-
-export type FilterFeature = {
-  words: string[];
 };
 
 export const rulesFeatureSchema = z.object({
