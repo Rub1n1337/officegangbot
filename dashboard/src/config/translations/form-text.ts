@@ -106,6 +106,11 @@ const RU: Record<string, string> = {
   'Idle tickets close automatically after this many hours.':
     'Неактивные тикеты закрываются автоматически через столько часов.',
   '0 = never auto-close.': '0 = не закрывать автоматически.',
+  'Reactions on existing messages': 'Реакции на существующих сообщениях',
+  'Grant a role when members react to any existing message (e.g. your rules post) — no new embed is created.':
+    'Выдавать роль за реакцию на любое существующее сообщение (например, пост с правилами) — новый эмбед не создаётся.',
+  'Want a role for accepting the rules? Add a reaction on the rules message under Role Menus → “Reactions on existing messages”, or use the Verification feature.':
+    'Нужна роль за принятие правил? Добавьте реакцию на сообщение правил в «Меню ролей» → «Реакции на существующих сообщениях» или используйте функцию «Верификация».',
   'Menu style': 'Стиль меню',
   'Buttons and dropdown are modern components — better on mobile than emoji reactions.':
     'Кнопки и дропдаун — современные компоненты, на мобильных удобнее эмодзи-реакций.',

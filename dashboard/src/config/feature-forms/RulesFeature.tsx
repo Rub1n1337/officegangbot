@@ -4,9 +4,6 @@ import { z } from 'zod';
 import { Box, Divider, Flex, SimpleGrid, Text } from '@chakra-ui/react';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { TextAreaForm } from '@/components/forms/TextAreaForm';
-import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
-import { RoleSelectForm } from '@/components/forms/RoleSelect';
-import { SwitchFieldForm } from '@/components/forms/SwitchField';
 import { RulesPreview } from '@/components/feature/RulesPreview';
 import { useFormText } from '@/config/translations/form-text';
 import type { RulesFeature } from '@/config/types/custom-types';
@@ -18,9 +15,6 @@ const schema = z.object({
     .string()
     .min(10, 'Rules message must be at least 10 characters')
     .max(4000, 'Rules message is too long (max 4000 characters)'),
-  reactionEnabled: z.boolean(),
-  reactionEmoji: z.string().optional(),
-  reactionRole: z.string().optional(),
 });
 
 type Input = z.infer<typeof schema>;
@@ -33,15 +27,10 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
     defaultValues: {
       channel: data.channel ?? undefined,
       message: data.message || '',
-      reactionEnabled: data.reactionEnabled ?? false,
-      reactionEmoji: data.reactionEmoji || '✅',
-      reactionRole: data.reactionRole ?? undefined,
     },
   });
 
-  const reactionEnabled = watch('reactionEnabled');
   const message = watch('message');
-  const reactionEmoji = watch('reactionEmoji');
 
   return {
     component: (
@@ -72,39 +61,13 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
             </Text>
           </Flex>
         </Box>
+        <Text fontSize="sm" color="TextSecondary">
+          {ft(
+            'Want a role for accepting the rules? Add a reaction on the rules message under Role Menus → “Reactions on existing messages”, or use the Verification feature.'
+          )}
+        </Text>
         <Divider my={1} />
-        <SwitchFieldForm
-          control={{
-            label: ft('Reaction Role'),
-            description: ft('Add a reaction to the rules message that grants a role when clicked'),
-          }}
-          controller={{ control, name: 'reactionEnabled' }}
-        />
-        {reactionEnabled && (
-          <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
-            <EmojiPickerInput
-              control={{
-                label: ft('Reaction Emoji'),
-                description: ft('Emoji members react with to accept the rules'),
-              }}
-              controller={{ control, name: 'reactionEmoji' }}
-              placeholder="✅"
-            />
-            <RoleSelectForm
-              control={{
-                label: ft('Reaction Role'),
-                description: ft('Role granted when a member reacts'),
-              }}
-              controller={{ control, name: 'reactionRole' }}
-            />
-          </SimpleGrid>
-        )}
-        <Divider my={1} />
-        <RulesPreview
-          message={message ?? ''}
-          reactionEnabled={reactionEnabled}
-          reactionEmoji={reactionEmoji}
-        />
+        <RulesPreview message={message ?? ''} />
       </SimpleGrid>
     ),
     onSubmit: handleSubmit(async (e) => {
@@ -112,9 +75,6 @@ export const useRulesFeature: UseFormRender<RulesFeature> = (data: RulesFeature,
         JSON.stringify({
           message: e.message,
           channel: e.channel,
-          reactionEnabled: e.reactionEnabled ?? false,
-          reactionEmoji: e.reactionEmoji,
-          reactionRole: e.reactionRole ?? null,
         })
       );
       reset(result);

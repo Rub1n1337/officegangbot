@@ -1,7 +1,7 @@
 import { useForm, useFieldArray, Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Divider, Flex, IconButton, Select, SimpleGrid, Switch, Text } from '@chakra-ui/react';
+import { Box, Button, Divider, Flex, Heading, IconButton, Select, SimpleGrid, Switch, Text } from '@chakra-ui/react';
 import { MdAdd, MdDelete } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
@@ -9,10 +9,24 @@ import { InputForm } from '@/components/forms/InputForm';
 import { TextAreaForm } from '@/components/forms/TextAreaForm';
 import { EmojiPickerInput } from '@/components/forms/EmojiPickerInput';
 import { useFormText } from '@/config/translations/form-text';
-import type { ReactionMenusFeature, ReactionMenuConfig } from '@/config/types/custom-types';
+import type { ReactionMenusFeature, ReactionMenuConfig, ReactionRoleItem } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
 const itemSchema = z.object({
+  emoji: z.string().min(1, 'Emoji is required'),
+  roleId: z.string().optional(),
+});
+
+// A reaction role attached to an *existing* message (the former standalone
+// Reaction Role feature, merged into this card).
+const standaloneSchema = z.object({
+  channelId: z.string().optional(),
+  messageId: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^\d{17,20}$/.test(v.trim()), {
+      message: 'Message ID must be 17–20 digits (Developer Mode → right-click message → Copy Message ID).',
+    }),
   emoji: z.string().min(1, 'Emoji is required'),
   roleId: z.string().optional(),
 });
@@ -27,9 +41,21 @@ const menuSchema = z.object({
   items: z.array(itemSchema),
 });
 
-const schema = z.object({ menus: z.array(menuSchema) });
+const schema = z.object({
+  menus: z.array(menuSchema),
+  standalone: z.array(standaloneSchema).max(100),
+});
 
 type Input = z.infer<typeof schema>;
+
+function toFormStandalone(items: ReactionRoleItem[] | undefined) {
+  return (items ?? []).map((it) => ({
+    channelId: it.channelId ?? undefined,
+    messageId: it.messageId ?? undefined,
+    emoji: it.emoji || '✅',
+    roleId: it.roleId ?? undefined,
+  }));
+}
 
 function toFormMenus(menus: ReactionMenuConfig[] | undefined) {
   return (menus ?? []).map((m) => ({
@@ -98,12 +124,78 @@ function MenuRoles({ control, menuIndex }: { control: Control<Input>; menuIndex:
   );
 }
 
+// The "existing message" rows (nested field array, rendered below the menus).
+function StandaloneRoles({ control, register, errors }: { control: Control<Input>; register: any; errors: any }) {
+  const ft = useFormText();
+  const { fields, append, remove } = useFieldArray({ control, name: 'standalone' });
+  return (
+    <Box>
+      <Heading size="sm">{ft('Reactions on existing messages')}</Heading>
+      <Text fontSize="sm" color="TextSecondary" mt={1} mb={3}>
+        {ft('Grant a role when members react to any existing message (e.g. your rules post) — no new embed is created.')}
+      </Text>
+      <Flex direction="column" gap={3}>
+        {fields.map((field, i) => (
+          <Box key={field.id} bg="CardBackground" rounded="2xl" p={4} borderWidth="1px" borderColor="CardBorder">
+            <Flex justify="space-between" align="center" mb={2}>
+              <Text fontWeight="600">Reaction role #{i + 1}</Text>
+              <IconButton
+                aria-label="Remove reaction role"
+                icon={<MdDelete />}
+                size="sm"
+                variant="danger"
+                onClick={() => remove(i)}
+              />
+            </Flex>
+            <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3}>
+              <ChannelSelectForm
+                control={{ label: ft('Channel'), description: ft('Channel containing the message') }}
+                controller={{ control, name: `standalone.${i}.channelId` }}
+              />
+              <InputForm
+                control={{
+                  label: ft('Message ID'),
+                  description: ft('Developer Mode → right-click the message → Copy Message ID.'),
+                  tooltip: ft(
+                    'Turn on Developer Mode in Discord (User Settings → Advanced). Then right-click (or long-press on mobile) the message and choose “Copy Message ID”. It is an 18–19 digit number.'
+                  ),
+                  error: errors.standalone?.[i]?.messageId?.message,
+                }}
+                placeholder="123456789012345678"
+                {...register(`standalone.${i}.messageId`)}
+              />
+              <EmojiPickerInput
+                control={{ label: ft('Emoji'), description: ft('Emoji members react with') }}
+                controller={{ control, name: `standalone.${i}.emoji` }}
+                placeholder="✅"
+              />
+              <RoleSelectForm
+                control={{ label: ft('Role'), description: ft('Role to grant on reaction') }}
+                controller={{ control, name: `standalone.${i}.roleId` }}
+              />
+            </SimpleGrid>
+          </Box>
+        ))}
+      </Flex>
+      <Button
+        leftIcon={<MdAdd />}
+        size="sm"
+        variant="action"
+        mt={3}
+        onClick={() => append({ channelId: undefined, messageId: '', emoji: '✅', roleId: undefined })}
+      >
+        {ft('Add reaction role')}
+      </Button>
+    </Box>
+  );
+}
+
 export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (data, onSubmit) => {
   const ft = useFormText();
   const { register, reset, handleSubmit, formState, control, watch, setValue } = useForm<Input>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
-    defaultValues: { menus: toFormMenus(data.menus) },
+    defaultValues: { menus: toFormMenus(data.menus), standalone: toFormStandalone(data.standalone) },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'menus' });
@@ -205,11 +297,16 @@ export const useReactionMenusFeature: UseFormRender<ReactionMenusFeature> = (dat
         >
           {ft('Add menu')}
         </Button>
+        <Divider my={2} />
+        <StandaloneRoles control={control} register={register} errors={formState.errors} />
       </Flex>
     ),
     onSubmit: handleSubmit(async (e) => {
-      const result = await onSubmit(JSON.stringify({ menus: e.menus }));
-      reset({ menus: toFormMenus((result?.menus ?? []) as ReactionMenuConfig[]) });
+      const result = await onSubmit(JSON.stringify({ menus: e.menus, standalone: e.standalone }));
+      reset({
+        menus: toFormMenus((result?.menus ?? []) as ReactionMenuConfig[]),
+        standalone: toFormStandalone((result?.standalone ?? []) as ReactionRoleItem[]),
+      });
     }),
     canSave: formState.isDirty,
     reset: () => reset(control._defaultValues),

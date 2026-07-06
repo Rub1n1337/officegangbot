@@ -10,8 +10,7 @@ type Meta = { name: string; description: string };
 const RU_FEATURES: Record<string, Meta> = {
   rules: { name: 'Правила', description: 'Канал и сообщение с правилами сервера' },
   'welcome-message': { name: 'Приветствие', description: 'Отправлять приветствие при входе участника' },
-  'reaction-role': { name: 'Роль за реакцию', description: 'Выдавать роль за реакцию на сообщение' },
-  'reaction-menus': { name: 'Меню ролей', description: 'Сообщение-эмбед, где роли выдаются за реакции' },
+  'reaction-menus': { name: 'Меню ролей', description: 'Роли через меню (реакции, кнопки, дропдаун) или реакции на существующих сообщениях' },
   levels: { name: 'Уровни', description: 'Опыт, анонсы повышения уровня и награды-роли' },
   'scheduled-messages': { name: 'Отложенные сообщения', description: 'Разовые или повторяющиеся анонсы по расписанию' },
   moderation: { name: 'Роли модераторов', description: 'Какие роли могут использовать команды модерации' },

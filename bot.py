@@ -279,23 +279,15 @@ class MyBot(commands.Bot):
             }
             for r in reaction_roles if r["source"] == "reaction-role"
         ]
-        rules_rr = next((r for r in reaction_roles if r["source"] == "rules"), None)
-
         feature_data = {
             "rules": {
                 "channel": self._snowflake_or_none(settings.get("rules_channel_id")),
                 "message": settings.get("rules_message") or DEFAULT_RULES_TEXT,
-                "reactionEnabled": rules_rr is not None,
-                "reactionEmoji": rules_rr["emoji"] if rules_rr else "✅",
-                "reactionRole": str(rules_rr["role_id"]) if rules_rr else None,
             },
             "welcome-message": {
                 "channel": self._snowflake_or_none(settings.get("welcome_channel_id")),
                 "message": str(settings.get("welcome_message") or "Welcome {user.mention} to **{server.name}**!"),
                 "autorole": self._snowflake_or_none(settings.get("autorole_id")),
-            },
-            "reaction-role": {
-                "items": standalone_rr,
             },
             "scheduled-messages": {
                 "items": [
@@ -396,6 +388,9 @@ class MyBot(commands.Bot):
                     }
                     for m in menus
                 ],
+                # Reaction roles attached to *existing* messages (the former
+                # standalone Reaction Role feature, merged under Role Menus).
+                "standalone": standalone_rr,
             },
         }
         return feature_data.get(feature, {})
@@ -1137,39 +1132,6 @@ class MyBot(commands.Bot):
         # Reaction roles live in the reaction_roles table (many per guild).
         # Replace the standalone set and best-effort add each reaction to its
         # message so members can click it.
-        if feature == "reaction-role":
-            items = options.get("items")
-            if isinstance(items, list):
-                if len(items) > 100:
-                    return {"error": "Too many reaction roles (max 100)."}
-                rows = []
-                for it in items:
-                    ch, msg = it.get("channelId"), it.get("messageId")
-                    emoji = (it.get("emoji") or "").strip()
-                    role = it.get("roleId")
-                    if not (ch and msg and emoji and role):
-                        continue
-                    try:
-                        rows.append({
-                            "channel_id": _validate_discord_id(ch),
-                            "message_id": _validate_discord_id(msg),
-                            "emoji": emoji,
-                            "role_id": _validate_discord_id(role),
-                        })
-                    except ValueError:
-                        return {"error": "Invalid reaction-role entry (ids must be numeric)"}
-                bad = self._unassignable_roles(self.get_guild(guild_id), [r["role_id"] for r in rows])
-                if bad:
-                    labels = ", ".join(label for _, label in bad)
-                    return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
-                old_rows = await self.db.get_reaction_roles(guild_id, "reaction-role")
-                await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
-                await self._sync_reactions(guild_id, rows, old_rows)
-            # Return the freshly-persisted payload so the dashboard re-syncs its
-            # form state (otherwise the Save button stays enabled and edits look
-            # like they didn't apply).
-            return await self._get_feature_payload(guild_id, feature)
-
         # Scheduled / recurring announcements live in the scheduled_messages
         # table (many per guild); replace the set like reaction roles.
         if feature == "scheduled-messages":
@@ -1392,6 +1354,36 @@ class MyBot(commands.Bot):
                     # when a menu is switched over.
                     desired_reactions = new_rows if style == "reactions" else []
                     await self._sync_reactions(guild_id, desired_reactions, old_rows)
+
+            # Reaction roles on *existing* messages (the former standalone
+            # Reaction Role feature, now a section of this card).
+            standalone_in = options.get("standalone")
+            if isinstance(standalone_in, list):
+                if len(standalone_in) > 100:
+                    return {"error": "Too many reaction roles (max 100)."}
+                rows = []
+                for it in standalone_in:
+                    ch, msg = it.get("channelId"), it.get("messageId")
+                    emoji = (it.get("emoji") or "").strip()
+                    role = it.get("roleId")
+                    if not (ch and msg and emoji and role):
+                        continue
+                    try:
+                        rows.append({
+                            "channel_id": _validate_discord_id(ch),
+                            "message_id": _validate_discord_id(msg),
+                            "emoji": emoji,
+                            "role_id": _validate_discord_id(role),
+                        })
+                    except ValueError:
+                        return {"error": "Invalid reaction-role entry (ids must be numeric)"}
+                bad = self._unassignable_roles(self.get_guild(guild_id), [r["role_id"] for r in rows])
+                if bad:
+                    labels = ", ".join(label for _, label in bad)
+                    return {"error": f"I can't grant {labels} — move my role above it (and it can't be a managed role)."}
+                old_rows = await self.db.get_reaction_roles(guild_id, "reaction-role")
+                await self.db.replace_reaction_roles(guild_id, "reaction-role", rows)
+                await self._sync_reactions(guild_id, rows, old_rows)
             return await self._get_feature_payload(guild_id, feature)
 
         # Settings keys that map to BIGINT columns in Postgres and need int conversion
@@ -1521,27 +1513,9 @@ class MyBot(commands.Bot):
                         except Exception as e:
                             logger.error(f"Error during Rules E2E sync: {e}", exc_info=True)
                             return {"error": f"Failed to sync with Discord: {str(e)}"}
-
-                    # Rules reaction-role (one mapping on the rules message)
-                    rules_msg_id = await self.db.get_guild_setting(guild_id, "rules_message_id")
-                    rules_ch_id = await self.db.get_guild_setting(guild_id, "rules_channel_id")
-                    old_rules = await self.db.get_reaction_roles(guild_id, "rules")
-                    if options.get("reactionEnabled") and options.get("reactionRole") and rules_msg_id and rules_ch_id:
-                        try:
-                            rr = {
-                                "channel_id": int(rules_ch_id),
-                                "message_id": int(rules_msg_id),
-                                "emoji": (options.get("reactionEmoji") or "✅").strip(),
-                                "role_id": _validate_discord_id(options.get("reactionRole")),
-                            }
-                        except ValueError:
-                            return {"error": "Invalid rules reaction role id"}
-                        await self.db.replace_reaction_roles(guild_id, "rules", [rr])
-                        await self._sync_reactions(guild_id, [rr], old_rules)
-                    else:
-                        await self.db.replace_reaction_roles(guild_id, "rules", [])
-                        # Remove the bot's stale reaction if the rules role was turned off.
-                        await self._sync_reactions(guild_id, [], old_rules)
+                    # The rules-message reaction role moved under Role Menus
+                    # ("existing message" section); rows with the old 'rules'
+                    # source are migrated to 'reaction-role' at startup.
 
             return await self._get_feature_payload(guild_id, feature)
 

@@ -170,7 +170,6 @@ export type GuildStats = {
 export type CustomFeatures = {
   'rules': RulesFeature;
   'welcome-message': WelcomeMessageFeature;
-  'reaction-role': ReactionRoleFeature;
   'moderation': ModerationFeature;
   'logging': LoggingFeature;
   'levels': LevelsFeature;
@@ -212,6 +211,8 @@ export type ReactionMenuConfig = {
 
 export type ReactionMenusFeature = {
   menus: ReactionMenuConfig[];
+  // Reaction roles attached to existing messages (former standalone feature).
+  standalone: ReactionRoleItem[];
 };
 
 export type ScheduledMessageItem = {
@@ -319,9 +320,6 @@ export type LevelsFeature = {
 export type RulesFeature = {
   channel?: string | null;
   message: string;
-  reactionEnabled?: boolean;
-  reactionEmoji?: string;
-  reactionRole?: string | null;
 };
 
 export type ReactionRoleItem = {
@@ -329,10 +327,6 @@ export type ReactionRoleItem = {
   messageId?: string | null;
   emoji: string;
   roleId?: string | null;
-};
-
-export type ReactionRoleFeature = {
-  items: ReactionRoleItem[];
 };
 
 export type ModerationFeature = {
