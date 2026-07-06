@@ -217,15 +217,26 @@ function LiveIndicator({ updatedAt }: { updatedAt: number }) {
   );
 }
 
-// A gentle setup nudge: each feature is a step, ticked off once it's enabled.
-// Hidden once everything is configured. Doubles as quick links into each
-// feature's settings.
+// The setup essentials — every feature beyond these is optional, so the
+// checklist shouldn't push admins to enable all of them.
+const CORE_SETUP_FEATURES = ['moderation', 'logging', 'automod', 'welcome-message'];
+
+// A gentle setup nudge over the core features only, ticked off once enabled.
+// Hidden when the essentials are configured, or dismissed (per guild, sticky).
 function OnboardingChecklist({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
-  const all = getFeatures();
+  const all = getFeatures().filter((f) => CORE_SETUP_FEATURES.includes(f.id));
   const enabled = new Set(enabledFeatures);
   const done = all.filter((f) => enabled.has(f.id)).length;
 
-  if (done === all.length) return null;
+  // Dismissal is per guild and read after mount (localStorage isn't available
+  // during SSR; the brief flash is acceptable for a dismissable banner).
+  const dismissKey = `onboarding-hidden-${guild}`;
+  const [hidden, setHidden] = useState(true);
+  useEffect(() => {
+    setHidden(localStorage.getItem(dismissKey) === '1');
+  }, [dismissKey]);
+
+  if (hidden || done === all.length) return null;
 
   const pct = Math.round((done / all.length) * 100);
 
@@ -233,9 +244,21 @@ function OnboardingChecklist({ guild, enabledFeatures }: { guild: string; enable
     <Box bg="CardBackground" rounded="2xl" p={5}>
       <Flex align="center" justify="space-between" gap={3} mb={2} wrap="wrap">
         <Heading size="sm">Finish setting up</Heading>
-        <Text fontSize="sm" color="TextSecondary">
-          {done} / {all.length} configured
-        </Text>
+        <Flex align="center" gap={3}>
+          <Text fontSize="sm" color="TextSecondary">
+            {done} / {all.length} configured
+          </Text>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              localStorage.setItem(dismissKey, '1');
+              setHidden(true);
+            }}
+          >
+            Hide
+          </Button>
+        </Flex>
       </Flex>
       <Progress value={pct} size="sm" rounded="full" colorScheme="brand" mb={4} />
       <SimpleGrid columns={{ base: 1, md: 2 }} gap={2}>

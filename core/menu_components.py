@@ -105,8 +105,13 @@ class RoleMenuSelect(
     discord.ui.DynamicItem[discord.ui.Select],
     template=r"rolemenusel:(?P<menu>\d+)",
 ):
-    """Dropdown role menu. The selection is reconciled against the menu's role
-    set: picked roles are granted, unpicked menu roles are removed."""
+    """Dropdown role menu.
+
+    Exclusive menus reconcile: the picked role is granted and the menu's other
+    roles are removed (single choice). Non-exclusive menus *toggle*: each picked
+    role is added if missing or removed if held, and unpicked roles are left
+    untouched — Discord can't pre-select a member's current roles in a select,
+    so reconciling would silently strip roles the member simply didn't re-pick."""
 
     def __init__(self, menu_id: int, options: Optional[List[discord.SelectOption]] = None,
                  max_values: int = 1, placeholder: Optional[str] = None):
@@ -136,14 +141,25 @@ class RoleMenuSelect(
         menu_role_ids = {int(m["role_id"]) for m in mappings}
         # Never grant a role that isn't part of this menu, whatever the payload says.
         selected &= menu_role_ids
-        to_add = [
-            r for rid in selected
-            if (r := guild.get_role(rid)) and r not in member.roles
-        ]
-        to_remove = [
-            r for rid in (menu_role_ids - selected)
-            if (r := guild.get_role(rid)) and r in member.roles
-        ]
+        exclusive = any(m.get("exclusive") for m in mappings)
+        if exclusive:
+            # Single choice: grant the pick, drop the menu's other roles.
+            to_add = [
+                r for rid in selected
+                if (r := guild.get_role(rid)) and r not in member.roles
+            ]
+            to_remove = [
+                r for rid in (menu_role_ids - selected)
+                if (r := guild.get_role(rid)) and r in member.roles
+            ]
+        else:
+            # Toggle each picked role; leave everything unpicked alone.
+            to_add, to_remove = [], []
+            for rid in selected:
+                r = guild.get_role(rid)
+                if r is None:
+                    continue
+                (to_remove if r in member.roles else to_add).append(r)
         try:
             if to_add:
                 await member.add_roles(*to_add, reason="Role menu (dropdown)")
