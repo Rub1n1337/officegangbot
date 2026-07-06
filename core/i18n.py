@@ -281,6 +281,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tickets.closed_dm_desc": "Your support ticket in **{guild}** has been closed. A transcript is attached for your records.",
         "tickets.auto_closed_notice": "🔒 This ticket has been inactive for over **{hours}h** and will be closed automatically.",
         "tickets.auto_close_comment": "Automatically closed after {hours}h of inactivity.",
+        "tickets.channel_deleted_comment": "Ticket channel was deleted.",
         # --- role menus (component style) ---
         "rolemenu.granted": "✅ Role **{role}** added.",
         "rolemenu.removed": "✅ Role **{role}** removed.",
@@ -583,6 +584,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tickets.closed_dm_desc": "Ваш тикет поддержки в **{guild}** был закрыт. Транскрипт прилагается.",
         "tickets.auto_closed_notice": "🔒 Тикет неактивен более **{hours}ч** и будет закрыт автоматически.",
         "tickets.auto_close_comment": "Автоматически закрыт после {hours}ч без активности.",
+        "tickets.channel_deleted_comment": "Канал тикета был удалён.",
         # --- role menus (component style) ---
         "rolemenu.granted": "✅ Роль **{role}** выдана.",
         "rolemenu.removed": "✅ Роль **{role}** снята.",
