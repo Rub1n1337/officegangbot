@@ -73,14 +73,22 @@ class AntiRaidCog(commands.Cog, name="🚨 Anti-Raid"):
             logger.warning(f"Anti-raid: couldn't {action} {member} in {member.guild.name}: {e}")
 
     async def _notify(self, guild: discord.Guild, joins: int, window: int, action: str):
-        """Posts a raid alert to the punishment log channel, if one is set."""
+        """Posts a raid alert to the punishment log channel — honouring the
+        Logging feature flag and falling back to fetch_channel on a cold cache,
+        consistent with the other log paths (_log_automod etc.)."""
         try:
+            enabled = await self.bot.db.get_enabled_features(guild.id)
+            if "logging" not in enabled:
+                return
             log_id = await self.bot.db.get_guild_setting(guild.id, "punishment_log_id")
             if not log_id:
                 return
             channel = guild.get_channel(int(log_id))
             if channel is None:
-                return
+                try:
+                    channel = await guild.fetch_channel(int(log_id))
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    return
             embed = discord.Embed(
                 title="🚨 Raid detected",
                 description=f"**{joins}** members joined within **{window}s**.\nAction applied: **{action}**.",
