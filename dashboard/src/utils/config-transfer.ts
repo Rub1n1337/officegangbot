@@ -14,7 +14,7 @@ export const PORTABLE_KEYS: Record<string, string[]> = {
     'blockInvites', 'blockLinks', 'allowedDomains', 'blockMassMentions',
     'spamCount', 'spamWindow', 'mentionLimit',
     'strikesEnabled', 'strikeExpiryHours', 'strikeMuteAt', 'strikeKickAt', 'strikeBanAt',
-    'dryRun', 'rules',
+    'dryRun', 'rules', 'bannedWords',
   ],
   'moderation': [
     'warnEscalationEnabled', 'warnExpiryHours', 'warnMuteAt', 'warnKickAt', 'warnBanAt',
@@ -22,7 +22,6 @@ export const PORTABLE_KEYS: Record<string, string[]> = {
   'anti-raid': ['joinCount', 'joinWindow', 'action', 'duration'],
   'tickets': ['autoCloseHours'],
   'levels': ['voiceXpEnabled', 'voiceXpPerMin', 'xpMultiplier', 'prestigeLevel'],
-  'filter': ['words'],
   'welcome-message': ['message'],
   'rules': ['message'],
 };
@@ -79,9 +78,19 @@ export function parseImport(raw: string):
   if ((file.version ?? 0) > TRANSFER_VERSION) {
     return { ok: false, error: 'This export was made by a newer version of the dashboard.' };
   }
+  const incoming: Record<string, unknown> = { ...(file.features as Record<string, unknown>) };
+  // Legacy: exports made before the word filter merged into AutoMod carried a
+  // 'filter' feature with { words } — map it onto automod.bannedWords.
+  const legacyFilter = incoming['filter'] as Record<string, unknown> | undefined;
+  if (legacyFilter && Array.isArray(legacyFilter.words)) {
+    incoming['automod'] = {
+      ...((incoming['automod'] as Record<string, unknown>) ?? {}),
+      bannedWords: legacyFilter.words,
+    };
+  }
   const features: Record<string, Record<string, unknown>> = {};
   for (const [feature, keys] of Object.entries(PORTABLE_KEYS)) {
-    const subset = (file.features as Record<string, unknown>)[feature];
+    const subset = incoming[feature];
     if (subset && typeof subset === 'object') {
       const picked = pick(subset as Record<string, unknown>, keys);
       if (Object.keys(picked).length > 0) features[feature] = picked;

@@ -328,9 +328,6 @@ class MyBot(commands.Bot):
                 "messagesChannel": self._snowflake_or_none(settings.get("audit_log_id")),
                 "leaveChannel": self._snowflake_or_none(settings.get("leave_log_id")),
             },
-            "filter": {
-                "words": settings.get("filter_words") or [],
-            },
             "anti-raid": {
                 "joinCount": int(settings.get("antiraid_join_count") or 8),
                 "joinWindow": int(settings.get("antiraid_join_window") or 10),
@@ -377,6 +374,7 @@ class MyBot(commands.Bot):
                 "dryRun": bool(settings.get("automod_dry_run")),
                 "ignoredChannels": [str(c) for c in (settings.get("automod_ignored_channels") or [])],
                 "ignoredRoles": [str(r) for r in (settings.get("automod_ignored_roles") or [])],
+                "bannedWords": settings.get("filter_words") or [],
                 "rules": [
                     {"pattern": r["pattern"], "action": r["action"], "enabled": bool(r["enabled"])}
                     for r in automod_rules
@@ -1136,23 +1134,6 @@ class MyBot(commands.Bot):
 
             return await self._get_feature_payload(guild_id, feature)
 
-        # Filter word list is a TEXT[] column and feeds a cached compiled
-        # regex, so it is handled separately: normalise the list and
-        # invalidate the filter cog's pattern cache so changes apply at once.
-        if feature == "filter":
-            words = options.get("words")
-            if isinstance(words, list):
-                # Cap word length (and overall count) so a bad payload can't
-                # bloat the TEXT[] column or the compiled filter regex.
-                cleaned = sorted({str(w).strip().lower()[:100] for w in words if str(w).strip()})
-                if len(cleaned) > 500:
-                    return {"error": "Too many filter words (max 500)."}
-                await self.db.set_guild_setting(guild_id, "filter_words", cleaned)
-                filter_cog = self.get_cog("🚫 Filter")
-                if filter_cog:
-                    await filter_cog._invalidate_pattern(guild_id)
-            return await self._get_feature_payload(guild_id, feature)
-
         # Reaction roles live in the reaction_roles table (many per guild).
         # Replace the standalone set and best-effort add each reaction to its
         # message so members can click it.
@@ -1263,11 +1244,23 @@ class MyBot(commands.Bot):
 
             ignored_channels = _id_list(options.get("ignoredChannels"))
             ignored_roles = _id_list(options.get("ignoredRoles"))
+
+            # Banned words (the merged word filter). Validate before any write
+            # so a bad list rejects the whole save, like the regex rules above.
+            words_raw = options.get("bannedWords")
+            banned_words = None
+            if isinstance(words_raw, list):
+                banned_words = sorted({str(w).strip().lower()[:100] for w in words_raw if str(w).strip()})
+                if len(banned_words) > 500:
+                    return {"error": "Too many banned words (max 500)."}
+
             await self.db.set_automod_config(
                 guild_id, block_invites, block_links, domains,
                 spam_count, spam_window, mention_limit, block_mass_mentions, dry_run,
                 ignored_channels, ignored_roles,
             )
+            if banned_words is not None:
+                await self.db.set_filter_words(guild_id, banned_words)
 
             # Strike escalation config (0 = that tier disabled).
             strikes_enabled = bool(options.get("strikesEnabled", False))

@@ -3,14 +3,15 @@ import discord
 from discord.ext import commands
 from core.logger import logger
 from core.i18n import t
-from core.content_filter import contains_invite, first_disallowed_link
+from core.content_filter import contains_invite, first_disallowed_link, build_words_pattern, first_banned_word
 from core.automod_rules import compile_rules, first_match
 import datetime
 
 class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
     """
     Auto-moderation:
-    - Content filter (invites / links), configurable anti-spam and mention limits.
+    - Content filter (invites / links / banned words), configurable anti-spam
+      and mention limits.
     - Custom regex rules and a strike-escalation system (mute/kick/ban).
     """
 
@@ -20,6 +21,8 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         # Cache of compiled regex rules per guild, keyed by a signature of the
         # rule list so it recompiles only when the rules actually change.
         self._rules_cache: dict = {}
+        # Same idea for the banned-words pattern.
+        self._words_cache: dict = {}
 
     def _get_compiled_rules(self, guild_id: int, rules: list):
         """Returns compiled [(regex, action)] for a guild, recompiling only when
@@ -30,6 +33,17 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             return cached[1]
         compiled = compile_rules(rules)
         self._rules_cache[guild_id] = (signature, compiled)
+        return compiled
+
+    def _get_words_pattern(self, guild_id: int, words: list):
+        """Returns the compiled banned-words pattern, recompiling only when the
+        word list changes."""
+        signature = tuple(words)
+        cached = self._words_cache.get(guild_id)
+        if cached and cached[0] == signature:
+            return cached[1]
+        compiled = build_words_pattern(words)
+        self._words_cache[guild_id] = (signature, compiled)
         return compiled
 
     async def _register_strike(self, message: discord.Message, reason: str):
@@ -186,6 +200,21 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         # In dry-run mode we still run every detection below, but log what *would*
         # have happened instead of deleting/timing-out/striking.
         dry_run = config["dry_run"]
+
+        # --- Banned words (the standalone word filter, merged into AutoMod so
+        # it shares the exemptions, dry-run and strike escalation above/below) ---
+        banned_words = config.get("banned_words") or []
+        if banned_words:
+            word = first_banned_word(message.content, self._get_words_pattern(guild_id, banned_words))
+            if word:
+                await self._block_message(
+                    message, loc, "filter.deleted",
+                    f"**Banned word** by {message.author.mention} (`{user_id}`) — message deleted.",
+                    dry_run=dry_run,
+                )
+                await self._register_strike(message, "banned word")
+                return
+
         if config["block_invites"] and contains_invite(message.content):
             await self._block_message(
                 message, loc, "automod.invite_blocked",

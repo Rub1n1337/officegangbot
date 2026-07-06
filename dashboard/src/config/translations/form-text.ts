@@ -84,6 +84,10 @@ const RU: Record<string, string> = {
   'Warning expiry (hours)': 'Срок предупреждения (часы)',
   'Warnings older than this stop counting toward escalation. 0 = never expire.':
     'Предупреждения старше этого срока не учитываются в эскалации. 0 = не сгорают.',
+  'Banned words': 'Запрещённые слова',
+  'Messages containing any of these words are deleted (whole words, case-insensitive). Also editable with /filter in Discord.':
+    'Сообщения с любым из этих слов удаляются (целые слова, без учёта регистра). Список также редактируется командой /filter в Discord.',
+  'type a word — press Enter to add': 'введите слово — Enter, чтобы добавить',
   'Exemptions': 'Исключения',
   'Channels and roles listed here are ignored by AutoMod entirely.':
     'Каналы и роли из этого списка полностью игнорируются AutoMod.',

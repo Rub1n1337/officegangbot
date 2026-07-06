@@ -33,6 +33,25 @@ def normalize_domain(domain: str) -> str:
     return d[4:] if d.startswith("www.") else d
 
 
+def build_words_pattern(words: Iterable[str]):
+    """Compile a banned-words pattern (whole-word, case-insensitive) — the same
+    ``\\b(word1|word2)\\b`` semantics the standalone word filter used, so the
+    merge into AutoMod changes nothing about what matches."""
+    cleaned = [w.strip() for w in (words or []) if w and w.strip()]
+    if not cleaned:
+        return None
+    return re.compile(r"\b(" + "|".join(re.escape(w) for w in cleaned) + r")\b", re.IGNORECASE)
+
+
+def first_banned_word(content: str, compiled) -> Optional[str]:
+    """The first banned word found in the text (via a build_words_pattern
+    result), or None."""
+    if compiled is None:
+        return None
+    m = compiled.search(content or "")
+    return m.group(1) if m else None
+
+
 def first_disallowed_link(content: str, allowed_domains: Iterable[str]) -> Optional[str]:
     """Return the first http(s) URL whose host is not allowed, or None.
 

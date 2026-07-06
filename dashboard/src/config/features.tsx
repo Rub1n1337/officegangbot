@@ -5,7 +5,6 @@ import {
   MdHistory,
   MdAddReaction,
   MdPeople,
-  MdBlock,
   MdTrendingUp,
   MdGppGood,
   MdConfirmationNumber,
@@ -20,7 +19,6 @@ import { useRulesFeature } from './feature-forms/RulesFeature';
 import { useReactionRoleFeature } from './feature-forms/ReactionRoleFeature';
 import { useLoggingFeature } from './feature-forms/LoggingFeature';
 import { useModerationFeature } from './feature-forms/ModerationFeature';
-import { useFilterFeature } from './feature-forms/FilterFeature';
 import { useLevelsFeature } from './feature-forms/LevelsFeature';
 import { useAutomodFeature } from './feature-forms/AutomodFeature';
 import { useTicketsFeature } from './feature-forms/TicketsFeature';
@@ -92,16 +90,9 @@ export const features: FeaturesConfig = {
     category: 'safety',
     useRender: useLoggingFeature,
   },
-  'filter': {
-    name: 'Word Filter',
-    description: 'Automatically delete messages containing banned words',
-    icon: <Icon as={MdBlock} />,
-    category: 'safety',
-    useRender: useFilterFeature,
-  },
   'automod': {
     name: 'AutoMod',
-    description: 'Automatic anti-spam and anti-mention-spam protection',
+    description: 'Anti-spam, banned words, invite/link blocking and strikes',
     icon: <Icon as={MdGppGood} />,
     category: 'safety',
     useRender: useAutomodFeature,

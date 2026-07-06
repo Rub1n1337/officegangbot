@@ -39,8 +39,8 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { feature: 'tickets', label: 'Ticket auto-close', keywords: ['auto-close', 'autoclose', 'inactive', 'автозакрыт'] },
   // Logging
   { feature: 'logging', label: 'Log channels', keywords: ['log', 'audit channel', 'лог', 'журнал'] },
-  // Filter
-  { feature: 'filter', label: 'Banned words', keywords: ['word', 'banned', 'blacklist', 'слов', 'мат'] },
+  // Banned words (merged into AutoMod)
+  { feature: 'automod', label: 'Banned words', keywords: ['word', 'banned', 'blacklist', 'filter', 'слов', 'мат', 'фильтр'] },
   // Role menus
   { feature: 'reaction-menus', label: 'Role menus (style, roles)', keywords: ['role menu', 'button', 'dropdown', 'reaction', 'меню ролей', 'кнопк', 'реакц'] },
   { feature: 'reaction-role', label: 'Single reaction role', keywords: ['reaction role', 'роль за реакц'] },
