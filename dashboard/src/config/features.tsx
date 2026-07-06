@@ -3,7 +3,6 @@ import {
   MdMessage,
   MdSecurity,
   MdHistory,
-  MdAddReaction,
   MdPeople,
   MdTrendingUp,
   MdGppGood,
@@ -16,7 +15,6 @@ import {
 import { FeaturesConfig } from './types';
 import { useWelcomeMessageFeature } from './feature-forms/WelcomeMessageFeature';
 import { useRulesFeature } from './feature-forms/RulesFeature';
-import { useReactionRoleFeature } from './feature-forms/ReactionRoleFeature';
 import { useLoggingFeature } from './feature-forms/LoggingFeature';
 import { useModerationFeature } from './feature-forms/ModerationFeature';
 import { useLevelsFeature } from './feature-forms/LevelsFeature';
@@ -48,16 +46,9 @@ export const features: FeaturesConfig = {
     category: 'engagement',
     useRender: useWelcomeMessageFeature,
   },
-  'reaction-role': {
-    name: 'Reaction Role',
-    description: 'Assign roles when users react to a message',
-    icon: <Icon as={MdAddReaction} />,
-    category: 'engagement',
-    useRender: useReactionRoleFeature,
-  },
   'reaction-menus': {
     name: 'Role Menus',
-    description: 'Post an embed members react to for roles',
+    description: 'Roles via menus (reactions, buttons, dropdown) or reactions on existing messages',
     icon: <Icon as={MdList} />,
     category: 'engagement',
     useRender: useReactionMenusFeature,

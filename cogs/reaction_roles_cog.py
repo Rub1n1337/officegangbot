@@ -4,10 +4,11 @@ import discord
 from discord.ext import commands
 from core.logger import logger
 
-# Which feature flag gates each reaction-role source.
+# Which feature flag gates each reaction-role source. The standalone
+# 'reaction-role' source (and the former rules-message reaction, migrated into
+# it) now lives under the Role Menus card, so both gate on 'reaction-menus'.
 SOURCE_FEATURE = {
-    "reaction-role": "reaction-role",
-    "rules": "rules",
+    "reaction-role": "reaction-menus",
     "menu": "reaction-menus",
 }
 
@@ -43,7 +44,7 @@ class ReactionRolesCog(commands.Cog, name="Reaction Roles"):
 
         # Gate by the feature that owns this mapping.
         enabled_features = await self.bot.db.get_enabled_features(payload.guild_id)
-        if SOURCE_FEATURE.get(match["source"], "reaction-role") not in enabled_features:
+        if SOURCE_FEATURE.get(match["source"], "reaction-menus") not in enabled_features:
             return
 
         guild = self.bot.get_guild(payload.guild_id)

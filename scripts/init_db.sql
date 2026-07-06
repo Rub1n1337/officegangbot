@@ -405,6 +405,23 @@ WHERE 'filter' = ANY(enabled_features)
 UPDATE guilds SET enabled_features = array_remove(enabled_features, 'filter')
 WHERE 'filter' = ANY(enabled_features);
 
+-- Migration: the standalone Reaction Role feature and the rules-message
+-- reaction merged under Role Menus. Enforcement of both sources now gates on
+-- the 'reaction-menus' flag, so guilds that relied on the old flags get it
+-- enabled before the old rows are re-sourced; the retired 'reaction-role'
+-- flag is then dropped (one-shot, like the filter migration above).
+UPDATE guilds SET enabled_features = array_append(enabled_features, 'reaction-menus')
+WHERE NOT ('reaction-menus' = ANY(enabled_features))
+  AND EXISTS (
+    SELECT 1 FROM reaction_roles rr
+    WHERE rr.guild_id = guilds.guild_id
+      AND ((rr.source = 'reaction-role' AND 'reaction-role' = ANY(guilds.enabled_features))
+        OR (rr.source = 'rules' AND 'rules' = ANY(guilds.enabled_features)))
+  );
+UPDATE reaction_roles SET source = 'reaction-role' WHERE source = 'rules';
+UPDATE guilds SET enabled_features = array_remove(enabled_features, 'reaction-role')
+WHERE 'reaction-role' = ANY(enabled_features);
+
 -- Migration: relax mod_roles to store permission-level role_types and allow a
 -- role to hold multiple permissions (older schema used CHECK ('mod','admin')
 -- and PK (guild_id, role_id), which rejected /config role assignments).

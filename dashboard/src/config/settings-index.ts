@@ -43,7 +43,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { feature: 'automod', label: 'Banned words', keywords: ['word', 'banned', 'blacklist', 'filter', 'слов', 'мат', 'фильтр'] },
   // Role menus
   { feature: 'reaction-menus', label: 'Role menus (style, roles)', keywords: ['role menu', 'button', 'dropdown', 'reaction', 'меню ролей', 'кнопк', 'реакц'] },
-  { feature: 'reaction-role', label: 'Single reaction role', keywords: ['reaction role', 'роль за реакц'] },
+  { feature: 'reaction-menus', label: 'Reaction on an existing message', keywords: ['reaction role', 'existing message', 'роль за реакц', 'существующ'] },
   // Rules / scheduled
   { feature: 'rules', label: 'Rules channel & message', keywords: ['rules', 'правил'] },
   { feature: 'scheduled-messages', label: 'Scheduled messages', keywords: ['schedule', 'announce', 'расписан', 'отложен', 'анонс'] },
