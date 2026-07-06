@@ -304,6 +304,31 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
     def cog_unload(self):
         self.auto_close_loop.cancel()
 
+    async def _close_orphaned_record(self, guild_id: int, channel_id: int):
+        """Closes the DB record for a ticket whose channel no longer exists —
+        it can never be closed from inside the channel, so without this it sits
+        "open" in the dashboard forever. No transcript and no opener DM: the
+        channel (and its history) is already gone."""
+        loc = await self.bot.db.get_locale(guild_id)
+        ticket = await self.bot.db.close_ticket(
+            channel_id, self.bot.user.id, "System",
+            t(loc, "tickets.channel_deleted_comment"), None,
+        )
+        if ticket:
+            logger.info(f"Closed ticket record #{ticket['id']} — channel {channel_id} was deleted (guild {guild_id})")
+        return ticket
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel):
+        """A manually deleted ticket channel leaves its record stuck open —
+        close it as soon as the deletion happens."""
+        if not self.bot.db or not isinstance(channel, discord.TextChannel):
+            return
+        try:
+            await self._close_orphaned_record(channel.guild.id, channel.id)
+        except Exception as e:
+            logger.exception(f"Failed to close ticket record for deleted channel {channel.id}: {e}")
+
     @staticmethod
     async def _channel_last_activity(channel: discord.TextChannel, opened_at):
         """Best-effort last-activity time for a ticket channel: derived from the
@@ -331,8 +356,20 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
             for c in candidates:
                 hours = int(c["hours"])
                 channel = self.bot.get_channel(int(c["channel_id"]))
+                if channel is None:
+                    # Not in cache — confirm whether it still exists before
+                    # touching the record.
+                    try:
+                        channel = await self.bot.fetch_channel(int(c["channel_id"]))
+                    except discord.NotFound:
+                        # Deleted (e.g. while the bot was offline, so the
+                        # delete event was missed) — close the stuck record.
+                        await self._close_orphaned_record(int(c["guild_id"]), int(c["channel_id"]))
+                        continue
+                    except (discord.Forbidden, discord.HTTPException):
+                        continue  # can't verify — leave the record alone
                 if not isinstance(channel, discord.TextChannel):
-                    continue  # gone or not visible; leave the record for a manual close
+                    continue  # not visible / wrong type; leave the record alone
                 last_activity = await self._channel_last_activity(channel, c["opened_at"])
                 if last_activity is None:
                     continue

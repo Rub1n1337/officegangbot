@@ -1360,7 +1360,13 @@ class MyBot(commands.Bot):
                     old_message_id = existing["message_id"] if existing else None
                     old_channel_id = existing["channel_id"] if existing else None
                     old_items = existing["items"] if existing else []
-                    if menu_id is None:
+                    # The row must exist before the view is built (components
+                    # carry the menu id) — so remember whether we created it
+                    # here: if the post below fails, a just-created row has to
+                    # be rolled back or it lingers as an empty "ghost" menu in
+                    # the dashboard.
+                    created_now = menu_id is None
+                    if created_now:
                         menu_id = await self.db.create_reaction_menu(guild_id, channel_id, title, description, exclusive, style)
                     # Component styles carry a persistent view; the legacy style
                     # passes view=None, which also clears components on an edit
@@ -1370,6 +1376,8 @@ class MyBot(commands.Bot):
                     edit_id = old_message_id if (old_message_id and old_channel_id == channel_id) else None
                     new_message_id = await self._render_menu(guild, channel_id, title, description, item_lines, edit_id, view)
                     if new_message_id is None:
+                        if created_now:
+                            await self.db.delete_reaction_menu(menu_id)
                         return {"error": "I couldn't post the role menu — check I can see and post in that channel."}
                     # If the menu moved channels, remove the old message + mappings.
                     if old_message_id and old_message_id != new_message_id:
