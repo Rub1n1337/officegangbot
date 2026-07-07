@@ -1,4 +1,4 @@
-import { LegalPage, LEGAL_CONTACT_EMAIL } from '@/components/LegalPage';
+import { LegalPage, ContactLink } from '@/components/LegalPage';
 
 export default function PrivacyPage() {
   return (
@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       </p>
       <p>
         Data controller: the individual developer operating the Service. Contact:{' '}
-        <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.
+        <ContactLink />.
       </p>
 
       <h2>1. What we collect and why</h2>
@@ -135,9 +135,9 @@ export default function PrivacyPage() {
       <p>
         Depending on your jurisdiction (for example under the GDPR), you may have the right to
         access, correct, delete, restrict, or receive a copy of your personal data, and to lodge a
-        complaint with your data-protection authority. To exercise any of these rights, email{' '}
-        <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a> from a way we can
-        verify (for example, the Discord account concerned). Note that moderation records are kept
+        complaint with your data-protection authority. To exercise any of these rights, contact us
+        (see “Contact” below) in a way that lets us verify the request relates to you (for
+        example, from the Discord account concerned). Note that moderation records are kept
         on behalf of the server that created them; where a request concerns a specific server’s
         records, we may coordinate with that server’s owner.
       </p>
@@ -165,8 +165,7 @@ export default function PrivacyPage() {
 
       <h2>9. Contact</h2>
       <p>
-        Privacy questions and requests:{' '}
-        <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.
+        Privacy questions and requests: <ContactLink />.
       </p>
     </LegalPage>
   );

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LegalPage, LEGAL_CONTACT_EMAIL } from '@/components/LegalPage';
+import { LegalPage, ContactLink } from '@/components/LegalPage';
 
 export default function TermsPage() {
   return (
@@ -12,7 +12,7 @@ export default function TermsPage() {
       </p>
       <p>
         The Service is operated by an individual developer (“we”, “us”). Contact:{' '}
-        <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.
+        <ContactLink />.
       </p>
 
       <h2>1. The Service</h2>
@@ -131,8 +131,7 @@ export default function TermsPage() {
 
       <h2>10. Contact</h2>
       <p>
-        Questions about these Terms:{' '}
-        <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.
+        Questions about these Terms: <ContactLink />.
       </p>
     </LegalPage>
   );
