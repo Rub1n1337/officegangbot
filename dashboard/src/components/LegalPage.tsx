@@ -44,4 +44,14 @@ export function LegalPage({
   );
 }
 
-export const LEGAL_CONTACT_EMAIL = 'rubn7228@gmail.com';
+// Contact shown on the legal pages. Set NEXT_PUBLIC_CONTACT_EMAIL in the
+// dashboard's environment (e.g. on Vercel) — no address is committed to the
+// repository. Without it, a neutral Discord-based contact line is shown.
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+
+export function ContactLink() {
+  if (CONTACT_EMAIL) {
+    return <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
+  }
+  return <>the developer via the OfficeGangBot support server on Discord</>;
+}
