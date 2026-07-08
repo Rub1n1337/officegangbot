@@ -40,7 +40,10 @@ export const cardStyles = defineMultiStyleConfig({
       container: {
         rounded: '2xl',
         _light: {
-          boxShadow: '14px 17px 30px 4px rgb(112 144 176 / 10%)',
+          boxShadow: light.shadow,
+        },
+        _dark: {
+          boxShadow: dark.shadow,
         },
       },
     }),
