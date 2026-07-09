@@ -1,0 +1,173 @@
+import { Box, Flex, Text, Icon } from '@chakra-ui/react';
+import { useColorMode } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react';
+import { flushSync } from 'react-dom';
+import type { MouseEvent } from 'react';
+import { MdSearch, MdDarkMode, MdLightMode, MdNotifications, MdPerson, MdMenu } from 'react-icons/md';
+import { useRouter } from 'next/router';
+import { iconUrl } from '@/api/discord';
+import { useGuildPreview, useGuildStatsQuery } from '@/api/hooks';
+import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
+
+const pulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}`;
+
+type DocWithVT = Document & { startViewTransition?: (cb: () => void) => unknown };
+
+function IconBtn({
+  children,
+  onClick,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick?: (e: MouseEvent<HTMLElement>) => void;
+  title?: string;
+}) {
+  return (
+    <Flex
+      as="button"
+      title={title}
+      onClick={onClick}
+      w="38px"
+      h="38px"
+      rounded="11px"
+      border="1px solid"
+      borderColor="CardBorder"
+      align="center"
+      justify="center"
+      color="TextSecondary"
+      position="relative"
+      transition="background .15s ease"
+      _hover={{ bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
+    >
+      {children}
+    </Flex>
+  );
+}
+
+export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
+  const { guild: guildId } = useRouter().query as { guild: string };
+  const { guild } = useGuildPreview(guildId);
+  const stats = useGuildStatsQuery(guildId).data;
+  const { colorMode, toggleColorMode } = useColorMode();
+
+  const online = stats?.online ?? false;
+
+  const onToggleTheme = (e: MouseEvent<HTMLElement>) => {
+    const doc = document as DocWithVT;
+    const reduce =
+      typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!doc.startViewTransition || reduce) {
+      toggleColorMode();
+      return;
+    }
+    document.documentElement.style.setProperty('--vt-x', `${e.clientX}px`);
+    document.documentElement.style.setProperty('--vt-y', `${e.clientY}px`);
+    doc.startViewTransition(() => flushSync(() => toggleColorMode()));
+  };
+
+  return (
+    <Flex
+      align="center"
+      gap="16px"
+      px={{ base: '16px', md: '28px' }}
+      py="15px"
+      borderBottom="1px solid"
+      borderColor="CardBorder"
+      bg="white"
+      _dark={{ bg: '#0D0D18' }}
+      flexShrink={0}
+    >
+      {/* Mobile: open sidebar */}
+      <Flex display={{ base: 'flex', xl: 'none' }}>
+        <IconBtn onClick={() => onOpenSidebar?.()} title="Меню">
+          <Icon as={MdMenu} boxSize="19px" />
+        </IconBtn>
+      </Flex>
+
+      {guild?.icon ? (
+        <Box
+          as="img"
+          src={iconUrl(guild) ?? undefined}
+          alt=""
+          w="34px"
+          h="34px"
+          rounded="11px"
+          objectFit="cover"
+        />
+      ) : (
+        <Flex
+          w="34px"
+          h="34px"
+          rounded="11px"
+          align="center"
+          justify="center"
+          bgGradient="linear(135deg, #8B7CFF, #6E56F5)"
+          color="white"
+          fontWeight="700"
+          fontSize="13px"
+        >
+          {(guild?.name ?? 'OG').slice(0, 2).toUpperCase()}
+        </Flex>
+      )}
+      <Box lineHeight="1.25" minW={0}>
+        <Text fontSize="15px" fontWeight="700" noOfLines={1}>
+          {guild?.name ?? '—'}
+        </Text>
+        <Flex align="center" gap="5px" fontSize="11.5px" color="TextSecondary">
+          <Box
+            w="7px"
+            h="7px"
+            rounded="full"
+            bg={online ? 'green.400' : 'secondaryGray.500'}
+            animation={online ? `${pulse} 2.4s infinite` : undefined}
+          />
+          {online ? `${(stats?.member_count ?? 0).toLocaleString('ru-RU')} участников` : 'Бот офлайн'}
+        </Flex>
+      </Box>
+
+      <Flex ml="auto" align="center" gap="10px">
+        <Flex
+          as="button"
+          display={{ base: 'none', md: 'flex' }}
+          align="center"
+          gap="8px"
+          px="14px"
+          py="8px"
+          rounded="11px"
+          border="1px solid"
+          borderColor="CardBorder"
+          color="TextSecondary"
+          fontSize="13px"
+          minW="180px"
+          transition="border-color .15s ease"
+          _hover={{ borderColor: 'brand.400' }}
+          onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE))}
+        >
+          <Icon as={MdSearch} boxSize="17px" />
+          Быстрый переход
+          <Box as="span" ml="auto" fontSize="11px" border="1px solid" borderColor="CardBorder" rounded="6px" px="6px">
+            ⌘K
+          </Box>
+        </Flex>
+        <IconBtn onClick={onToggleTheme} title="Сменить тему">
+          <Icon as={colorMode === 'light' ? MdDarkMode : MdLightMode} boxSize="19px" />
+        </IconBtn>
+        <IconBtn title="Уведомления">
+          <Icon as={MdNotifications} boxSize="19px" />
+        </IconBtn>
+        <Flex
+          w="38px"
+          h="38px"
+          rounded="full"
+          align="center"
+          justify="center"
+          bg="blackAlpha.100"
+          _dark={{ bg: 'whiteAlpha.100' }}
+          color="TextSecondary"
+        >
+          <Icon as={MdPerson} boxSize="20px" />
+        </Flex>
+      </Flex>
+    </Flex>
+  );
+}
