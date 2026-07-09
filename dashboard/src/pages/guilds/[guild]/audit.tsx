@@ -153,17 +153,19 @@ const AuditPage: NextPageWithLayout = () => {
   const filtersActive = q !== '' || action !== 'all' || period !== 'all';
 
   return (
-    <Flex direction="column" gap={5}>
-      <Flex align="center" gap={2}>
-        <Icon as={MdHistory} fontSize="2xl" color="Brand" />
-        <Heading fontSize="2xl" fontWeight="600">
-          Audit log
+    <Flex direction="column" gap="18px">
+      <Box>
+        <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+          ЖУРНАЛ
+        </Text>
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+          Активность дашборда
         </Heading>
-      </Flex>
-      <Text fontSize="sm" color="TextSecondary" mt={-3}>
-        Every action taken from this dashboard — moderation, feature changes and settings — with who
-        did it and when.
-      </Text>
+        <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+          Каждое действие из этого дашборда — модерация, изменения функций и настроек — с автором и
+          временем.
+        </Text>
+      </Box>
 
       <QueryStatus query={query} loading={<AuditSkeleton />} error="Failed to load the audit log.">
         <Box bg="CardBackground" rounded="2xl" p={5}>
