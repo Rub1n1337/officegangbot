@@ -104,17 +104,48 @@ export function UpdateFeaturePanel({
         </BreadcrumbItem>
       </Breadcrumb>
 
-      <Flex direction={{ base: 'column', md: 'row' }} mx={{ '3sm': 5 }} justify="space-between" gap={3}>
-        <Box>
-          <Heading fontSize="2xl" fontWeight="600">
-            {name}
-          </Heading>
-          <Text color="TextSecondary">{description}</Text>
-        </Box>
-        <Flex align="center" gap={3} mt={{ base: 2, md: 0 }}>
-          <Text fontWeight="600" color={enabled ? 'green.400' : 'TextSecondary'}>
+      <Flex direction={{ base: 'column', md: 'row' }} mx={{ '3sm': 5 }} justify="space-between" gap={3} align={{ md: 'center' }}>
+        <Flex align="center" gap="14px" minW={0}>
+          <Flex
+            w="52px"
+            h="52px"
+            rounded="15px"
+            align="center"
+            justify="center"
+            flexShrink={0}
+            fontSize="27px"
+            color="white"
+            bgGradient="linear(135deg, #8B7CFF, #6E56F5)"
+            boxShadow="0 10px 22px -8px rgba(110,86,245,.6)"
+          >
+            {config.icon}
+          </Flex>
+          <Box minW={0}>
+            <Heading fontSize="22px" fontWeight="700">
+              {name}
+            </Heading>
+            <Text fontSize="13.5px" color="TextSecondary" mt="3px">
+              {description}
+            </Text>
+          </Box>
+        </Flex>
+        <Flex align="center" gap={3} mt={{ base: 2, md: 0 }} flexShrink={0}>
+          <Box
+            as="span"
+            fontSize="12px"
+            fontWeight="700"
+            rounded="20px"
+            px="11px"
+            py="4px"
+            color={enabled ? 'green.500' : 'TextSecondary'}
+            bg={enabled ? 'green.100' : 'blackAlpha.100'}
+            _dark={{
+              bg: enabled ? 'whiteAlpha.100' : 'whiteAlpha.100',
+              color: enabled ? 'green.400' : 'TextSecondary',
+            }}
+          >
             {enabled ? 'Enabled' : 'Disabled'}
-          </Text>
+          </Box>
           <Switch
             variant="main"
             size="lg"
