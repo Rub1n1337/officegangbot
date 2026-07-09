@@ -91,11 +91,22 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <Box bg="CardBackground" rounded="2xl" p={5}>
-      <Flex align="center" gap={2} mb={4}>
-        {icon}
-        <Heading size="sm">{title}</Heading>
-        <Badge rounded="md" colorScheme="gray">
+    <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+      <Flex align="center" gap="10px" mb="14px">
+        <Box color="brand.200" display="flex" fontSize="20px">
+          {icon}
+        </Box>
+        <Heading fontSize="15px" fontWeight="700">
+          {title}
+        </Heading>
+        <Badge
+          rounded="20px"
+          bg="blackAlpha.100"
+          _dark={{ bg: 'whiteAlpha.100' }}
+          color="TextSecondary"
+          px="9px"
+          fontSize="12px"
+        >
           {count}
         </Badge>
       </Flex>
@@ -157,7 +168,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
   };
 
   return (
-    <Section icon={<Icon as={MdGavel} color="Brand" />} title="Recent warnings" count={rows.length}>
+    <Section icon={<Icon as={MdGavel} />} title="Recent warnings" count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
           No warnings on record.
@@ -213,7 +224,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
 function Punishments({ rows }: { rows: ModerationPunishment[] }) {
   return (
     <Section
-      icon={<Icon as={MdTimer} color="Brand" />}
+      icon={<Icon as={MdTimer} />}
       title="Active timed punishments"
       count={rows.length}
     >
@@ -269,7 +280,7 @@ function Strikes({ data }: { data: ModerationStrikes }) {
 
   return (
     <Section
-      icon={<Icon as={MdShield} color="Brand" />}
+      icon={<Icon as={MdShield} />}
       title="Active strikes"
       count={data.users.length}
     >
@@ -339,7 +350,7 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
 
   return (
     <Section
-      icon={<Icon as={MdOutlineHowToReg} color="Brand" />}
+      icon={<Icon as={MdOutlineHowToReg} />}
       title="Ban appeals"
       count={pendingCount}
     >
@@ -423,7 +434,7 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
 
   return (
     <Section
-      icon={<Icon as={MdHistory} color="Brand" />}
+      icon={<Icon as={MdHistory} />}
       title="Dashboard activity"
       count={rows.length}
     >
@@ -493,10 +504,15 @@ const ModerationPage: NextPageWithLayout = () => {
   const audit = useAuditQuery(guild);
 
   return (
-    <Flex direction="column" gap={5}>
-      <Heading fontSize="2xl" fontWeight="600">
-        Moderation
-      </Heading>
+    <Flex direction="column" gap="16px">
+      <Box>
+        <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+          МОДЕРАЦИЯ
+        </Text>
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+          Предупреждения, наказания и апелляции
+        </Heading>
+      </Box>
       <QueryStatus
         query={query}
         loading={<ModerationSkeleton />}
