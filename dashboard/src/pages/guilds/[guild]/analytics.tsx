@@ -286,16 +286,26 @@ const AnalyticsPage: NextPageWithLayout = () => {
   const query = useAnalyticsQuery(guild, days);
 
   return (
-    <Flex direction="column" gap={5}>
-      <Flex align="center" gap={2} wrap="wrap">
-        <Icon as={MdInsights} fontSize="2xl" color="Brand" />
-        <Heading fontSize="2xl" fontWeight="600">
-          Analytics
-        </Heading>
+    <Flex direction="column" gap="18px">
+      <Flex align="flex-end" justify="space-between" gap="12px" wrap="wrap">
+        <Box>
+          <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+            АНАЛИТИКА
+          </Text>
+          <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+            Тренды и модерация
+          </Heading>
+          <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+            Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений —
+            содержимое, автор и время не хранятся.
+          </Text>
+        </Box>
         <Select
-          variant="main"
+          bg="CardBackground"
+          border="1px solid"
+          borderColor="CardBorder"
+          rounded="11px"
           w="auto"
-          ml="auto"
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
         >
@@ -306,10 +316,6 @@ const AnalyticsPage: NextPageWithLayout = () => {
           ))}
         </Select>
       </Flex>
-      <Text fontSize="sm" color="TextSecondary" mt={-3}>
-        Activity trends and moderation insights. The heatmap uses aggregate message counts only — no
-        content, author or per-message timestamps are stored.
-      </Text>
 
       <QueryStatus query={query} loading={<AnalyticsSkeleton />} error="Failed to load analytics.">
         {query.data && <AnalyticsBody data={query.data} />}

@@ -316,21 +316,28 @@ const TicketsPage: NextPageWithLayout = () => {
   );
 
   return (
-    <Flex direction="column" gap={5}>
-      <Flex align="center" gap={2}>
-        <Icon as={MdConfirmationNumber} fontSize="2xl" color="Brand" />
-        <Heading fontSize="2xl" fontWeight="600">
-          Tickets
-        </Heading>
-        {openCount > 0 && (
-          <Badge colorScheme="green" rounded="md">
-            {openCount} open
-          </Badge>
-        )}
-      </Flex>
-      <Text fontSize="sm" color="TextSecondary" mt={-3}>
-        Support tickets with priority, closing comments and full transcripts of closed conversations.
-      </Text>
+    <Flex direction="column" gap="18px">
+      <Box>
+        <Flex align="center" gap="12px" wrap="wrap">
+          <Box>
+            <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+              ТИКЕТЫ
+            </Text>
+            <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+              Поддержка
+            </Heading>
+          </Box>
+          {openCount > 0 && (
+            <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px="11px" py="4px" fontSize="12px">
+              {openCount} открыто
+            </Badge>
+          )}
+        </Flex>
+        <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+          Тикеты поддержки с приоритетом, комментариями при закрытии и полными транскриптами
+          закрытых обращений.
+        </Text>
+      </Box>
 
       <QueryStatus query={query} loading={<TicketsSkeleton />} error="Failed to load tickets.">
         <Box bg="CardBackground" rounded="2xl" p={5}>
