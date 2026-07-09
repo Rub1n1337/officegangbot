@@ -22,7 +22,14 @@ import {
   Wrap,
   WrapItem,
 } from '@chakra-ui/react';
-import { IoSearch, IoArrowBack, IoWarning, IoDocumentText, IoFileTrayFull } from 'react-icons/io5';
+import {
+  IoSearch,
+  IoArrowBack,
+  IoWarning,
+  IoDocumentText,
+  IoFileTrayFull,
+  IoChevronForward,
+} from 'react-icons/io5';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
@@ -195,7 +202,7 @@ function DetailCard({
   moderatorName?: string;
 }) {
   return (
-    <Box bg="CardBackground" rounded="2xl" p={5}>
+    <Box bg="CardBackground" rounded="18px" p="22px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
       <Flex align="center" gap={4} mb={4}>
         <Avatar src={data.avatar ?? undefined} name={data.displayName} size="lg" />
         <Box minW={0}>
@@ -367,19 +374,30 @@ const MembersPage: NextPageWithLayout = () => {
   const hasQuery = debounced.trim().length >= 2;
 
   return (
-    <Flex direction="column" gap={5}>
-      <Heading fontSize="2xl" fontWeight="600">
-        Members
-      </Heading>
+    <Flex direction="column" gap="18px">
+      <Box>
+        <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+          УЧАСТНИКИ
+        </Text>
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+          Поиск и модерация
+        </Heading>
+      </Box>
 
-      <InputGroup maxW={{ base: 'full', sm: 'md' }}>
-        <InputLeftElement pointerEvents="none">
+      <InputGroup maxW={{ base: 'full', sm: '420px' }}>
+        <InputLeftElement pointerEvents="none" h="full">
           <Icon as={IoSearch} color="TextSecondary" />
         </InputLeftElement>
         <Input
-          variant="main"
+          bg="CardBackground"
+          border="1px solid"
+          borderColor="CardBorder"
+          rounded="12px"
           pl="2.75rem"
-          placeholder="Search members by name…"
+          h="46px"
+          placeholder="Поиск по имени или @нику…"
+          _hover={{ borderColor: 'brand.400' }}
+          _focusVisible={{ borderColor: 'brand.400', boxShadow: 'none' }}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -423,18 +441,20 @@ const MembersPage: NextPageWithLayout = () => {
               w="full"
               aria-label={`View ${m.displayName}`}
               align="center"
-              gap={3}
-              p={3}
-              rounded="xl"
+              gap="13px"
+              p="12px 14px"
+              rounded="14px"
               cursor="pointer"
               bg="CardBackground"
-              transition="background 0.12s ease"
-              _hover={{ bg: 'blackAlpha.100', _dark: { bg: 'whiteAlpha.100' } }}
+              border="1px solid"
+              borderColor="CardBorder"
+              transition="border-color .15s ease, transform .15s ease"
+              _hover={{ borderColor: 'brand.400', transform: 'translateY(-2px)' }}
               _focusVisible={{ outline: '2px solid', outlineColor: 'Brand', outlineOffset: '2px' }}
               onClick={() => setSelected(m.id)}
             >
               <Avatar src={m.avatar} name={m.displayName} size="sm" />
-              <Box minW={0}>
+              <Box minW={0} flex="1">
                 <Text fontWeight="600" isTruncated>
                   {m.displayName}
                 </Text>
@@ -442,6 +462,7 @@ const MembersPage: NextPageWithLayout = () => {
                   @{m.name}
                 </Text>
               </Box>
+              <Icon as={IoChevronForward} color="TextSecondary" boxSize="18px" />
             </Flex>
           ))}
         </Flex>
