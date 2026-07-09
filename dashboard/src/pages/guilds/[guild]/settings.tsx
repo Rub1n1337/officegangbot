@@ -8,7 +8,6 @@ import {
   Icon,
   SimpleGrid,
   Skeleton,
-  Progress,
   SkeletonText,
   Spacer,
   Text,
@@ -18,18 +17,8 @@ import {
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import { StyledChart } from '@/components/chart/StyledChart';
-import {
-  MdPeople,
-  MdTag,
-  MdMic,
-  MdShield,
-  MdSpeed,
-  MdToggleOn,
-  MdDownload,
-  MdUpload,
-} from 'react-icons/md';
+import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
-import { IoCheckmarkCircle, IoArrowForward } from 'react-icons/io5';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -42,34 +31,36 @@ import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-tran
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { NotJoinedPanel } from '@/components/feature/NotJoinedPanel';
 import { getFeatures } from '@/utils/common';
+import { featureCategories } from '@/config/features';
+import { useFeatureMeta } from '@/config/feature-meta';
 import type { CustomFeatures, GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 
-function StatCard({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: ReactNode;
-  hint?: string;
-}) {
+// Iris metric card: label, big value, optional hint. Soft surface with a
+// hover lift, matching the mockup's overview stat tiles.
+function IrisStat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <Flex bg="CardBackground" rounded="2xl" p={5} direction="column" gap={2}>
-      <Flex align="center" gap={2} color="TextSecondary">
-        {icon}
-        <Text fontSize="sm">{label}</Text>
-      </Flex>
-      <Text fontSize="3xl" fontWeight="700" lineHeight="1.1">
+    <Box
+      bg="CardBackground"
+      border="1px solid"
+      borderColor="CardBorder"
+      rounded="16px"
+      p="16px"
+      boxShadow="normal"
+      transition="transform .18s ease, border-color .18s ease"
+      _hover={{ transform: 'translateY(-4px)', borderColor: 'brand.400' }}
+    >
+      <Text fontSize="12px" color="TextSecondary" fontWeight="500">
+        {label}
+      </Text>
+      <Text fontSize="27px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="9px">
         {value}
       </Text>
       {hint && (
-        <Text fontSize="xs" color="TextSecondary">
+        <Text fontSize="11px" color="TextSecondary" mt="6px">
           {hint}
         </Text>
       )}
-    </Flex>
+    </Box>
   );
 }
 
@@ -126,40 +117,23 @@ function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
   );
 }
 
-function Overview({ stats }: { stats: GuildStats }) {
+function OverviewMetrics({ stats }: { stats: GuildStats }) {
   return (
-    <Flex direction="column" gap={4}>
-      <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={3}>
-        <StatCard
-          icon={<Icon as={MdPeople} />}
-          label="Members"
-          value={stats.member_count.toLocaleString()}
-        />
-        <StatCard
-          icon={<Icon as={MdTag} />}
-          label="Text channels"
-          value={stats.text_channels}
-          hint={`${stats.channel_count} channels total`}
-        />
-        <StatCard
-          icon={<Icon as={MdMic} />}
-          label="Voice channels"
-          value={stats.voice_channels}
-        />
-        <StatCard icon={<Icon as={MdShield} />} label="Roles" value={stats.role_count} />
-        <StatCard
-          icon={<Icon as={MdToggleOn} />}
-          label="Enabled features"
-          value={stats.enabled_feature_count}
-        />
-        <StatCard
-          icon={<Icon as={MdSpeed} />}
-          label="Bot latency"
-          value={`${Math.round(stats.latency_ms)} ms`}
-        />
-      </SimpleGrid>
-      <TopXp rows={stats.top_xp} />
-    </Flex>
+    <Box
+      display="grid"
+      gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))"
+      gap="16px"
+    >
+      <IrisStat label="Участников" value={stats.member_count.toLocaleString('ru-RU')} />
+      <IrisStat
+        label="Каналов"
+        value={stats.channel_count}
+        hint={`${stats.text_channels} текстовых · ${stats.voice_channels} голосовых`}
+      />
+      <IrisStat label="Ролей" value={stats.role_count} />
+      <IrisStat label="Функций включено" value={stats.enabled_feature_count} />
+      <IrisStat label="Задержка бота" value={`${Math.round(stats.latency_ms)} мс`} />
+    </Box>
   );
 }
 
@@ -218,88 +192,212 @@ function LiveIndicator({ updatedAt }: { updatedAt: number }) {
 }
 
 // The setup essentials — every feature beyond these is optional, so the
-// checklist shouldn't push admins to enable all of them.
+// banner only nudges on these.
 const CORE_SETUP_FEATURES = ['moderation', 'logging', 'automod', 'welcome-message'];
+const GRADIENT = 'linear(135deg, #8B7CFF, #6E56F5)';
 
-// A gentle setup nudge over the core features only, ticked off once enabled.
-// Hidden when the essentials are configured, or dismissed (per guild, sticky).
-function OnboardingChecklist({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
-  const all = getFeatures().filter((f) => CORE_SETUP_FEATURES.includes(f.id));
+// Iris highlight banner: a setup nudge while core features are missing, a
+// positive note once they're all on.
+function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
   const enabled = new Set(enabledFeatures);
-  const done = all.filter((f) => enabled.has(f.id)).length;
-
-  // Dismissal is per guild and read after mount (localStorage isn't available
-  // during SSR; the brief flash is acceptable for a dismissable banner).
-  const dismissKey = `onboarding-hidden-${guild}`;
-  const [hidden, setHidden] = useState(true);
-  useEffect(() => {
-    setHidden(localStorage.getItem(dismissKey) === '1');
-  }, [dismissKey]);
-
-  if (hidden || done === all.length) return null;
-
-  const pct = Math.round((done / all.length) * 100);
+  const core = getFeatures().filter((f) => CORE_SETUP_FEATURES.includes(f.id));
+  const missing = core.filter((f) => !enabled.has(f.id));
+  const allDone = missing.length === 0;
+  const target = allDone
+    ? `/guilds/${guild}/analytics`
+    : `/guilds/${guild}/features/${missing[0].id}`;
 
   return (
-    <Box bg="CardBackground" rounded="2xl" p={5}>
-      <Flex align="center" justify="space-between" gap={3} mb={2} wrap="wrap">
-        <Heading size="sm">Finish setting up</Heading>
-        <Flex align="center" gap={3}>
-          <Text fontSize="sm" color="TextSecondary">
-            {done} / {all.length} configured
+    <Flex
+      align="center"
+      gap="16px"
+      bgGradient="linear(90deg, var(--chakra-colors-brandAlpha-100), transparent)"
+      border="1px solid"
+      borderColor="brandAlpha.100"
+      rounded="16px"
+      p="16px 20px"
+    >
+      <Flex w="42px" h="42px" rounded="12px" bg="brandAlpha.100" align="center" justify="center" flexShrink={0}>
+        <Icon as={MdBolt} boxSize="22px" color="brand.200" />
+      </Flex>
+      <Box flex="1" minW={0}>
+        <Text fontSize="14.5px" fontWeight="700">
+          {allDone
+            ? 'Базовые функции настроены'
+            : `Базовая настройка: ${core.length - missing.length} из ${core.length}`}
+        </Text>
+        <Text fontSize="13px" color="TextSecondary" mt="2px">
+          {allDone
+            ? 'Загляни в аналитику или добавь новые функции ниже.'
+            : 'Включи ключевые функции, чтобы бот заработал в полную силу.'}
+        </Text>
+      </Box>
+      <Button
+        as={Link}
+        href={target}
+        flexShrink={0}
+        rounded="11px"
+        px="16px"
+        h="40px"
+        color="white"
+        bgGradient={GRADIENT}
+        boxShadow="0 8px 20px -8px rgba(110,86,245,.7)"
+        _hover={{ filter: 'brightness(1.08)' }}
+        rightIcon={<Icon as={MdArrowForward} boxSize="17px" />}
+      >
+        {allDone ? 'Аналитика' : 'Продолжить'}
+      </Button>
+    </Flex>
+  );
+}
+
+// One feature card in the overview grid: gradient icon + green dot when on,
+// accent-soft icon when off; a Настроить (on) / Включить (off) action that
+// opens the feature's config page.
+function FeatureCard({
+  guild,
+  feature,
+  on,
+  meta,
+}: {
+  guild: string;
+  feature: ReturnType<typeof getFeatures>[number];
+  on: boolean;
+  meta: ReturnType<typeof useFeatureMeta>;
+}) {
+  const m = meta.feature(feature.id, feature.name, feature.description);
+  return (
+    <Flex
+      direction="column"
+      gap="12px"
+      bg="CardBackground"
+      border="1px solid"
+      borderColor="CardBorder"
+      rounded="16px"
+      p="16px"
+      boxShadow="normal"
+      transition="transform .18s ease, border-color .18s ease"
+      _hover={{ transform: 'translateY(-4px)', borderColor: 'brand.400' }}
+    >
+      <Flex align="flex-start" gap="12px">
+        <Flex
+          w="42px"
+          h="42px"
+          rounded="12px"
+          align="center"
+          justify="center"
+          flexShrink={0}
+          fontSize="22px"
+          color={on ? 'white' : 'brand.200'}
+          {...(on ? { bgGradient: GRADIENT } : { bg: 'brandAlpha.100' })}
+        >
+          {feature.icon}
+        </Flex>
+        <Box flex="1" minW={0}>
+          <Flex align="center" gap="7px">
+            <Text fontWeight="600" fontSize="14.5px">
+              {m.name}
+            </Text>
+            {on && <Box w="7px" h="7px" rounded="full" bg="green.400" flexShrink={0} />}
+          </Flex>
+          <Text fontSize="12.5px" color="TextSecondary" mt="4px" lineHeight="1.4" noOfLines={2}>
+            {m.description}
           </Text>
+        </Box>
+      </Flex>
+      <Flex justify="flex-end">
+        {on ? (
           <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => {
-              localStorage.setItem(dismissKey, '1');
-              setHidden(true);
-            }}
+            as={Link}
+            href={`/guilds/${guild}/features/${feature.id}`}
+            size="sm"
+            variant="outline"
+            rounded="10px"
+            leftIcon={<Icon as={MdTune} boxSize="16px" />}
           >
-            Hide
+            Настроить
           </Button>
+        ) : (
+          <Button
+            as={Link}
+            href={`/guilds/${guild}/features/${feature.id}`}
+            size="sm"
+            rounded="10px"
+            color="white"
+            bgGradient={GRADIENT}
+            boxShadow="0 6px 16px -7px rgba(110,86,245,.7)"
+            _hover={{ filter: 'brightness(1.08)' }}
+            leftIcon={<Icon as={MdAdd} boxSize="16px" />}
+          >
+            Включить
+          </Button>
+        )}
+      </Flex>
+    </Flex>
+  );
+}
+
+// The features grid, grouped by category, with all / enabled / disabled pills.
+function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
+  const enabled = new Set(enabledFeatures);
+  const meta = useFeatureMeta();
+  const [filter, setFilter] = useState<'all' | 'on' | 'off'>('all');
+  const all = getFeatures();
+  const enabledCount = all.filter((f) => enabled.has(f.id)).length;
+  const pass = (id: string) =>
+    filter === 'all' ? true : filter === 'on' ? enabled.has(id) : !enabled.has(id);
+  const pills: { k: 'all' | 'on' | 'off'; label: string }[] = [
+    { k: 'all', label: 'Все' },
+    { k: 'on', label: 'Включённые' },
+    { k: 'off', label: 'Выключенные' },
+  ];
+
+  return (
+    <Flex direction="column" gap="14px">
+      <Flex align="center" justify="space-between" wrap="wrap" gap="12px">
+        <Flex align="center" gap="11px">
+          <Heading fontSize="18px" fontWeight="700">
+            Функции
+          </Heading>
+          <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px="10px" py="3px" fontSize="12px">
+            {enabledCount} включено
+          </Badge>
+        </Flex>
+        <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p="3px" gap="2px">
+          {pills.map((p) => (
+            <Button
+              key={p.k}
+              size="sm"
+              rounded="8px"
+              fontSize="13px"
+              fontWeight={filter === p.k ? '600' : '500'}
+              onClick={() => setFilter(p.k)}
+              {...(filter === p.k
+                ? { color: 'white', bg: 'Brand' }
+                : { variant: 'ghost', color: 'TextSecondary' })}
+            >
+              {p.label}
+            </Button>
+          ))}
         </Flex>
       </Flex>
-      <Progress value={pct} size="sm" rounded="full" colorScheme="brand" mb={4} />
-      <SimpleGrid columns={{ base: 1, md: 2 }} gap={2}>
-        {all.map((feature) => {
-          const isDone = enabled.has(feature.id);
-          return (
-            <Flex
-              key={feature.id}
-              as={Link}
-              href={`/guilds/${guild}/features/${feature.id}`}
-              align="center"
-              gap={3}
-              px={3}
-              py={2.5}
-              rounded="xl"
-              bg="blackAlpha.200"
-              _dark={{ bg: 'whiteAlpha.50' }}
-              _hover={{ bg: 'blackAlpha.300', _dark: { bg: 'whiteAlpha.100' } }}
-              opacity={isDone ? 0.65 : 1}
-            >
-              {isDone ? (
-                <Icon as={IoCheckmarkCircle} color="green.400" boxSize={5} />
-              ) : (
-                <Box color="Brand" display="flex">
-                  {feature.icon}
-                </Box>
-              )}
-              <Text
-                flex={1}
-                fontWeight={isDone ? '400' : '600'}
-                textDecoration={isDone ? 'line-through' : 'none'}
-                isTruncated
-              >
-                {feature.name}
-              </Text>
-              {!isDone && <Icon as={IoArrowForward} color="TextSecondary" />}
-            </Flex>
-          );
-        })}
-      </SimpleGrid>
-    </Box>
+      {featureCategories.map((cat) => {
+        const items = all.filter((f) => f.category === cat.id && pass(f.id));
+        if (items.length === 0) return null;
+        return (
+          <Flex key={cat.id} direction="column" gap="14px">
+            <Text fontSize="11px" fontWeight="700" letterSpacing="0.08em" color="TextSecondary" textTransform="uppercase">
+              {meta.category(cat.id, cat.label)}
+            </Text>
+            <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(290px, 1fr))" gap="14px">
+              {items.map((f) => (
+                <FeatureCard key={f.id} guild={guild} feature={f} on={enabled.has(f.id)} meta={meta} />
+              ))}
+            </Box>
+          </Flex>
+        );
+      })}
+    </Flex>
   );
 }
 
@@ -464,31 +562,42 @@ const GuildOverviewPage: NextPageWithLayout = () => {
     return <NotJoinedPanel guild={guild} />;
   }
 
+  const enabledFeatures = infoQuery.data?.enabledFeatures ?? [];
+
   return (
-    <Flex direction="column" gap={5}>
-      <Flex align="center" gap={3} wrap="wrap">
-        <Heading fontSize="2xl" fontWeight="600">
-          Overview
-        </Heading>
-        {statsQuery.data?.online ? (
-          <LiveIndicator updatedAt={statsQuery.dataUpdatedAt} />
-        ) : statsQuery.data ? (
-          <Badge colorScheme="red" rounded="md" px={2}>
-            Bot offline
-          </Badge>
-        ) : null}
-        <Spacer />
-        {infoQuery.data && <BotLanguage guild={guild} locale={infoQuery.data.locale ?? 'en'} />}
+    <Flex direction="column" gap="22px">
+      <Flex align="flex-end" justify="space-between" gap="12px" wrap="wrap">
+        <Box>
+          <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+            ОБЗОР
+          </Text>
+          <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+            Здоровье сервера
+          </Heading>
+          <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+            Ключевые метрики и функции бота — на одном экране.
+          </Text>
+        </Box>
+        <Flex align="center" gap={3}>
+          {statsQuery.data?.online ? (
+            <LiveIndicator updatedAt={statsQuery.dataUpdatedAt} />
+          ) : statsQuery.data ? (
+            <Badge colorScheme="red" rounded="md" px={2}>
+              Бот офлайн
+            </Badge>
+          ) : null}
+          {infoQuery.data && <BotLanguage guild={guild} locale={infoQuery.data.locale ?? 'en'} />}
+        </Flex>
       </Flex>
-      {infoQuery.data && (
-        <OnboardingChecklist
-          guild={guild}
-          enabledFeatures={infoQuery.data.enabledFeatures ?? []}
-        />
-      )}
+
       <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error="Failed to load guild stats.">
-        {statsQuery.data && <Overview stats={statsQuery.data} />}
+        {statsQuery.data && <OverviewMetrics stats={statsQuery.data} />}
       </QueryStatus>
+
+      {infoQuery.data && <HighlightBanner guild={guild} enabledFeatures={enabledFeatures} />}
+      {infoQuery.data && <FeaturesSection guild={guild} enabledFeatures={enabledFeatures} />}
+
+      {statsQuery.data && statsQuery.data.top_xp.length > 0 && <TopXp rows={statsQuery.data.top_xp} />}
       <ConfigTransfer guild={guild} />
     </Flex>
   );
