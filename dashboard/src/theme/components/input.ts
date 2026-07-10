@@ -8,32 +8,37 @@ const { definePartsStyle, defineMultiStyleConfig } = createMultiStyleConfigHelpe
 
 const main = definePartsStyle({
   field: {
-    border: '2px solid',
-    borderRadius: '16px',
+    border: '1px solid',
+    borderRadius: '12px',
     fontSize: 'sm',
-    p: '20px',
+    h: '44px',
+    px: '14px',
     _light: {
       color: 'secondaryGray.900',
-      bg: 'transparent',
+      bg: 'secondaryGray.100',
       _placeholder: {
-        color: 'secondaryGray.700',
+        color: 'secondaryGray.500',
       },
       _invalid: {
         borderColor: 'red.400',
       },
-      borderColor: 'secondaryGray.400',
+      borderColor: 'blackAlpha.200',
+      _hover: { borderColor: 'brand.400' },
+      _focus: { borderColor: 'brand.400', boxShadow: 'none' },
     },
 
     _dark: {
       color: 'white',
-      bg: 'navy.800',
+      bg: 'navy.600',
       _placeholder: {
-        color: 'secondaryGray.600',
+        color: 'navy.100',
       },
       _invalid: {
         borderColor: 'red.400',
       },
-      borderColor: 'navy.600',
+      borderColor: 'whiteAlpha.200',
+      _hover: { borderColor: 'brand.400' },
+      _focus: { borderColor: 'brand.400', boxShadow: 'none' },
     },
   },
 });

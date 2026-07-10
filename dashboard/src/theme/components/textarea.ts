@@ -14,15 +14,17 @@ export const textareaStyles = defineStyleConfig({
   })),
   variants: {
     main: defineStyle((props: any) => ({
-      bg: mode('transparent', 'navy.800')(props),
-      border: '2px solid',
+      bg: mode('secondaryGray.100', 'navy.600')(props),
+      border: '1px solid',
       color: mode('secondaryGray.900', 'white')(props),
-      borderColor: mode('secondaryGray.400', 'navy.600')(props),
-      borderRadius: '16px',
+      borderColor: mode('blackAlpha.200', 'whiteAlpha.200')(props),
+      borderRadius: '12px',
       fontSize: 'sm',
-      p: '20px',
+      p: '13px 14px',
+      _hover: { borderColor: 'brand.400' },
+      _focus: { borderColor: 'brand.400', boxShadow: 'none' },
       _placeholder: {
-        color: mode('secondaryGray.700', 'secondaryGray.600')(props),
+        color: mode('secondaryGray.500', 'navy.100')(props),
       },
     })),
     glass: {
