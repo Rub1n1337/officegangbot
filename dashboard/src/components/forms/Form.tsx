@@ -22,11 +22,13 @@ export function Form(props: FormControlProps) {
       as={Flex}
       direction="column"
       bg="CardBackground"
-      rounded="3xl"
-      p={5}
+      rounded="16px"
+      p="20px"
       boxShadow="normal"
       borderWidth="1px"
       borderColor="CardBorder"
+      transition="border-color .15s ease"
+      _hover={{ borderColor: 'brand.400' }}
       {...props}
     >
       {props.children}
@@ -63,7 +65,7 @@ export function FormCard({
   return (
     <Form isRequired={required} isInvalid={error != null} {...baseControl}>
       <Flex align="center" gap={1.5}>
-        <FormLabel fontSize={{ base: '16px', md: 'lg' }} fontWeight="medium" mb={0}>
+        <FormLabel fontSize="15px" fontWeight="600" mb={0}>
           {label}
         </FormLabel>
         {tooltip != null && (
@@ -91,7 +93,7 @@ export function FormCard({
           </Tooltip>
         )}
       </Flex>
-      <Text fontSize={{ base: 'sm', md: 'md' }} color="TextSecondary">
+      <Text fontSize="13px" color="TextSecondary">
         {description}
       </Text>
       <Spacer mt={2} />
