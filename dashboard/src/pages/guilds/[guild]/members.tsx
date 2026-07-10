@@ -30,7 +30,7 @@ import {
   IoFileTrayFull,
   IoChevronForward,
 } from 'react-icons/io5';
-import { useRef, useState } from 'react';
+import { ReactNode, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
@@ -49,7 +49,48 @@ function fmtDate(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('ru-RU', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Russian plural for warnings: 1 предупреждение, 2 предупреждения, 5 предупреждений.
+function pluralStrikes(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return 'активный страйк';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'активных страйка';
+  return 'активных страйков';
+}
+
+// Iris "inset" row surface — a defined step below the card.
+const INSET = { bg: 'secondaryGray.100', _dark: { bg: 'navy.600' } };
+
+const ACTION_RU: Record<ModerateAction, string> = {
+  warn: 'Предупредить',
+  mute: 'Мут',
+  unmute: 'Снять мут',
+  kick: 'Кик',
+  ban: 'Бан',
+};
+
+// A rounded status pill in one of the Iris tones.
+function Pill({ children, color, bg, dark }: { children: ReactNode; color: string; bg: string; dark?: object }) {
+  return (
+    <Box as="span" fontSize="12px" fontWeight="600" rounded="20px" px="12px" py="5px" color={color} bg={bg} _dark={dark}>
+      {children}
+    </Box>
+  );
+}
+
+// A uppercase section label with an accent-ink icon.
+function SectionLabel({ icon, children }: { icon: any; children: ReactNode }) {
+  return (
+    <Flex align="center" gap="8px" mb="8px">
+      <Icon as={icon} color="brand.200" boxSize="16px" />
+      <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary">
+        {children}
+      </Text>
+    </Flex>
+  );
 }
 
 function ModerateBar({
@@ -94,41 +135,51 @@ function ModerateBar({
     );
   };
 
+  const safeBtn = {
+    size: 'sm' as const,
+    rounded: '10px',
+    variant: 'outline' as const,
+    borderColor: 'CardBorder',
+    _hover: { bg: 'blackAlpha.50', borderColor: 'brand.400', _dark: { bg: 'whiteAlpha.50' } },
+  };
+  const dangerBtn = {
+    size: 'sm' as const,
+    rounded: '10px',
+    variant: 'outline' as const,
+    color: 'red.400',
+    borderColor: 'red.400',
+    _hover: { bg: 'rgba(241,106,106,0.1)' },
+  };
+
   return (
-    <Box mt={4}>
-      <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary" mb={2}>
-        Actions
+    <Box borderTop="1px solid" borderColor="CardBorder" pt="16px">
+      <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb="10px">
+        Действия
       </Text>
-      <Wrap>
+      <Wrap spacing="8px">
         <WrapItem>
-          <Button size="sm" onClick={() => open('warn')} isDisabled={!member.inServer}>
-            Warn
+          <Button {...safeBtn} onClick={() => open('warn')} isDisabled={!member.inServer}>
+            Предупредить
           </Button>
         </WrapItem>
         <WrapItem>
-          <Button size="sm" onClick={() => open('mute')} isDisabled={!member.inServer}>
-            Mute
+          <Button {...safeBtn} onClick={() => open('mute')} isDisabled={!member.inServer}>
+            Мут
           </Button>
         </WrapItem>
         <WrapItem>
-          <Button size="sm" variant="outline" onClick={() => open('unmute')} isDisabled={!member.inServer}>
-            Unmute
+          <Button {...safeBtn} onClick={() => open('unmute')} isDisabled={!member.inServer}>
+            Снять мут
           </Button>
         </WrapItem>
         <WrapItem>
-          <Button
-            size="sm"
-            colorScheme="orange"
-            variant="outline"
-            onClick={() => open('kick')}
-            isDisabled={!member.inServer}
-          >
-            Kick
+          <Button {...dangerBtn} onClick={() => open('kick')} isDisabled={!member.inServer}>
+            Кик
           </Button>
         </WrapItem>
         <WrapItem>
-          <Button size="sm" colorScheme="red" onClick={() => open('ban')}>
-            Ban
+          <Button {...dangerBtn} onClick={() => open('ban')}>
+            Бан
           </Button>
         </WrapItem>
       </Wrap>
@@ -141,13 +192,13 @@ function ModerateBar({
       >
         <AlertDialogOverlay>
           <AlertDialogContent bg="CardBackground" mx={4}>
-            <AlertDialogHeader textTransform="capitalize">
-              {pending} {member.displayName}?
+            <AlertDialogHeader>
+              {pending ? ACTION_RU[pending] : ''} — {member.displayName}?
             </AlertDialogHeader>
             <AlertDialogBody>
               {pending !== 'unmute' && (
                 <Textarea
-                  placeholder="Reason (optional)"
+                  placeholder="Причина (необязательно)"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   mb={pending === 'mute' ? 3 : 0}
@@ -155,30 +206,29 @@ function ModerateBar({
               )}
               {pending === 'mute' && (
                 <Select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
-                  <option value={10}>10 minutes</option>
-                  <option value={60}>1 hour</option>
-                  <option value={1440}>1 day</option>
-                  <option value={10080}>7 days</option>
+                  <option value={10}>10 минут</option>
+                  <option value={60}>1 час</option>
+                  <option value={1440}>1 день</option>
+                  <option value={10080}>7 дней</option>
                 </Select>
               )}
               {danger && (
                 <Text fontSize="sm" color="red.400" mt={3}>
-                  This can’t be undone from the dashboard.
+                  Это нельзя отменить из дашборда.
                 </Text>
               )}
             </AlertDialogBody>
             <AlertDialogFooter>
               <Button ref={cancelRef} onClick={() => setPending(null)} variant="ghost">
-                Cancel
+                Отмена
               </Button>
               <Button
                 colorScheme={danger ? 'red' : 'brand'}
                 ml={3}
                 isLoading={mutation.isLoading}
                 onClick={confirm}
-                textTransform="capitalize"
               >
-                {pending}
+                {pending ? ACTION_RU[pending] : ''}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -202,55 +252,80 @@ function DetailCard({
   moderatorName?: string;
 }) {
   return (
-    <Box bg="CardBackground" rounded="18px" p="22px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
-      <Flex align="center" gap={4} mb={4}>
+    <Flex
+      direction="column"
+      gap="18px"
+      bg="CardBackground"
+      rounded="18px"
+      p="22px"
+      border="1px solid"
+      borderColor="CardBorder"
+      boxShadow="normal"
+    >
+      <Flex align="center" gap="14px">
         <Avatar src={data.avatar ?? undefined} name={data.displayName} size="lg" />
-        <Box minW={0}>
-          <Heading size="md" isTruncated>
+        <Box flex="1" minW={0}>
+          <Heading fontSize="20px" fontWeight="700" isTruncated>
             {data.displayName}
           </Heading>
-          <Text fontSize="sm" color="TextSecondary">
-            @{data.name} · {data.id}
+          <Text fontSize="13px" color="TextSecondary">
+            @{data.name}
+            {data.inServer && ` · присоединился ${fmtDate(data.joinedAt)}`}
           </Text>
         </Box>
-        <Button ml="auto" size="sm" variant="ghost" leftIcon={<Icon as={IoArrowBack} />} onClick={onBack}>
-          Back
+        <Button
+          size="sm"
+          variant="outline"
+          rounded="10px"
+          borderColor="CardBorder"
+          color="TextSecondary"
+          leftIcon={<Icon as={IoArrowBack} />}
+          onClick={onBack}
+          _hover={{ bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
+        >
+          Назад
         </Button>
       </Flex>
 
-      <Flex gap={3} wrap="wrap" mb={4}>
-        <Badge colorScheme="purple" rounded="md" px={2} py={1}>
-          Level {data.level} · {data.xp.toLocaleString()} XP
-        </Badge>
-        <Badge colorScheme={data.inServer ? 'green' : 'gray'} rounded="md" px={2} py={1}>
-          {data.inServer ? `Joined ${fmtDate(data.joinedAt)}` : 'Not in server'}
-        </Badge>
+      <Flex gap="10px" wrap="wrap">
+        <Pill color="brand.200" bg="brandAlpha.100">
+          Уровень {data.level} · {data.xp.toLocaleString('ru-RU')} XP
+        </Pill>
         {(data.activeStrikes ?? 0) > 0 && (
-          <Badge colorScheme="orange" rounded="md" px={2} py={1}>
-            {data.activeStrikes} active strike{data.activeStrikes === 1 ? '' : 's'}
-          </Badge>
+          <Pill color="orange.400" bg="rgba(245,177,76,0.14)">
+            {data.activeStrikes} {pluralStrikes(data.activeStrikes)}
+          </Pill>
+        )}
+        {!data.inServer && (
+          <Pill color="TextSecondary" bg="blackAlpha.100" dark={{ bg: 'whiteAlpha.100' }}>
+            Не на сервере
+          </Pill>
         )}
       </Flex>
 
       {data.roles.length > 0 && (
-        <Box mb={4}>
-          <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary" mb={2}>
-            Roles
+        <Box>
+          <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb="8px">
+            Роли
           </Text>
           <Wrap>
             {data.roles.map((r) => {
               const colored = r.color !== 0;
               return (
                 <WrapItem key={r.id}>
-                  <Badge
-                    rounded="md"
-                    variant="subtle"
-                    {...(colored
-                      ? { color: toRGB(r.color), borderWidth: '1px', borderColor: toRGB(r.color) }
-                      : {})}
+                  <Box
+                    fontSize="12px"
+                    fontWeight="500"
+                    rounded="8px"
+                    px="11px"
+                    py="4px"
+                    border="1px solid"
+                    borderColor="CardBorder"
+                    {...INSET}
+                    {...(colored ? { color: toRGB(r.color) } : {})}
                   >
                     {r.name}
-                  </Badge>
+                  </Box>
                 </WrapItem>
               );
             })}
@@ -259,23 +334,18 @@ function DetailCard({
       )}
 
       <Box>
-        <Flex align="center" gap={2} mb={2}>
-          <Icon as={IoWarning} color="Brand" />
-          <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary">
-            Warnings ({data.warnings.length})
-          </Text>
-        </Flex>
+        <SectionLabel icon={IoWarning}>Предупреждения ({data.warnings.length})</SectionLabel>
         {data.warnings.length === 0 ? (
-          <Text fontSize="sm" color="TextSecondary">
-            No warnings on record.
+          <Text fontSize="13px" color="TextSecondary">
+            Предупреждений нет.
           </Text>
         ) : (
-          <Flex direction="column" gap={2}>
+          <Flex direction="column" gap="8px">
             {data.warnings.map((w) => (
-              <Box key={w.id} p={3} rounded="xl" bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.50' }}>
-                <Text fontSize="sm">{w.reason}</Text>
-                <Text fontSize="xs" color="TextSecondary">
-                  by {w.moderatorName} · {fmtDate(w.createdAt)}
+              <Box key={w.id} rounded="11px" p="11px 13px" {...INSET}>
+                <Text fontSize="13.5px">{w.reason}</Text>
+                <Text fontSize="11.5px" color="TextSecondary" mt="2px">
+                  {w.moderatorName} · {fmtDate(w.createdAt)}
                 </Text>
               </Box>
             ))}
@@ -284,23 +354,18 @@ function DetailCard({
       </Box>
 
       <Box>
-        <Flex align="center" gap={2} mb={2}>
-          <Icon as={IoDocumentText} color="Brand" />
-          <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary">
-            Mod notes ({data.notes?.length ?? 0})
-          </Text>
-        </Flex>
+        <SectionLabel icon={IoDocumentText}>Заметки модераторов ({data.notes?.length ?? 0})</SectionLabel>
         {!data.notes || data.notes.length === 0 ? (
-          <Text fontSize="sm" color="TextSecondary">
-            No notes. Add one with /note in Discord — the member never sees them.
+          <Text fontSize="13px" color="TextSecondary">
+            Заметок нет. Добавьте через /note в Discord — участник их не видит.
           </Text>
         ) : (
-          <Flex direction="column" gap={2}>
+          <Flex direction="column" gap="8px">
             {data.notes.map((n) => (
-              <Box key={n.id} p={3} rounded="xl" bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.50' }}>
-                <Text fontSize="sm" whiteSpace="pre-wrap">{n.note}</Text>
-                <Text fontSize="xs" color="TextSecondary">
-                  #{n.id} · by {n.authorName ?? '—'} · {fmtDate(n.createdAt)}
+              <Box key={n.id} rounded="11px" p="11px 13px" {...INSET}>
+                <Text fontSize="13.5px" whiteSpace="pre-wrap">{n.note}</Text>
+                <Text fontSize="11.5px" color="TextSecondary" mt="2px">
+                  #{n.id} · {n.authorName ?? '—'} · {fmtDate(n.createdAt)}
                 </Text>
               </Box>
             ))}
@@ -309,38 +374,24 @@ function DetailCard({
       </Box>
 
       <Box>
-        <Flex align="center" gap={2} mb={2}>
-          <Icon as={IoFileTrayFull} color="Brand" />
-          <Text fontSize="xs" fontWeight="700" textTransform="uppercase" color="TextSecondary">
-            Recent cases ({data.cases?.length ?? 0})
-          </Text>
-        </Flex>
+        <SectionLabel icon={IoFileTrayFull}>Недавние кейсы ({data.cases?.length ?? 0})</SectionLabel>
         {!data.cases || data.cases.length === 0 ? (
-          <Text fontSize="sm" color="TextSecondary">
-            No moderation cases on record.
+          <Text fontSize="13px" color="TextSecondary">
+            Кейсов модерации нет.
           </Text>
         ) : (
-          <Flex direction="column" gap={2}>
+          <Flex direction="column" gap="8px">
             {data.cases.map((c) => (
-              <Flex
-                key={c.caseNumber}
-                align="center"
-                justify="space-between"
-                gap={3}
-                p={3}
-                rounded="xl"
-                bg="blackAlpha.200"
-                _dark={{ bg: 'whiteAlpha.50' }}
-              >
+              <Flex key={c.caseNumber} align="center" justify="space-between" gap="10px" rounded="11px" p="11px 13px" {...INSET}>
                 <Box minW={0}>
-                  <Text fontSize="sm" fontWeight="600" isTruncated>
+                  <Text fontSize="13.5px" fontWeight="600" isTruncated textTransform="capitalize">
                     #{c.caseNumber} · {c.action}
                   </Text>
-                  <Text fontSize="xs" color="TextSecondary" noOfLines={1}>
-                    {c.reason ?? 'No reason provided'} · by {c.moderatorName ?? '—'}
+                  <Text fontSize="11.5px" color="TextSecondary" noOfLines={1}>
+                    {c.reason ?? 'Без причины'} · {c.moderatorName ?? '—'}
                   </Text>
                 </Box>
-                <Text fontSize="xs" color="TextSecondary" flexShrink={0}>
+                <Text fontSize="11.5px" color="TextSecondary" flexShrink={0}>
                   {fmtDate(c.createdAt)}
                 </Text>
               </Flex>
@@ -355,7 +406,7 @@ function DetailCard({
         moderatorId={moderatorId}
         moderatorName={moderatorName}
       />
-    </Box>
+    </Flex>
   );
 }
 
@@ -418,10 +469,10 @@ const MembersPage: NextPageWithLayout = () => {
             moderatorName={moderatorName}
           />
         ) : (
-          <Text color="TextSecondary">Couldn’t load this member.</Text>
+          <Text color="TextSecondary">Не удалось загрузить участника.</Text>
         )
       ) : !hasQuery ? (
-        <Text color="TextSecondary">Type at least 2 characters to search.</Text>
+        <Text color="TextSecondary">Введите минимум 2 символа для поиска.</Text>
       ) : search.isLoading ? (
         <Flex direction="column" gap={2}>
           <Skeleton h="56px" rounded="xl" />
@@ -429,7 +480,7 @@ const MembersPage: NextPageWithLayout = () => {
           <Skeleton h="56px" rounded="xl" />
         </Flex>
       ) : (search.data?.length ?? 0) === 0 ? (
-        <Text color="TextSecondary">No members match “{debounced}”.</Text>
+        <Text color="TextSecondary">Никого не найдено по «{debounced}».</Text>
       ) : (
         <Flex direction="column" gap={2}>
           {search.data!.map((m) => (
