@@ -34,31 +34,40 @@ import type {
   ModerationWarning,
 } from '@/config/types/custom-types';
 
+// Russian plural: 1 страйк, 2 страйка, 5 страйков.
+function pluralStrikes(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return 'страйк';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'страйка';
+  return 'страйков';
+}
+
 function expiresIn(iso: string | null): string {
   if (!iso) return '';
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
   const s = Math.floor((d - Date.now()) / 1000);
-  if (s <= 0) return 'expiring';
+  if (s <= 0) return 'истекает';
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m left`;
+  if (m < 60) return `${m}м осталось`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h left`;
-  return `${Math.floor(h / 24)}d left`;
+  if (h < 24) return `${h}ч осталось`;
+  return `${Math.floor(h / 24)}д осталось`;
 }
 
 // When a user's oldest active strike will drop out of the decay window.
 function decayLabel(iso: string | null): string {
-  if (!iso) return 'never expires';
+  if (!iso) return 'не истекает';
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
   const s = Math.floor((d - Date.now()) / 1000);
-  if (s <= 0) return 'expiring now';
+  if (s <= 0) return 'истекает';
   const m = Math.floor(s / 60);
-  if (m < 60) return `~${m}m left`;
+  if (m < 60) return `~${m}м осталось`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `~${h}h left`;
-  return `~${Math.floor(h / 24)}d left`;
+  if (h < 24) return `~${h}ч осталось`;
+  return `~${Math.floor(h / 24)}д осталось`;
 }
 
 // Colour a strike count by how close it is to the first enabled escalation tier.
@@ -73,10 +82,50 @@ function strikeColor(count: number, s: ModerationStrikes): string {
 
 function policyLabel(s: ModerationStrikes): string {
   const parts: string[] = [];
-  if (s.muteAt > 0) parts.push(`mute at ${s.muteAt}`);
-  if (s.kickAt > 0) parts.push(`kick at ${s.kickAt}`);
-  if (s.banAt > 0) parts.push(`ban at ${s.banAt}`);
+  if (s.muteAt > 0) parts.push(`мут при ${s.muteAt}`);
+  if (s.kickAt > 0) parts.push(`кик при ${s.kickAt}`);
+  if (s.banAt > 0) parts.push(`бан при ${s.banAt}`);
   return parts.join(' · ');
+}
+
+// Iris "inset" row surface — a defined step below the card (visible on both
+// themes), unlike the near-invisible whiteAlpha the rows used before.
+const INSET = { bg: 'secondaryGray.100', _dark: { bg: 'navy.600' } };
+
+// Soft-tinted status pill (matches the mockup's colored labels).
+const PILL_TONE: Record<string, { color: string; bg: string; darkBg?: string }> = {
+  red: { color: 'red.400', bg: 'rgba(241,106,106,0.14)' },
+  amber: { color: 'orange.400', bg: 'rgba(245,177,76,0.14)' },
+  green: { color: 'green.400', bg: 'rgba(63,208,126,0.14)' },
+  gray: { color: 'TextSecondary', bg: 'blackAlpha.100', darkBg: 'whiteAlpha.100' },
+};
+
+function Pill({ tone, children }: { tone: keyof typeof PILL_TONE; children: ReactNode }) {
+  const t = PILL_TONE[tone] ?? PILL_TONE.gray;
+  return (
+    <Box
+      as="span"
+      fontSize="11px"
+      fontWeight="700"
+      rounded="7px"
+      px="10px"
+      py="3px"
+      flexShrink={0}
+      color={t.color}
+      bg={t.bg}
+      _dark={t.darkBg ? { bg: t.darkBg } : undefined}
+    >
+      {children}
+    </Box>
+  );
+}
+
+// Map an AutoMod-strike severity colour name to a pill tone.
+function toneFromScheme(scheme: string): keyof typeof PILL_TONE {
+  if (scheme === 'red') return 'red';
+  if (scheme === 'orange' || scheme === 'yellow') return 'amber';
+  if (scheme === 'green') return 'green';
+  return 'gray';
 }
 
 function Section({
@@ -168,43 +217,38 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
   };
 
   return (
-    <Section icon={<Icon as={MdGavel} />} title="Recent warnings" count={rows.length}>
+    <Section icon={<Icon as={MdGavel} />} title="Недавние предупреждения" count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          No warnings on record.
+          Предупреждений нет.
         </Text>
       ) : (
-        <Flex direction="column" gap={2}>
+        <Flex direction="column" gap="8px">
           {shown.map((w) => (
-            <Flex
-              key={w.id}
-              align="center"
-              justify="space-between"
-              gap={3}
-              p={3}
-              rounded="xl"
-              bg="blackAlpha.200"
-              _dark={{ bg: 'whiteAlpha.50' }}
-            >
-              <Box minW={0}>
-                <Flex align="center" gap={2} wrap="wrap">
-                  <Text fontWeight="600" isTruncated>
-                    {w.userName}
-                  </Text>
-                  <Text fontSize="xs" color="TextSecondary">
-                    by {w.moderatorName} · {timeAgo(w.createdAt)}
-                  </Text>
-                </Flex>
-                <Text fontSize="sm" color="TextSecondary" noOfLines={2}>
+            <Flex key={w.id} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+              <Box flex="1" minW={0}>
+                <Text fontSize="13.5px" fontWeight="600" isTruncated>
+                  {w.userName}
+                </Text>
+                <Text fontSize="12.5px" color="TextSecondary" noOfLines={2}>
                   {w.reason}
+                </Text>
+                <Text fontSize="11.5px" color="TextSecondary" opacity={0.75} mt="2px">
+                  {w.moderatorName} · {timeAgo(w.createdAt)}
                 </Text>
               </Box>
               <IconButton
-                aria-label="Delete warning"
+                aria-label="Удалить предупреждение"
                 icon={<MdDelete />}
-                size="sm"
-                variant="ghost"
-                colorScheme="red"
+                w="34px"
+                h="34px"
+                minW="34px"
+                rounded="9px"
+                variant="outline"
+                borderColor="CardBorder"
+                color="TextSecondary"
+                _hover={{ color: 'red.400', borderColor: 'red.400' }}
+                flexShrink={0}
                 isLoading={del.isLoading && del.variables?.id === w.id}
                 onClick={() => handleDelete(w)}
               />
@@ -212,7 +256,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
           ))}
           {rows.length > INITIAL_WARNINGS && (
             <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Show less' : `Show all ${rows.length}`}
+              {showAll ? 'Свернуть' : `Показать все (${rows.length})`}
             </Button>
           )}
         </Flex>
@@ -223,44 +267,27 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
 
 function Punishments({ rows }: { rows: ModerationPunishment[] }) {
   return (
-    <Section
-      icon={<Icon as={MdTimer} />}
-      title="Active timed punishments"
-      count={rows.length}
-    >
+    <Section icon={<Icon as={MdTimer} />} title="Активные наказания" count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          No active mutes or temp-bans.
+          Активных мутов и банов нет.
         </Text>
       ) : (
-        <Flex direction="column" gap={2}>
+        <Flex direction="column" gap="8px">
           {rows.map((p) => (
-            <Flex
-              key={p.userId}
-              align="center"
-              justify="space-between"
-              gap={3}
-              p={3}
-              rounded="xl"
-              bg="blackAlpha.200"
-              _dark={{ bg: 'whiteAlpha.50' }}
-            >
-              <Box minW={0}>
-                <Flex align="center" gap={2} wrap="wrap">
-                  <Badge colorScheme={p.type === 'ban' ? 'red' : 'orange'} rounded="md">
-                    {p.type}
-                  </Badge>
-                  <Text fontWeight="600" isTruncated>
-                    {p.userName}
-                  </Text>
-                </Flex>
+            <Flex key={p.userId} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+              <Pill tone={p.type === 'ban' ? 'red' : 'amber'}>{p.type === 'ban' ? 'бан' : 'мут'}</Pill>
+              <Box flex="1" minW={0}>
+                <Text fontSize="13.5px" fontWeight="600" isTruncated>
+                  {p.userName}
+                </Text>
                 {p.reason && (
-                  <Text fontSize="sm" color="TextSecondary" noOfLines={1}>
+                  <Text fontSize="12px" color="TextSecondary" opacity={0.85} noOfLines={1}>
                     {p.reason}
                   </Text>
                 )}
               </Box>
-              <Text fontSize="sm" color="TextSecondary" flexShrink={0}>
+              <Text fontSize="12px" color="TextSecondary" flexShrink={0}>
                 {expiresIn(p.expiresAt)}
               </Text>
             </Flex>
@@ -279,48 +306,35 @@ function Strikes({ data }: { data: ModerationStrikes }) {
   const policy = policyLabel(data);
 
   return (
-    <Section
-      icon={<Icon as={MdShield} />}
-      title="Active strikes"
-      count={data.users.length}
-    >
-      <Text fontSize="xs" color="TextSecondary" mb={3}>
-        {data.enabled ? 'Strikes on' : 'Strikes off'}
-        {data.expiryHours > 0 ? ` · decay after ${data.expiryHours}h` : ' · never decay'}
+    <Section icon={<Icon as={MdShield} />} title="Активные страйки" count={data.users.length}>
+      <Text fontSize="12px" color="TextSecondary" mb="14px">
+        {data.enabled ? 'Страйки вкл' : 'Страйки выкл'}
+        {data.expiryHours > 0 ? ` · затухают через ${data.expiryHours}ч` : ' · не затухают'}
         {policy && ` · ${policy}`}
       </Text>
       {data.users.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          No members have active strikes.
+          Ни у кого нет активных страйков.
         </Text>
       ) : (
-        <Flex direction="column" gap={2}>
+        <Flex direction="column" gap="8px">
           {shown.map((u) => (
-            <Flex
-              key={u.userId}
-              align="center"
-              justify="space-between"
-              gap={3}
-              p={3}
-              rounded="xl"
-              bg="blackAlpha.200"
-              _dark={{ bg: 'whiteAlpha.50' }}
-            >
-              <Flex align="center" gap={3} minW={0}>
-                <Badge colorScheme={strikeColor(u.count, data)} rounded="md" flexShrink={0}>
-                  {u.count} {u.count === 1 ? 'strike' : 'strikes'}
-                </Badge>
-                <Text fontWeight="600" isTruncated>
+            <Flex key={u.userId} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+              <Pill tone={toneFromScheme(strikeColor(u.count, data))}>
+                {u.count} {pluralStrikes(u.count)}
+              </Pill>
+              <Box flex="1" minW={0}>
+                <Text fontSize="13.5px" fontWeight="600" isTruncated>
                   {u.userName}
                 </Text>
-              </Flex>
+              </Box>
               <Box textAlign="right" flexShrink={0}>
-                <Text fontSize="sm" color="TextSecondary">
+                <Text fontSize="12px" color="TextSecondary">
                   {decayLabel(u.nextDecayAt)}
                 </Text>
                 {u.lastStrikeAt && (
-                  <Text fontSize="xs" color="TextSecondary" opacity={0.7}>
-                    last {timeAgo(u.lastStrikeAt)}
+                  <Text fontSize="11px" color="TextSecondary" opacity={0.7}>
+                    последний: {timeAgo(u.lastStrikeAt)}
                   </Text>
                 )}
               </Box>
@@ -328,7 +342,7 @@ function Strikes({ data }: { data: ModerationStrikes }) {
           ))}
           {data.users.length > INITIAL_STRIKES && (
             <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Show less' : `Show all ${data.users.length}`}
+              {showAll ? 'Свернуть' : `Показать все (${data.users.length})`}
             </Button>
           )}
         </Flex>
@@ -337,10 +351,10 @@ function Strikes({ data }: { data: ModerationStrikes }) {
   );
 }
 
-const APPEAL_STATUS: Record<string, string> = {
-  approved: 'green',
-  denied: 'red',
-  pending: 'yellow',
+const APPEAL_STATUS: Record<string, { tone: 'green' | 'red' | 'amber' | 'gray'; label: string }> = {
+  approved: { tone: 'green', label: 'одобрено' },
+  denied: { tone: 'red', label: 'отклонено' },
+  pending: { tone: 'amber', label: 'на рассмотрении' },
 };
 
 function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string }) {
@@ -349,14 +363,10 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
   const pendingCount = data.items.filter((a) => a.status === 'pending').length;
 
   return (
-    <Section
-      icon={<Icon as={MdOutlineHowToReg} />}
-      title="Ban appeals"
-      count={pendingCount}
-    >
-      <Flex align="center" justify="space-between" gap={3} mb={4}>
-        <Text fontSize="sm" color="TextSecondary">
-          When on, ban DMs include an “Appeal” button. Appeals show up here for review.
+    <Section icon={<Icon as={MdOutlineHowToReg} />} title="Апелляции на бан" count={pendingCount}>
+      <Flex align="center" justify="space-between" gap="12px" rounded="11px" p="12px 14px" mb="12px" {...INSET}>
+        <Text fontSize="13px" color="TextSecondary" flex="1">
+          В бан-DM добавляется кнопка «Апелляция». Заявки появляются здесь на рассмотрение.
         </Text>
         <Switch
           isChecked={data.enabled}
@@ -368,58 +378,63 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
 
       {data.items.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          {data.enabled ? 'No appeals submitted yet.' : 'Ban appeals are off.'}
+          {data.enabled ? 'Заявок пока нет.' : 'Апелляции на бан выключены.'}
         </Text>
       ) : (
-        <Flex direction="column" gap={2}>
-          {data.items.map((a) => (
-            <Box key={a.id} p={3} rounded="xl" bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.50' }}>
-              <Flex align="center" justify="space-between" gap={3} wrap="wrap">
-                <Flex align="center" gap={2} minW={0}>
-                  <Badge colorScheme={APPEAL_STATUS[a.status] ?? 'gray'} rounded="md" flexShrink={0}>
-                    {a.status}
-                  </Badge>
-                  <Text fontWeight="600" isTruncated>
+        <Flex direction="column" gap="8px">
+          {data.items.map((a) => {
+            const st = APPEAL_STATUS[a.status] ?? { tone: 'gray' as const, label: a.status };
+            return (
+              <Box key={a.id} rounded="11px" p="12px 14px" {...INSET}>
+                <Flex align="center" gap="10px" wrap="wrap">
+                  <Pill tone={st.tone}>{st.label}</Pill>
+                  <Text fontSize="13.5px" fontWeight="600" isTruncated>
                     {a.userName ?? a.userId}
                   </Text>
-                  <Text fontSize="xs" color="TextSecondary">
+                  <Text fontSize="11.5px" color="TextSecondary" opacity={0.75}>
                     {timeAgo(a.createdAt)}
                   </Text>
+                  {a.status === 'pending' && (
+                    <Flex ml="auto" gap="8px" flexShrink={0}>
+                      <Button
+                        size="sm"
+                        rounded="9px"
+                        color="white"
+                        bg="green.500"
+                        _hover={{ filter: 'brightness(1.08)' }}
+                        isLoading={decide.isLoading && decide.variables?.appealId === a.id}
+                        onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'approve' })}
+                      >
+                        Одобрить · разбан
+                      </Button>
+                      <Button
+                        size="sm"
+                        rounded="9px"
+                        variant="outline"
+                        color="red.400"
+                        borderColor="red.400"
+                        _hover={{ bg: 'rgba(241,106,106,0.1)' }}
+                        isLoading={decide.isLoading && decide.variables?.appealId === a.id}
+                        onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'deny' })}
+                      >
+                        Отклонить
+                      </Button>
+                    </Flex>
+                  )}
+                  {a.status !== 'pending' && a.decidedByName && (
+                    <Text ml="auto" fontSize="11.5px" color="TextSecondary" flexShrink={0}>
+                      решение: {a.decidedByName}
+                    </Text>
+                  )}
                 </Flex>
-                {a.status === 'pending' && (
-                  <Flex gap={2} flexShrink={0}>
-                    <Button
-                      size="xs"
-                      colorScheme="green"
-                      isLoading={decide.isLoading && decide.variables?.appealId === a.id}
-                      onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'approve' })}
-                    >
-                      Approve &amp; unban
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      colorScheme="red"
-                      isLoading={decide.isLoading && decide.variables?.appealId === a.id}
-                      onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'deny' })}
-                    >
-                      Deny
-                    </Button>
-                  </Flex>
-                )}
-                {a.status !== 'pending' && a.decidedByName && (
-                  <Text fontSize="xs" color="TextSecondary" flexShrink={0}>
-                    by {a.decidedByName}
+                {a.reason && (
+                  <Text fontSize="12.5px" color="TextSecondary" mt="8px" whiteSpace="pre-wrap">
+                    {a.reason}
                   </Text>
                 )}
-              </Flex>
-              {a.reason && (
-                <Text fontSize="sm" color="TextSecondary" mt={2} whiteSpace="pre-wrap">
-                  {a.reason}
-                </Text>
-              )}
-            </Box>
-          ))}
+              </Box>
+            );
+          })}
         </Flex>
       )}
     </Section>
@@ -433,49 +448,36 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
   const shown = showAll ? rows : rows.slice(0, INITIAL_AUDIT);
 
   return (
-    <Section
-      icon={<Icon as={MdHistory} />}
-      title="Dashboard activity"
-      count={rows.length}
-    >
+    <Section icon={<Icon as={MdHistory} />} title="Активность дашборда" count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          No dashboard actions recorded yet.
+          Действий из дашборда пока нет.
         </Text>
       ) : (
-        <Flex direction="column" gap={2}>
+        <Flex direction="column" gap="8px">
           {shown.map((e) => (
-            <Flex
-              key={e.id}
-              align="center"
-              justify="space-between"
-              gap={3}
-              p={3}
-              rounded="xl"
-              bg="blackAlpha.200"
-              _dark={{ bg: 'whiteAlpha.50' }}
-            >
-              <Box minW={0}>
-                <Text fontSize="sm" isTruncated>
+            <Flex key={e.id} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+              <Box flex="1" minW={0}>
+                <Text fontSize="13.5px" isTruncated>
                   <Text as="span" fontWeight="600">
-                    {e.actorName ?? 'Someone'}
+                    {e.actorName ?? 'Кто-то'}
                   </Text>{' '}
                   {describeAudit(e)}
                 </Text>
                 {isModerationAction(e.action) && e.detail && (
-                  <Text fontSize="xs" color="TextSecondary" noOfLines={1}>
+                  <Text fontSize="11.5px" color="TextSecondary" noOfLines={1}>
                     {e.detail}
                   </Text>
                 )}
               </Box>
-              <Text fontSize="xs" color="TextSecondary" flexShrink={0}>
+              <Text fontSize="11.5px" color="TextSecondary" flexShrink={0}>
                 {timeAgo(e.createdAt)}
               </Text>
             </Flex>
           ))}
           {rows.length > INITIAL_AUDIT && (
             <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Show less' : `Show all ${rows.length}`}
+              {showAll ? 'Свернуть' : `Показать все (${rows.length})`}
             </Button>
           )}
         </Flex>

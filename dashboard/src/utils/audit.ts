@@ -6,12 +6,12 @@ export function timeAgo(iso: string | null): string {
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
   const s = Math.max(0, Math.floor((Date.now() - d) / 1000));
-  if (s < 60) return 'just now';
+  if (s < 60) return 'только что';
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m} мин назад`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return `${h} ч назад`;
+  return `${Math.floor(h / 24)} д назад`;
 }
 
 /** Absolute, locale-aware date-time for a nullable ISO timestamp. */
