@@ -25,8 +25,8 @@ const PERIODS = [
   { value: 90, label: 'Last 90 days' },
 ];
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const BRAND = '#4318FF';
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const BRAND = '#6E56F5';
 
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -45,15 +45,24 @@ function sum(rows: { count: number }[]): number {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <Box bg="CardBackground" rounded="2xl" p={5}>
-      <Text fontSize="sm" color="TextSecondary">
+    <Box
+      bg="CardBackground"
+      rounded="16px"
+      p="18px"
+      border="1px solid"
+      borderColor="CardBorder"
+      boxShadow="normal"
+      transition="transform .18s ease, border-color .18s ease"
+      _hover={{ transform: 'translateY(-4px)', borderColor: 'brand.400' }}
+    >
+      <Text fontSize="12px" color="TextSecondary" fontWeight="500">
         {label}
       </Text>
-      <Text fontSize="3xl" fontWeight="700" lineHeight="1.2" mt={1}>
+      <Text fontSize="28px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="7px">
         {value}
       </Text>
       {hint && (
-        <Text fontSize="xs" color="TextSecondary" mt={1}>
+        <Text fontSize="11px" color="TextSecondary" mt="6px">
           {hint}
         </Text>
       )}
@@ -75,8 +84,8 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Box bg="CardBackground" rounded="2xl" p={5}>
-      <Heading size="sm">{title}</Heading>
+    <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+      <Heading fontSize="15px" fontWeight="700">{title}</Heading>
       {subtitle && (
         <Text fontSize="xs" color="TextSecondary" mt={1}>
           {subtitle}
@@ -168,21 +177,21 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
   return (
     <Flex direction="column" gap={5}>
       <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
-        <StatCard label="Moderation actions" value={totalMod.toLocaleString()} hint={`last ${data.days} days`} />
-        <StatCard label="AutoMod violations" value={totalAutomod.toLocaleString()} hint={`last ${data.days} days`} />
-        <StatCard label="Tickets opened" value={totalOpened.toLocaleString()} hint={`last ${data.days} days`} />
+        <StatCard label="Действия модерации" value={totalMod.toLocaleString('ru-RU')} hint={`за ${data.days} дней`} />
+        <StatCard label="Нарушения AutoMod" value={totalAutomod.toLocaleString('ru-RU')} hint={`за ${data.days} дней`} />
+        <StatCard label="Открыто тикетов" value={totalOpened.toLocaleString('ru-RU')} hint={`за ${data.days} дней`} />
         <StatCard
-          label="Avg ticket resolution"
-          value={data.avgTicketResolutionHours != null ? `${data.avgTicketResolutionHours}h` : '—'}
-          hint={data.avgTicketResolutionHours != null ? 'open → closed' : 'no closed tickets'}
+          label="Среднее время закрытия"
+          value={data.avgTicketResolutionHours != null ? `${data.avgTicketResolutionHours}ч` : '—'}
+          hint={data.avgTicketResolutionHours != null ? 'открыт → закрыт' : 'нет закрытых тикетов'}
         />
       </SimpleGrid>
 
       <ChartCard
-        title="Activity heatmap"
-        subtitle="Messages by weekday and hour (UTC). Aggregate counts only — no message content is stored."
+        title="Хитмап активности"
+        subtitle="Сообщения по дням недели и часам (UTC). Только агрегатные счётчики — содержимое не хранится."
         isEmpty={heatmapEmpty}
-        emptyText="No activity recorded yet. Counts start accumulating from now on."
+        emptyText="Активности пока нет. Счётчики начинают копиться с этого момента."
       >
         <StyledChart
           type="heatmap"
@@ -199,17 +208,17 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
               tickAmount: 12,
               labels: { rotate: 0 },
             },
-            tooltip: { y: { formatter: (v: number) => `${v} messages` } },
+            tooltip: { y: { formatter: (v: number) => `${v} сообщений` } },
           }}
         />
       </ChartCard>
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={5}>
         <ChartCard
-          title="Moderation actions over time"
-          subtitle="From the numbered moderation cases, stacked by action type."
+          title="Действия модерации по времени"
+          subtitle="Из нумерованных кейсов модерации, стопкой по типу действия."
           isEmpty={actions.series.length === 0}
-          emptyText="No moderation cases in this period."
+          emptyText="Кейсов модерации за период нет."
         >
           <StyledChart
             type="bar"
@@ -226,10 +235,10 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
         </ChartCard>
 
         <ChartCard
-          title="Tickets opened vs closed"
-          subtitle="Daily open/close volume over the period."
+          title="Тикеты: открыто и закрыто"
+          subtitle="Ежедневный объём открытий/закрытий за период."
           isEmpty={tickets.series[0].data.length === 0}
-          emptyText="No ticket activity in this period."
+          emptyText="Активности по тикетам за период нет."
         >
           <StyledChart
             type="bar"
@@ -247,30 +256,27 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
         </ChartCard>
       </SimpleGrid>
 
-      <Box bg="CardBackground" rounded="2xl" p={5}>
-        <Heading size="sm" mb={4}>
-          Top moderators
+      <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Heading fontSize="15px" fontWeight="700" mb="18px">
+          Топ модераторов
         </Heading>
         {data.topModerators.length === 0 ? (
           <Text fontSize="sm" color="TextSecondary">
-            No moderation cases in this period.
+            Кейсов модерации за период нет.
           </Text>
         ) : (
-          <Flex direction="column" gap={3}>
-            {data.topModerators.map((m, i) => (
-              <Flex key={m.name} align="center" gap={3}>
-                <Text fontSize="sm" w="1.5em" color="TextSecondary" textAlign="center">
-                  {i + 1}
-                </Text>
-                <Text fontSize="sm" fontWeight="600" minW="120px" isTruncated>
+          <Flex direction="column" gap="15px">
+            {data.topModerators.map((m) => (
+              <Flex key={m.name} align="center" gap="10px">
+                <Text fontSize="13px" fontWeight="600" minW="90px" isTruncated>
                   {m.name}
                 </Text>
-                <Box flex={1} bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.100' }} rounded="full" h="8px">
-                  <Box bg="Brand" rounded="full" h="8px" w={`${(m.count / maxMods) * 100}%`} />
+                <Box flex={1} bg="secondaryGray.100" _dark={{ bg: 'navy.600' }} rounded="5px" h="8px" overflow="hidden">
+                  <Box bgGradient="linear(135deg, #8B7CFF, #6E56F5)" rounded="5px" h="8px" w={`${(m.count / maxMods) * 100}%`} />
                 </Box>
-                <Badge rounded="md" colorScheme="purple" flexShrink={0}>
+                <Text fontSize="12px" fontWeight="700" color="brand.200" minW="20px" textAlign="right" flexShrink={0}>
                   {m.count}
-                </Badge>
+                </Text>
               </Flex>
             ))}
           </Flex>

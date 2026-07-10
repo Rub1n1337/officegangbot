@@ -36,11 +36,14 @@ import type { Ticket, TicketPriority } from '@/config/types/custom-types';
 // full list — cheap windowing without a virtualization dependency.
 const PAGE = 50;
 
+// Iris "inset" row surface — a defined step below the card.
+const INSET = { bg: 'secondaryGray.100', _dark: { bg: 'navy.600' } };
+
 const PRIORITY: Record<TicketPriority, { label: string; color: string }> = {
-  low: { label: '🟢 Low', color: 'green' },
-  medium: { label: '🟡 Medium', color: 'yellow' },
-  high: { label: '🟠 High', color: 'orange' },
-  urgent: { label: '🔴 Urgent', color: 'red' },
+  low: { label: '🟢 Низкий', color: 'green' },
+  medium: { label: '🟡 Средний', color: 'yellow' },
+  high: { label: '🟠 Высокий', color: 'orange' },
+  urgent: { label: '🔴 Срочный', color: 'red' },
 };
 
 function PriorityBadge({ priority }: { priority: TicketPriority }) {
@@ -68,7 +71,7 @@ function TranscriptModal({
     <Modal isOpen={open} onClose={onClose} size="2xl" scrollBehavior="inside" isCentered>
       <ModalOverlay />
       <ModalContent bg="CardBackground">
-        <ModalHeader>Ticket transcript</ModalHeader>
+        <ModalHeader>Транскрипт тикета</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
           {query.isLoading && (
@@ -78,20 +81,20 @@ function TranscriptModal({
           )}
           {query.isError && (
             <ErrorPanel retry={() => query.refetch()} isRetrying={query.isFetching}>
-              Failed to load this transcript.
+              Не удалось загрузить транскрипт.
             </ErrorPanel>
           )}
           {query.data && (
             <Flex direction="column" gap={3}>
               <Flex gap={2} wrap="wrap" align="center" fontSize="sm" color="TextSecondary">
                 <PriorityBadge priority={query.data.priority} />
-                <Text>Opened by {query.data.openerName ?? 'unknown'}</Text>
-                {query.data.closedByName && <Text>· closed by {query.data.closedByName}</Text>}
+                <Text>Открыл {query.data.openerName ?? 'неизвестно'}</Text>
+                {query.data.closedByName && <Text>· закрыл {query.data.closedByName}</Text>}
               </Flex>
               {query.data.closeComment && (
-                <Box bg="blackAlpha.200" _dark={{ bg: 'whiteAlpha.50' }} rounded="lg" p={3}>
+                <Box rounded="11px" p={3} {...INSET}>
                   <Text fontSize="xs" color="TextSecondary" mb={1}>
-                    Closing comment
+                    Комментарий при закрытии
                   </Text>
                   <Text fontSize="sm">{query.data.closeComment}</Text>
                 </Box>
@@ -108,7 +111,7 @@ function TranscriptModal({
                 maxH="55vh"
                 overflowY="auto"
               >
-                {query.data.transcript ?? 'No transcript was captured for this ticket.'}
+                {query.data.transcript ?? 'Транскрипт для этого тикета не сохранён.'}
               </Box>
             </Flex>
           )}
@@ -120,49 +123,44 @@ function TranscriptModal({
 
 function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
   return (
-    <Flex
-      align="flex-start"
-      justify="space-between"
-      gap={3}
-      p={3}
-      rounded="xl"
-      bg="blackAlpha.200"
-      _dark={{ bg: 'whiteAlpha.50' }}
-    >
-      <Flex gap={3} flex="1" minW={0} align="flex-start">
+    <Flex align="flex-start" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+      <Flex gap="12px" flex="1" minW={0} align="flex-start">
         <PriorityBadge priority={t.priority} />
         <Box minW={0}>
-          <Flex align="center" gap={2} wrap="wrap">
-            <Text fontWeight="600" isTruncated maxW="100%">
+          <Flex align="center" gap="8px" wrap="wrap">
+            <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
               {t.openerName ?? t.openerId}
             </Text>
-            <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="md" flexShrink={0}>
-              {t.status}
+            <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="20px" px="9px" flexShrink={0}>
+              {t.status === 'open' ? 'открыт' : 'закрыт'}
             </Badge>
           </Flex>
-          <Text fontSize="xs" color="TextSecondary" noOfLines={{ base: 2, sm: 1 }}>
-            Opened {timeAgo(t.openedAt)}
-            {t.closedAt && ` · closed ${timeAgo(t.closedAt)}`}
-            {t.closedByName && ` by ${t.closedByName}`}
+          <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, sm: 1 }} mt="2px">
+            Открыт {timeAgo(t.openedAt)}
+            {t.closedAt && ` · закрыт ${timeAgo(t.closedAt)}`}
+            {t.closedByName && `, ${t.closedByName}`}
           </Text>
           {t.closeComment && (
-            <Text fontSize="sm" color="TextSecondary" noOfLines={2} mt={1}>
-              “{t.closeComment}”
+            <Text fontSize="12.5px" color="TextSecondary" noOfLines={2} mt="4px">
+              «{t.closeComment}»
             </Text>
           )}
         </Box>
       </Flex>
       {t.hasTranscript && (
         <Button
-          size="xs"
+          size="sm"
+          rounded="9px"
           variant="outline"
+          borderColor="CardBorder"
           onClick={() => onView(t.id)}
           flexShrink={0}
-          aria-label="View transcript"
+          aria-label="Открыть транскрипт"
+          _hover={{ borderColor: 'brand.400' }}
         >
           <Icon as={MdDescription} />
           <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
-            Transcript
+            Транскрипт
           </Box>
         </Button>
       )}
@@ -196,14 +194,14 @@ function TranscriptHits({
 }) {
   if (query.length < 2) return null;
   return (
-    <Box bg="CardBackground" rounded="2xl" p={5}>
-      <Flex align="center" gap={2} mb={3}>
-        <Icon as={MdSearch} color="Brand" />
-        <Heading size="sm">Found in transcripts</Heading>
+    <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+      <Flex align="center" gap="10px" mb="14px">
+        <Icon as={MdSearch} color="brand.200" boxSize="20px" />
+        <Heading fontSize="15px" fontWeight="700">Найдено в транскриптах</Heading>
         {hits.length > 0 && (
-          <Badge rounded="md" colorScheme="gray">
+          <Box as="span" fontSize="12px" fontWeight="700" rounded="20px" px="9px" color="TextSecondary" bg="blackAlpha.100" _dark={{ bg: 'whiteAlpha.100' }}>
             {hits.length}
-          </Badge>
+          </Box>
         )}
       </Flex>
       {isLoading ? (
@@ -212,29 +210,20 @@ function TranscriptHits({
         </Flex>
       ) : hits.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          No transcript text matches “{query}”.
+          В транскриптах нет совпадений по «{query}».
         </Text>
       ) : (
         <Flex direction="column" gap={2}>
           {hits.map((t) => (
-            <Flex
-              key={t.id}
-              align="flex-start"
-              justify="space-between"
-              gap={3}
-              p={3}
-              rounded="xl"
-              bg="blackAlpha.200"
-              _dark={{ bg: 'whiteAlpha.50' }}
-            >
-              <Flex gap={3} flex="1" minW={0} align="flex-start">
+            <Flex key={t.id} align="flex-start" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+              <Flex gap="12px" flex="1" minW={0} align="flex-start">
                 <PriorityBadge priority={t.priority} />
                 <Box minW={0}>
-                  <Text fontWeight="600" isTruncated maxW="100%">
+                  <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
                     {t.openerName ?? t.openerId}
                   </Text>
                   {t.snippet && (
-                    <Text fontSize="xs" color="TextSecondary" noOfLines={2} mt={0.5}>
+                    <Text fontSize="11.5px" color="TextSecondary" noOfLines={2} mt={0.5}>
                       …
                       <Highlight
                         query={query}
@@ -249,15 +238,18 @@ function TranscriptHits({
               </Flex>
               {t.hasTranscript && (
                 <Button
-                  size="xs"
+                  size="sm"
+                  rounded="9px"
                   variant="outline"
+                  borderColor="CardBorder"
                   onClick={() => onView(t.id)}
                   flexShrink={0}
-                  aria-label="View transcript"
+                  aria-label="Открыть транскрипт"
+                  _hover={{ borderColor: 'brand.400' }}
                 >
                   <Icon as={MdDescription} />
                   <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
-                    Transcript
+                    Транскрипт
                   </Box>
                 </Button>
               )}
@@ -340,7 +332,7 @@ const TicketsPage: NextPageWithLayout = () => {
       </Box>
 
       <QueryStatus query={query} loading={<TicketsSkeleton />} error="Failed to load tickets.">
-        <Box bg="CardBackground" rounded="2xl" p={5}>
+        <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" justify="space-between" gap={3} mb={4} wrap="wrap">
             <Flex gap={3} wrap="wrap" flex={1} w={{ base: 'full', sm: 'auto' }}>
               <InputGroup maxW={{ base: 'full', sm: '280px' }}>
@@ -349,34 +341,34 @@ const TicketsPage: NextPageWithLayout = () => {
                 </InputLeftElement>
                 <Input
                   variant="main"
-                  placeholder="Search tickets & transcripts…"
+                  placeholder="Поиск по тикетам и транскриптам…"
                   value={search}
                   onChange={(ev) => setSearch(ev.target.value)}
                 />
               </InputGroup>
               <Select
                 variant="main"
-                maxW={{ base: 'full', sm: '160px' }}
+                maxW={{ base: 'full', sm: '170px' }}
                 value={status}
                 onChange={(ev) => setStatus(ev.target.value as 'all' | 'open' | 'closed')}
               >
-                <option value="all">All statuses</option>
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
+                <option value="all">Все статусы</option>
+                <option value="open">Открытые</option>
+                <option value="closed">Закрытые</option>
               </Select>
             </Flex>
             <Text fontSize="sm" color="TextSecondary">
-              {filtered.length} of {rows.length}
+              {filtered.length} из {rows.length}
             </Text>
           </Flex>
 
           {rows.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              No tickets have been opened yet.
+              Тикеты ещё не открывались.
             </Text>
           ) : filtered.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              No tickets match your filters.
+              Ничего не найдено по фильтрам.
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
@@ -391,7 +383,7 @@ const TicketsPage: NextPageWithLayout = () => {
                   mt={1}
                   onClick={() => setVisible((v) => v + PAGE)}
                 >
-                  Show more ({filtered.length - visible})
+                  Показать ещё ({filtered.length - visible})
                 </Button>
               )}
             </Flex>

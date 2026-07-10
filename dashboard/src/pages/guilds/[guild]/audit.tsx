@@ -34,10 +34,10 @@ import type { AuditEntry } from '@/config/types/custom-types';
 const PAGE = 50;
 
 const PERIODS: Record<string, { label: string; days: number | null }> = {
-  all: { label: 'All time', days: null },
-  '1': { label: 'Last 24 hours', days: 1 },
-  '7': { label: 'Last 7 days', days: 7 },
-  '30': { label: 'Last 30 days', days: 30 },
+  all: { label: 'Всё время', days: null },
+  '1': { label: 'За 24 часа', days: 1 },
+  '7': { label: 'За 7 дней', days: 7 },
+  '30': { label: 'За 30 дней', days: 30 },
 };
 
 function matchesSearch(e: AuditEntry, q: string): boolean {
@@ -70,17 +70,9 @@ function downloadCsv(filename: string, csv: string) {
 
 function AuditRow({ e }: { e: AuditEntry }) {
   return (
-    <Flex
-      align="flex-start"
-      justify="space-between"
-      gap={3}
-      p={3}
-      rounded="xl"
-      bg="blackAlpha.200"
-      _dark={{ bg: 'whiteAlpha.50' }}
-    >
+    <Flex align="flex-start" justify="space-between" gap={3} rounded="11px" p="12px 14px" bg="secondaryGray.100" _dark={{ bg: 'navy.600' }}>
       <Flex gap={3} minW={0} align="flex-start">
-        <Badge colorScheme={auditActionColor(e.action)} rounded="md" mt="2px" flexShrink={0}>
+        <Badge colorScheme={auditActionColor(e.action)} rounded="20px" px="9px" mt="1px" flexShrink={0}>
           {actionLabel(e.action)}
         </Badge>
         <Box minW={0}>
@@ -168,7 +160,7 @@ const AuditPage: NextPageWithLayout = () => {
       </Box>
 
       <QueryStatus query={query} loading={<AuditSkeleton />} error="Failed to load the audit log.">
-        <Box bg="CardBackground" rounded="2xl" p={5}>
+        <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" gap={3} mb={4} wrap="wrap">
             <InputGroup maxW="260px">
               <InputLeftElement pointerEvents="none">
@@ -176,7 +168,7 @@ const AuditPage: NextPageWithLayout = () => {
               </InputLeftElement>
               <Input
                 variant="main"
-                placeholder="Search actor, action or detail…"
+                placeholder="Поиск по автору, действию, деталям…"
                 value={search}
                 onChange={(ev) => setSearch(ev.target.value)}
               />
@@ -184,11 +176,11 @@ const AuditPage: NextPageWithLayout = () => {
 
             <Select
               variant="main"
-              maxW="200px"
+              maxW="220px"
               value={action}
               onChange={(ev) => setAction(ev.target.value)}
             >
-              <option value="all">All actions</option>
+              <option value="all">Все действия</option>
               {actionOptions.map((a) => (
                 <option key={a} value={a}>
                   {actionLabel(a)}
@@ -210,7 +202,7 @@ const AuditPage: NextPageWithLayout = () => {
             </Select>
 
             <Text fontSize="sm" color="TextSecondary">
-              {filtered.length} of {rows.length}
+              {filtered.length} из {rows.length}
             </Text>
 
             <Button
@@ -226,17 +218,17 @@ const AuditPage: NextPageWithLayout = () => {
                 )
               }
             >
-              Export CSV
+              Экспорт CSV
             </Button>
           </Flex>
 
           {rows.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              No dashboard actions recorded yet.
+              Действий из дашборда пока нет.
             </Text>
           ) : filtered.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              No entries match your filters.
+              Ничего не найдено по фильтрам.
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
@@ -251,7 +243,7 @@ const AuditPage: NextPageWithLayout = () => {
                   mt={1}
                   onClick={() => setVisible((v) => v + PAGE)}
                 >
-                  Show more ({filtered.length - visible})
+                  Показать ещё ({filtered.length - visible})
                 </Button>
               )}
             </Flex>
@@ -259,7 +251,7 @@ const AuditPage: NextPageWithLayout = () => {
 
           {filtersActive && filtered.length > 0 && (
             <Text fontSize="xs" color="TextSecondary" mt={3} textAlign="center">
-              Export includes the {filtered.length} filtered {filtered.length === 1 ? 'entry' : 'entries'}.
+              В экспорт войдут отфильтрованные записи: {filtered.length}.
             </Text>
           )}
         </Box>
