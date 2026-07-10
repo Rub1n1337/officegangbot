@@ -30,16 +30,30 @@ export function formatDateTime(iso: string | null): string {
 
 /** Maps an audit action to a human sentence, using the entry's target/detail. */
 export const AUDIT_LABEL: Record<string, (e: AuditEntry) => string> = {
-  warn: () => 'warned a member',
-  mute: () => 'muted a member',
-  unmute: () => 'removed a timeout',
-  kick: () => 'kicked a member',
-  ban: () => 'banned a member',
-  enable_feature: (e) => `enabled ${e.target ?? 'a feature'}`,
-  disable_feature: (e) => `disabled ${e.target ?? 'a feature'}`,
-  update_feature: (e) => `updated ${e.target ?? 'a feature'} settings`,
-  set_locale: (e) => `set the bot language to ${e.detail ?? ''}`.trim(),
-  delete_warning: () => 'deleted a warning',
+  warn: () => 'выдал предупреждение',
+  mute: () => 'замутил участника',
+  unmute: () => 'снял мут',
+  kick: () => 'кикнул участника',
+  ban: () => 'забанил участника',
+  enable_feature: (e) => `включил ${e.target ?? 'функцию'}`,
+  disable_feature: (e) => `выключил ${e.target ?? 'функцию'}`,
+  update_feature: (e) => `изменил настройки ${e.target ?? 'функции'}`,
+  set_locale: (e) => `сменил язык бота на ${e.detail ?? ''}`.trim(),
+  delete_warning: () => 'удалил предупреждение',
+};
+
+// Russian short labels for the action-filter dropdown.
+const ACTION_LABEL_RU: Record<string, string> = {
+  warn: 'Предупреждение',
+  mute: 'Мут',
+  unmute: 'Снятие мута',
+  kick: 'Кик',
+  ban: 'Бан',
+  enable_feature: 'Включение функции',
+  disable_feature: 'Выключение функции',
+  update_feature: 'Изменение функции',
+  set_locale: 'Смена языка',
+  delete_warning: 'Удаление предупреждения',
 };
 
 export function describeAudit(e: AuditEntry): string {
@@ -63,8 +77,9 @@ export function auditActionColor(action: string): string {
   return 'purple';
 }
 
-/** Short label for the action itself, e.g. "delete_warning" -> "Delete warning". */
+/** Short Russian label for the action itself (for the filter dropdown). */
 export function actionLabel(action: string): string {
+  if (ACTION_LABEL_RU[action]) return ACTION_LABEL_RU[action];
   const s = action.replace(/_/g, ' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
