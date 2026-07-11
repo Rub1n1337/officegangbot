@@ -35,13 +35,19 @@ const customComponents = {
 const styles: ChakraStylesConfig<any, any, any> = {
   menuList: (provided) => ({
     ...provided,
+    rounded: '14px',
+    border: '1px solid',
     _light: {
       ...(provided as any)._light,
       shadow: light.shadow,
+      borderColor: 'blackAlpha.200',
+      bg: 'white',
     },
     _dark: {
       ...(provided as any)._dark,
       shadow: dark.shadow,
+      borderColor: 'whiteAlpha.200',
+      bg: 'navy.800',
     },
   }),
   placeholder: (provided) => ({
@@ -82,16 +88,21 @@ const styles: ChakraStylesConfig<any, any, any> = {
       },
     },
   }),
+  // Iris inset pill: the control sits on the card as a defined inset surface
+  // with a 1px token border, accent on hover/focus.
   control: (provided, data) => ({
     ...provided,
-    rounded: '2xl',
+    rounded: '12px',
+    minH: '44px',
     _light: {
-      borderColor: data.isFocused ? light.brand : 'secondaryGray.500',
-      bg: 'secondaryGray.300',
+      borderColor: data.isFocused ? light.brand : 'blackAlpha.200',
+      bg: 'secondaryGray.100',
+      _hover: { borderColor: light.brand },
     },
     _dark: {
-      borderColor: data.isFocused ? dark.brand : 'navy.600',
-      bg: 'blackAlpha.300',
+      borderColor: data.isFocused ? dark.brand : 'whiteAlpha.200',
+      bg: 'navy.600',
+      _hover: { borderColor: dark.brand },
     },
   }),
 };

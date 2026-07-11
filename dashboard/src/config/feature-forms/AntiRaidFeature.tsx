@@ -1,18 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  Box,
-  Flex,
-  Icon,
-  NumberDecrementStepper,
-  NumberIncrementStepper,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  Select,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Flex, Icon, Select, Text } from '@chakra-ui/react';
+import { NumberStepper } from '@/components/forms/NumberStepper';
 import { MdGroupAdd, MdTimer, MdGavel, MdHourglassBottom } from 'react-icons/md';
 import { useFormText } from '@/config/translations/form-text';
 import type { AntiRaidFeature } from '@/config/types/custom-types';
@@ -68,20 +58,12 @@ export const useAntiRaidFeature: UseFormRender<AntiRaidFeature> = (data, onSubmi
   const action = watch('action');
 
   const numberField = (name: 'joinCount' | 'joinWindow' | 'duration', min: number, max: number) => (
-    <NumberInput
+    <NumberStepper
       value={watch(name)}
       min={min}
       max={max}
-      w="100px"
-      flexShrink={0}
-      onChange={(_, num) => setValue(name, Number.isNaN(num) ? min : num, { shouldDirty: true })}
-    >
-      <NumberInputField />
-      <NumberInputStepper>
-        <NumberIncrementStepper />
-        <NumberDecrementStepper />
-      </NumberInputStepper>
-    </NumberInput>
+      onChange={(num) => setValue(name, num, { shouldDirty: true })}
+    />
   );
 
   return {

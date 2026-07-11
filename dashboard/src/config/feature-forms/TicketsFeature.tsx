@@ -1,16 +1,5 @@
-import {
-  Box,
-  Flex,
-  FormControl,
-  FormLabel,
-  NumberDecrementStepper,
-  NumberIncrementStepper,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  SimpleGrid,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Flex, FormControl, FormLabel, SimpleGrid, Text } from '@chakra-ui/react';
+import { NumberStepper } from '@/components/forms/NumberStepper';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -66,21 +55,12 @@ export const useTicketsFeature: UseFormRender<TicketsFeature> = (data, onSubmit)
             {ft('Auto-close after inactivity (hours)')}
           </FormLabel>
           <Flex align="center" gap={3}>
-            <NumberInput
+            <NumberStepper
               value={autoCloseHours}
               min={0}
               max={720}
-              w="120px"
-              onChange={(_, num) =>
-                setValue('autoCloseHours', Number.isNaN(num) ? 0 : num, { shouldDirty: true })
-              }
-            >
-              <NumberInputField />
-              <NumberInputStepper>
-                <NumberIncrementStepper />
-                <NumberDecrementStepper />
-              </NumberInputStepper>
-            </NumberInput>
+              onChange={(num) => setValue('autoCloseHours', num, { shouldDirty: true })}
+            />
             <Text fontSize="sm" color="TextSecondary">
               {autoCloseHours > 0
                 ? ft('Idle tickets close automatically after this many hours.')

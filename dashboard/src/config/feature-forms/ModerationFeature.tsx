@@ -1,20 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  Box,
-  Divider,
-  Flex,
-  Icon,
-  NumberDecrementStepper,
-  NumberIncrementStepper,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  SimpleGrid,
-  Switch,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Divider, Flex, Icon, SimpleGrid, Switch, Text } from '@chakra-ui/react';
+import { NumberStepper } from '@/components/forms/NumberStepper';
 import { MdGavel } from 'react-icons/md';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { useFormText } from '@/config/translations/form-text';
@@ -72,20 +60,12 @@ export const useModerationFeature: UseFormRender<ModerationFeature> = (
   const escalationOn = watch('warnEscalationEnabled');
 
   const numberField = (name: 'warnExpiryHours' | 'warnMuteAt' | 'warnKickAt' | 'warnBanAt', max: number) => (
-    <NumberInput
+    <NumberStepper
       value={watch(name)}
       min={0}
       max={max}
-      w="90px"
-      flexShrink={0}
-      onChange={(_, num) => setValue(name, Number.isNaN(num) ? 0 : num, { shouldDirty: true })}
-    >
-      <NumberInputField />
-      <NumberInputStepper>
-        <NumberIncrementStepper />
-        <NumberDecrementStepper />
-      </NumberInputStepper>
-    </NumberInput>
+      onChange={(num) => setValue(name, num, { shouldDirty: true })}
+    />
   );
 
   const row = (label: string, desc: string, field: JSX.Element) => (
