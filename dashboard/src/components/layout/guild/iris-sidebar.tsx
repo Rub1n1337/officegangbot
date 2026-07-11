@@ -5,7 +5,6 @@ import { ReactNode } from 'react';
 import type { IconType } from 'react-icons';
 import {
   MdSmartToy,
-  MdUnfoldMore,
   MdSearch,
   MdSpaceDashboard,
   MdGavel,
@@ -15,8 +14,9 @@ import {
   MdHistory,
   MdSettings,
 } from 'react-icons/md';
-import { iconUrl, avatarUrl } from '@/api/discord';
-import { useGuildPreview, useGuildInfoQuery, useSelfUserQuery } from '@/api/hooks';
+import { avatarUrl } from '@/api/discord';
+import { ServerPicker } from './ServerPicker';
+import { useGuildInfoQuery, useSelfUserQuery } from '@/api/hooks';
 import { getFeatures } from '@/utils/common';
 import { useFeatureMeta } from '@/config/feature-meta';
 import { guild as view } from '@/config/translations/guild';
@@ -72,7 +72,6 @@ function NavItem({
 export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const { guild: guildId } = router.query as Params;
-  const { guild } = useGuildPreview(guildId);
   const info = useGuildInfoQuery(guildId);
   const user = useSelfUserQuery().data;
   const t = view.useTranslations();
@@ -127,57 +126,8 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </Box>
       </Flex>
 
-      {/* Server switcher */}
-      <Flex
-        as={Link}
-        href="/user/home"
-        align="center"
-        gap="10px"
-        p="9px 10px"
-        rounded="12px"
-        bg="CardBackground"
-        border="1px solid"
-        borderColor="CardBorder"
-        transition="border-color .15s ease"
-        _hover={{ borderColor: 'brand.400' }}
-      >
-        {guild?.icon ? (
-          <Box
-            as="img"
-            src={iconUrl(guild) ?? undefined}
-            alt=""
-            w="28px"
-            h="28px"
-            rounded="8px"
-            objectFit="cover"
-            flexShrink={0}
-          />
-        ) : (
-          <Flex
-            w="28px"
-            h="28px"
-            rounded="8px"
-            align="center"
-            justify="center"
-            bgGradient="linear(135deg, #8B7CFF, #6E56F5)"
-            color="white"
-            fontSize="11px"
-            fontWeight="700"
-            flexShrink={0}
-          >
-            {(guild?.name ?? 'OG').slice(0, 2).toUpperCase()}
-          </Flex>
-        )}
-        <Box flex="1" minW={0} lineHeight="1.2">
-          <Text fontSize="13px" fontWeight="600" noOfLines={1}>
-            {guild?.name ?? '—'}
-          </Text>
-          <Text fontSize="11px" color="TextSecondary">
-            Сменить сервер
-          </Text>
-        </Box>
-        <Icon as={MdUnfoldMore} boxSize="18px" color="TextSecondary" />
-      </Flex>
+      {/* Server switcher → opens the server picker popover */}
+      <ServerPicker guildId={guildId} />
 
       {/* Search */}
       <Flex
