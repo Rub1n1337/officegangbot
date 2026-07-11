@@ -1,125 +1,203 @@
-import { Flex, Grid, Spacer, Text, VStack } from '@chakra-ui/layout';
-import {
-  Avatar,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  FormControl,
-  FormLabel,
-  Image,
-  useColorMode,
-  Box,
-} from '@chakra-ui/react';
-import { avatarUrl, bannerUrl } from '@/api/discord';
-import { SelectField } from '@/components/forms/SelectField';
-import { SwitchField } from '@/components/forms/SwitchField';
+import { Avatar, Box, Button, Flex, Heading, Icon, Switch, Text } from '@chakra-ui/react';
+import { useColorMode } from '@chakra-ui/react';
+import { MdArrowBack, MdLogout } from 'react-icons/md';
+import { FaDiscord } from 'react-icons/fa';
+import Link from 'next/link';
+import { avatarUrl } from '@/api/discord';
 import { languages, names, useLang } from '@/config/translations/provider';
-import { profile } from '@/config/translations/profile';
-import { IoLogOut } from 'react-icons/io5';
 import { useSettingsStore } from '@/stores';
 import { NextPageWithLayout } from '@/pages/_app';
 import AppLayout from '@/components/layout/app';
 import { useLogoutMutation } from '@/utils/auth/hooks';
 import { useSelfUser } from '@/api/hooks';
 
-/**
- * User info and general settings here
- */
+// Iris profile screen (handoff README §11): back link, avatar header,
+// Discord-account card, preferences (appearance + language segmented,
+// dev mode toggle), sign out. Appearance drives Chakra color mode; language
+// drives the existing i18n provider. The mockup's "compact mode" and "email
+// notifications" toggles are omitted — nothing backs them.
+
+const INSET = { bg: 'secondaryGray.100', _dark: { bg: 'navy.600' } };
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p="3px" gap="2px" flexShrink={0}>
+      {options.map((o) => (
+        <Button
+          key={o.value}
+          size="sm"
+          rounded="8px"
+          fontSize="13px"
+          fontWeight={value === o.value ? '600' : '500'}
+          onClick={() => value !== o.value && onChange(o.value)}
+          {...(value === o.value
+            ? { color: 'white', bg: 'Brand', _hover: { bg: 'Brand' } }
+            : { variant: 'ghost', color: 'TextSecondary' })}
+        >
+          {o.label}
+        </Button>
+      ))}
+    </Flex>
+  );
+}
+
+function PrefRow({
+  title,
+  desc,
+  control,
+}: {
+  title: string;
+  desc: string;
+  control: React.ReactNode;
+}) {
+  return (
+    <Flex align="center" justify="space-between" gap="12px" rounded="11px" p="14px" {...INSET}>
+      <Box minW={0}>
+        <Text fontSize="14px" fontWeight="600">
+          {title}
+        </Text>
+        <Text fontSize="12.5px" color="TextSecondary" mt="1px">
+          {desc}
+        </Text>
+      </Box>
+      {control}
+    </Flex>
+  );
+}
+
 const ProfilePage: NextPageWithLayout = () => {
   const user = useSelfUser();
   const logout = useLogoutMutation();
-  const t = profile.useTranslations();
-
   const { colorMode, setColorMode } = useColorMode();
   const { lang, setLang } = useLang();
   const [devMode, setDevMode] = useSettingsStore((s) => [s.devMode, s.setDevMode]);
 
   return (
-    <Grid templateColumns={{ base: '1fr', lg: 'minmax(0, 800px) auto' }} gap={{ base: 3, lg: 6 }}>
-      <Flex direction="column">
-        {user.banner != null ? (
-          <Image
-            alt="banner"
-            src={bannerUrl(user.id, user.banner)}
-            sx={{ aspectRatio: '1100 / 440' }}
-            objectFit="cover"
-            rounded="2xl"
-          />
-        ) : (
-          <Box bg="Brand" rounded="2xl" sx={{ aspectRatio: '1100 / 440' }} />
-        )}
-        <VStack mt="-50px" ml="40px" align="start">
-          <Avatar
-            src={avatarUrl(user)}
-            name={user.username}
-            w="100px"
-            h="100px"
-            ringColor="CardBackground"
-            ring="6px"
-          />
-          <Text fontWeight="600" fontSize="2xl">
-            {user.username}
-          </Text>
-        </VStack>
+    <Flex direction="column" gap="20px" maxW="720px" mx="auto" w="full">
+      <Flex
+        as={Link}
+        href="/user/home"
+        align="center"
+        gap="6px"
+        fontSize="13px"
+        color="TextSecondary"
+        _hover={{ color: 'TextPrimary' }}
+        w="fit-content"
+      >
+        <Icon as={MdArrowBack} boxSize="17px" />
+        Назад
       </Flex>
-      <Card w="full" rounded="3xl" h="fit-content" variant="primary">
-        <CardHeader fontSize="2xl" fontWeight="600">
-          {t.settings}
-        </CardHeader>
-        <CardBody as={Flex} direction="column" gap={6} mt={3}>
-          <SwitchField
-            id="dark-mode"
-            label={t['dark mode']}
-            desc={t['dark mode description']}
-            isChecked={colorMode === 'dark'}
-            onChange={(e) => setColorMode(e.target.checked ? 'dark' : 'light')}
-          />
-          <SwitchField
-            id="developer-mode"
-            label={t['dev mode']}
-            desc={t['dev mode description']}
-            isChecked={devMode}
-            onChange={(e) => setDevMode(e.target.checked)}
-          />
-          <FormControl>
-            <Box mb={2}>
-              <FormLabel fontSize="md" fontWeight="medium" m={0}>
-                {t.language}
-              </FormLabel>
-              <Text color="TextSecondary">{t['language description']}</Text>
-            </Box>
-            <SelectField
-              value={{
-                label: names[lang],
-                value: lang,
-              }}
-              onChange={(e) => e != null && setLang(e.value)}
-              options={languages.map((lang) => ({
-                label: lang.name,
-                value: lang.key,
-              }))}
-            />
-          </FormControl>
-          <Spacer />
-          <Button
-            leftIcon={<IoLogOut />}
-            variant="danger"
-            isLoading={logout.isLoading}
-            onClick={() => logout.mutate()}
+
+      {/* Header */}
+      <Flex align="center" gap="16px">
+        <Avatar src={avatarUrl(user)} name={user.username} w="72px" h="72px" />
+        <Box minW={0}>
+          <Heading fontSize="24px" fontWeight="800" letterSpacing="-0.02em">
+            {user.username}
+          </Heading>
+          <Text fontSize="13.5px" color="TextSecondary" mt="2px">
+            @{user.username} · Администратор
+          </Text>
+        </Box>
+      </Flex>
+
+      {/* Discord account */}
+      <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Text fontSize="15px" fontWeight="700" mb="14px">
+          Аккаунт Discord
+        </Text>
+        <Flex align="center" gap="12px" rounded="11px" p="14px" {...INSET}>
+          <Flex w="40px" h="40px" rounded="11px" align="center" justify="center" bg="#5865F2" color="white" flexShrink={0}>
+            <Icon as={FaDiscord} boxSize="22px" />
+          </Flex>
+          <Box flex="1" minW={0}>
+            <Text fontSize="14px" fontWeight="600" noOfLines={1}>
+              {user.username}
+            </Text>
+            <Text fontSize="12px" color="TextSecondary">
+              Подключён · ID {user.id}
+            </Text>
+          </Box>
+          <Box
+            as="span"
+            fontSize="11px"
+            fontWeight="700"
+            rounded="20px"
+            px="10px"
+            py="4px"
+            color="green.500"
+            bg="green.100"
+            _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }}
+            flexShrink={0}
           >
-            {t.logout}
-          </Button>
-        </CardBody>
-      </Card>
-      <Content />
-    </Grid>
+            Привязан
+          </Box>
+        </Flex>
+      </Box>
+
+      {/* Preferences */}
+      <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Text fontSize="15px" fontWeight="700" mb="14px">
+          Настройки
+        </Text>
+        <Flex direction="column" gap="10px">
+          <PrefRow
+            title="Оформление"
+            desc="Тема интерфейса дашборда"
+            control={
+              <Segmented
+                value={colorMode}
+                options={[
+                  { value: 'dark', label: 'Тёмная' },
+                  { value: 'light', label: 'Светлая' },
+                ]}
+                onChange={(v) => setColorMode(v)}
+              />
+            }
+          />
+          <PrefRow
+            title="Язык"
+            desc="Язык интерфейса дашборда"
+            control={
+              <Segmented
+                value={lang}
+                options={languages.map((l) => ({ value: l.key, label: names[l.key] }))}
+                onChange={(v) => setLang(v)}
+              />
+            }
+          />
+          <PrefRow
+            title="Режим разработчика"
+            desc="Показывать отладочную информацию"
+            control={<Switch isChecked={devMode} onChange={(e) => setDevMode(e.target.checked)} />}
+          />
+        </Flex>
+      </Box>
+
+      <Button
+        alignSelf="flex-start"
+        rounded="12px"
+        variant="outline"
+        color="red.400"
+        borderColor="red.400"
+        _hover={{ bg: 'rgba(241,106,106,0.1)' }}
+        leftIcon={<Icon as={MdLogout} />}
+        isLoading={logout.isLoading}
+        onClick={() => logout.mutate()}
+      >
+        Выйти из аккаунта
+      </Button>
+    </Flex>
   );
 };
-
-function Content() {
-  return <></>;
-}
 
 ProfilePage.getLayout = (p) => <AppLayout>{p}</AppLayout>;
 
