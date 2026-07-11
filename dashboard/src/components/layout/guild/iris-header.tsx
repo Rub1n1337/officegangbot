@@ -3,7 +3,8 @@ import { useColorMode } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import { flushSync } from 'react-dom';
 import type { MouseEvent } from 'react';
-import { MdSearch, MdDarkMode, MdLightMode, MdNotifications, MdPerson, MdMenu } from 'react-icons/md';
+import { MdSearch, MdDarkMode, MdLightMode, MdPerson, MdMenu } from 'react-icons/md';
+import { NotificationsBell } from './NotificationsPanel';
 import { useRouter } from 'next/router';
 import { iconUrl } from '@/api/discord';
 import { useGuildPreview, useGuildStatsQuery } from '@/api/hooks';
@@ -152,9 +153,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
         <IconBtn onClick={onToggleTheme} title="Сменить тему">
           <Icon as={colorMode === 'light' ? MdDarkMode : MdLightMode} boxSize="19px" />
         </IconBtn>
-        <IconBtn title="Уведомления">
-          <Icon as={MdNotifications} boxSize="19px" />
-        </IconBtn>
+        <NotificationsBell guild={guildId} />
         <Flex
           w="38px"
           h="38px"
