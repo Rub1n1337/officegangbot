@@ -5,9 +5,10 @@ import { flushSync } from 'react-dom';
 import type { MouseEvent } from 'react';
 import { MdSearch, MdDarkMode, MdLightMode, MdPerson, MdMenu } from 'react-icons/md';
 import { NotificationsBell } from './NotificationsPanel';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { iconUrl } from '@/api/discord';
-import { useGuildPreview, useGuildStatsQuery } from '@/api/hooks';
+import { iconUrl, avatarUrl } from '@/api/discord';
+import { useGuildPreview, useGuildStatsQuery, useSelfUserQuery } from '@/api/hooks';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 
 const pulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}`;
@@ -49,6 +50,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   const { guild: guildId } = useRouter().query as { guild: string };
   const { guild } = useGuildPreview(guildId);
   const stats = useGuildStatsQuery(guildId).data;
+  const user = useSelfUserQuery().data;
   const { colorMode, toggleColorMode } = useColorMode();
 
   const online = stats?.online ?? false;
@@ -154,17 +156,30 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           <Icon as={colorMode === 'light' ? MdDarkMode : MdLightMode} boxSize="19px" />
         </IconBtn>
         <NotificationsBell guild={guildId} />
+        {/* Avatar → profile (README §11) */}
         <Flex
+          as={Link}
+          href="/user/profile"
+          title="Профиль"
           w="38px"
           h="38px"
           rounded="full"
+          overflow="hidden"
           align="center"
           justify="center"
           bg="blackAlpha.100"
           _dark={{ bg: 'whiteAlpha.100' }}
           color="TextSecondary"
+          border="1px solid"
+          borderColor="transparent"
+          transition="border-color .15s ease"
+          _hover={{ borderColor: 'brand.400' }}
         >
-          <Icon as={MdPerson} boxSize="20px" />
+          {user ? (
+            <Box as="img" src={avatarUrl(user)} alt="" w="full" h="full" objectFit="cover" />
+          ) : (
+            <Icon as={MdPerson} boxSize="20px" />
+          )}
         </Flex>
       </Flex>
     </Flex>
