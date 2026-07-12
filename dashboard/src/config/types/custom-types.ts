@@ -166,6 +166,7 @@ export type GuildStats = {
   role_count: number;
   latency_ms: number;
   enabled_feature_count: number;
+  open_tickets: number;
   top_xp: GuildStatsTopXp[];
 };
 

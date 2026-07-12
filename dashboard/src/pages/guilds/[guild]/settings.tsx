@@ -124,7 +124,7 @@ function OverviewMetrics({ stats }: { stats: GuildStats }) {
   return (
     <Box
       display="grid"
-      gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))"
+      gridTemplateColumns="repeat(auto-fit, minmax(210px, 1fr))"
       gap="16px"
     >
       <IrisStat label={tt('Участников')} value={stats.member_count.toLocaleString('ru-RU')} />
@@ -449,7 +449,7 @@ function ConfigTransfer({ guild }: { guild: string }) {
   const [busy, setBusy] = useState<'export' | 'import' | null>(null);
 
   const notify = (title: string, status: 'success' | 'error' | 'warning') =>
-    toast({ title, status, duration: 5000, isClosable: true, position: 'bottom-right' });
+    toast({ title, status, duration: 5000, isClosable: true, position: 'bottom' });
 
   const doExport = async () => {
     if (!session) return;

@@ -16,7 +16,7 @@ import {
 } from 'react-icons/md';
 import { avatarUrl } from '@/api/discord';
 import { ServerPicker } from './ServerPicker';
-import { useGuildInfoQuery, useSelfUserQuery } from '@/api/hooks';
+import { useGuildInfoQuery, useGuildStatsQuery, useSelfUserQuery } from '@/api/hooks';
 import { getFeatures } from '@/utils/common';
 import { useFeatureMeta } from '@/config/feature-meta';
 import { guild as view } from '@/config/translations/guild';
@@ -33,11 +33,13 @@ function NavItem({
   icon,
   label,
   active,
+  badge,
 }: {
   href: string;
   icon: IconType;
   label: ReactNode;
   active: boolean;
+  badge?: number;
 }) {
   return (
     <Flex
@@ -66,6 +68,21 @@ function NavItem({
         _dark={{ color: active ? 'brand.200' : 'inherit' }}
       />
       {label}
+      {badge != null && badge > 0 && (
+        <Box
+          as="span"
+          ml="auto"
+          fontSize="11px"
+          fontWeight="700"
+          rounded="20px"
+          px="8px"
+          py="1px"
+          color="brand.200"
+          bg="brandAlpha.100"
+        >
+          {badge}
+        </Box>
+      )}
     </Flex>
   );
 }
@@ -82,13 +99,17 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const enabled = new Set(info.data?.enabledFeatures ?? []);
   const enabledFeatures = getFeatures().filter((f) => enabled.has(f.id));
 
+  // Mockup order: Overview, Moderation, Members, Tickets, Audit Log, Analytics.
+  // The Tickets badge shows open tickets from the stats query the header
+  // already polls — same react-query key, so no extra RPC from here.
+  const openTickets = useGuildStatsQuery(guildId).data?.open_tickets ?? 0;
   const nav = [
     { href: `/guilds/${guildId}/settings`, icon: MdSpaceDashboard, label: t.bn.settings, route: '/guilds/[guild]/settings' },
     { href: `/guilds/${guildId}/moderation`, icon: MdGavel, label: t.bn.moderation, route: '/guilds/[guild]/moderation' },
     { href: `/guilds/${guildId}/members`, icon: MdPeople, label: t.bn.members, route: '/guilds/[guild]/members' },
-    { href: `/guilds/${guildId}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets' },
-    { href: `/guilds/${guildId}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
+    { href: `/guilds/${guildId}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets', badge: openTickets },
     { href: `/guilds/${guildId}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
+    { href: `/guilds/${guildId}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
   ];
 
   return (
@@ -173,6 +194,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
             href={n.href}
             icon={n.icon}
             label={n.label}
+            badge={'badge' in n ? n.badge : undefined}
             active={router.route === n.route}
           />
         ))}

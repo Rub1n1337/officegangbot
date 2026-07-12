@@ -191,7 +191,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
           toast({
             duration: 6000,
             isClosable: true,
-            position: 'bottom-right',
+            position: 'bottom',
             render: ({ onClose }) => (
               <Flex
                 bg="CardBackground"
