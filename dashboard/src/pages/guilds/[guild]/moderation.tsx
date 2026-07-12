@@ -26,6 +26,8 @@ import {
 } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { timeAgo, describeAudit, isModerationAction } from '@/utils/audit';
+import { provider, type Languages } from '@/config/translations/provider';
+import { useText } from '@/config/translations/ui-text';
 import type {
   AuditEntry,
   ModerationAppeals,
@@ -34,8 +36,9 @@ import type {
   ModerationWarning,
 } from '@/config/types/custom-types';
 
-// Russian plural: 1 страйк, 2 страйка, 5 страйков.
-function pluralStrikes(n: number): string {
+// Russian plural: 1 страйк, 2 страйка, 5 страйков. English: strike/strikes.
+function pluralStrikes(n: number, lang: Languages): string {
+  if (lang !== 'ru') return n === 1 ? 'strike' : 'strikes';
   const m10 = n % 10;
   const m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return 'страйк';
@@ -43,31 +46,35 @@ function pluralStrikes(n: number): string {
   return 'страйков';
 }
 
-function expiresIn(iso: string | null): string {
+function expiresIn(iso: string | null, lang: Languages): string {
   if (!iso) return '';
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
+  const ru = lang === 'ru';
   const s = Math.floor((d - Date.now()) / 1000);
-  if (s <= 0) return 'истекает';
+  if (s <= 0) return ru ? 'истекает' : 'expiring';
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}м осталось`;
+  if (m < 60) return ru ? `${m}м осталось` : `${m}m left`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}ч осталось`;
-  return `${Math.floor(h / 24)}д осталось`;
+  if (h < 24) return ru ? `${h}ч осталось` : `${h}h left`;
+  const days = Math.floor(h / 24);
+  return ru ? `${days}д осталось` : `${days}d left`;
 }
 
 // When a user's oldest active strike will drop out of the decay window.
-function decayLabel(iso: string | null): string {
-  if (!iso) return 'не истекает';
+function decayLabel(iso: string | null, lang: Languages): string {
+  const ru = lang === 'ru';
+  if (!iso) return ru ? 'не истекает' : 'never expires';
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
   const s = Math.floor((d - Date.now()) / 1000);
-  if (s <= 0) return 'истекает';
+  if (s <= 0) return ru ? 'истекает' : 'expiring';
   const m = Math.floor(s / 60);
-  if (m < 60) return `~${m}м осталось`;
+  if (m < 60) return ru ? `~${m}м осталось` : `~${m}m left`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `~${h}ч осталось`;
-  return `~${Math.floor(h / 24)}д осталось`;
+  if (h < 24) return ru ? `~${h}ч осталось` : `~${h}h left`;
+  const days = Math.floor(h / 24);
+  return ru ? `~${days}д осталось` : `~${days}d left`;
 }
 
 // Colour a strike count by how close it is to the first enabled escalation tier.
@@ -80,11 +87,12 @@ function strikeColor(count: number, s: ModerationStrikes): string {
   return 'yellow';
 }
 
-function policyLabel(s: ModerationStrikes): string {
+function policyLabel(s: ModerationStrikes, lang: Languages): string {
+  const ru = lang === 'ru';
   const parts: string[] = [];
-  if (s.muteAt > 0) parts.push(`мут при ${s.muteAt}`);
-  if (s.kickAt > 0) parts.push(`кик при ${s.kickAt}`);
-  if (s.banAt > 0) parts.push(`бан при ${s.banAt}`);
+  if (s.muteAt > 0) parts.push(ru ? `мут при ${s.muteAt}` : `mute at ${s.muteAt}`);
+  if (s.kickAt > 0) parts.push(ru ? `кик при ${s.kickAt}` : `kick at ${s.kickAt}`);
+  if (s.banAt > 0) parts.push(ru ? `бан при ${s.banAt}` : `ban at ${s.banAt}`);
   return parts.join(' · ');
 }
 
@@ -171,6 +179,8 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
   const undo = useModerateMemberMutation();
   const toast = useToast();
   const [showAll, setShowAll] = useState(false);
+  const lang = provider.useLang();
+  const tt = useText();
   const shown = showAll ? rows : rows.slice(0, INITIAL_WARNINGS);
 
   const handleDelete = (w: ModerationWarning) => {
@@ -193,7 +203,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
                 borderWidth="1px"
                 borderColor="whiteAlpha.200"
               >
-                <Text fontSize="sm">Warning removed</Text>
+                <Text fontSize="sm">{tt('Предупреждение удалено')}</Text>
                 <Button
                   size="xs"
                   variant="outline"
@@ -206,7 +216,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
                     onClose();
                   }}
                 >
-                  Undo
+                  {tt('Вернуть')}
                 </Button>
               </Flex>
             ),
@@ -217,10 +227,10 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
   };
 
   return (
-    <Section icon={<Icon as={MdGavel} />} title="Недавние предупреждения" count={rows.length}>
+    <Section icon={<Icon as={MdGavel} />} title={tt('Недавние предупреждения')} count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          Предупреждений нет.
+          {tt('Предупреждений нет.')}
         </Text>
       ) : (
         <Flex direction="column" gap="8px">
@@ -234,11 +244,11 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
                   {w.reason}
                 </Text>
                 <Text fontSize="11.5px" color="TextSecondary" opacity={0.75} mt="2px">
-                  {w.moderatorName} · {timeAgo(w.createdAt)}
+                  {w.moderatorName} · {timeAgo(w.createdAt, lang)}
                 </Text>
               </Box>
               <IconButton
-                aria-label="Удалить предупреждение"
+                aria-label={tt('Удалить предупреждение')}
                 icon={<MdDelete />}
                 w="34px"
                 h="34px"
@@ -256,7 +266,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
           ))}
           {rows.length > INITIAL_WARNINGS && (
             <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Свернуть' : `Показать все (${rows.length})`}
+              {showAll ? tt('Свернуть') : `${tt('Показать все')} (${rows.length})`}
             </Button>
           )}
         </Flex>
@@ -266,17 +276,19 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
 }
 
 function Punishments({ rows }: { rows: ModerationPunishment[] }) {
+  const lang = provider.useLang();
+  const tt = useText();
   return (
-    <Section icon={<Icon as={MdTimer} />} title="Активные наказания" count={rows.length}>
+    <Section icon={<Icon as={MdTimer} />} title={tt('Активные наказания')} count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          Активных мутов и банов нет.
+          {tt('Активных мутов и банов нет.')}
         </Text>
       ) : (
         <Flex direction="column" gap="8px">
           {rows.map((p) => (
             <Flex key={p.userId} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
-              <Pill tone={p.type === 'ban' ? 'red' : 'amber'}>{p.type === 'ban' ? 'бан' : 'мут'}</Pill>
+              <Pill tone={p.type === 'ban' ? 'red' : 'amber'}>{p.type === 'ban' ? tt('бан') : tt('мут')}</Pill>
               <Box flex="1" minW={0}>
                 <Text fontSize="13.5px" fontWeight="600" isTruncated>
                   {p.userName}
@@ -288,7 +300,7 @@ function Punishments({ rows }: { rows: ModerationPunishment[] }) {
                 )}
               </Box>
               <Text fontSize="12px" color="TextSecondary" flexShrink={0}>
-                {expiresIn(p.expiresAt)}
+                {expiresIn(p.expiresAt, lang)}
               </Text>
             </Flex>
           ))}
@@ -302,26 +314,30 @@ const INITIAL_STRIKES = 12;
 
 function Strikes({ data }: { data: ModerationStrikes }) {
   const [showAll, setShowAll] = useState(false);
+  const lang = provider.useLang();
+  const tt = useText();
   const shown = showAll ? data.users : data.users.slice(0, INITIAL_STRIKES);
-  const policy = policyLabel(data);
+  const policy = policyLabel(data, lang);
 
   return (
-    <Section icon={<Icon as={MdShield} />} title="Активные страйки" count={data.users.length}>
+    <Section icon={<Icon as={MdShield} />} title={tt('Активные страйки')} count={data.users.length}>
       <Text fontSize="12px" color="TextSecondary" mb="14px">
-        {data.enabled ? 'Страйки вкл' : 'Страйки выкл'}
-        {data.expiryHours > 0 ? ` · затухают через ${data.expiryHours}ч` : ' · не затухают'}
+        {data.enabled ? tt('Страйки вкл') : tt('Страйки выкл')}
+        {data.expiryHours > 0
+          ? ` · ${tt('затухают через')} ${data.expiryHours}${tt('ч')}`
+          : ` · ${tt('не затухают')}`}
         {policy && ` · ${policy}`}
       </Text>
       {data.users.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          Ни у кого нет активных страйков.
+          {tt('Ни у кого нет активных страйков.')}
         </Text>
       ) : (
         <Flex direction="column" gap="8px">
           {shown.map((u) => (
             <Flex key={u.userId} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
               <Pill tone={toneFromScheme(strikeColor(u.count, data))}>
-                {u.count} {pluralStrikes(u.count)}
+                {u.count} {pluralStrikes(u.count, lang)}
               </Pill>
               <Box flex="1" minW={0}>
                 <Text fontSize="13.5px" fontWeight="600" isTruncated>
@@ -330,11 +346,11 @@ function Strikes({ data }: { data: ModerationStrikes }) {
               </Box>
               <Box textAlign="right" flexShrink={0}>
                 <Text fontSize="12px" color="TextSecondary">
-                  {decayLabel(u.nextDecayAt)}
+                  {decayLabel(u.nextDecayAt, lang)}
                 </Text>
                 {u.lastStrikeAt && (
                   <Text fontSize="11px" color="TextSecondary" opacity={0.7}>
-                    последний: {timeAgo(u.lastStrikeAt)}
+                    {tt('последний:')} {timeAgo(u.lastStrikeAt, lang)}
                   </Text>
                 )}
               </Box>
@@ -342,7 +358,7 @@ function Strikes({ data }: { data: ModerationStrikes }) {
           ))}
           {data.users.length > INITIAL_STRIKES && (
             <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Свернуть' : `Показать все (${data.users.length})`}
+              {showAll ? tt('Свернуть') : `${tt('Показать все')} (${data.users.length})`}
             </Button>
           )}
         </Flex>
@@ -360,13 +376,15 @@ const APPEAL_STATUS: Record<string, { tone: 'green' | 'red' | 'amber' | 'gray'; 
 function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string }) {
   const setEnabled = useSetBanAppealsMutation();
   const decide = useDecideBanAppealMutation();
+  const lang = provider.useLang();
+  const tt = useText();
   const pendingCount = data.items.filter((a) => a.status === 'pending').length;
 
   return (
-    <Section icon={<Icon as={MdOutlineHowToReg} />} title="Апелляции на бан" count={pendingCount}>
+    <Section icon={<Icon as={MdOutlineHowToReg} />} title={tt('Апелляции на бан')} count={pendingCount}>
       <Flex align="center" justify="space-between" gap="12px" rounded="11px" p="12px 14px" mb="12px" {...INSET}>
         <Text fontSize="13px" color="TextSecondary" flex="1">
-          В бан-DM добавляется кнопка «Апелляция». Заявки появляются здесь на рассмотрение.
+          {tt('В бан-DM добавляется кнопка «Апелляция». Заявки появляются здесь на рассмотрение.')}
         </Text>
         <Switch
           isChecked={data.enabled}
@@ -378,7 +396,7 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
 
       {data.items.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          {data.enabled ? 'Заявок пока нет.' : 'Апелляции на бан выключены.'}
+          {data.enabled ? tt('Заявок пока нет.') : tt('Апелляции на бан выключены.')}
         </Text>
       ) : (
         <Flex direction="column" gap="8px">
@@ -387,12 +405,12 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
             return (
               <Box key={a.id} rounded="11px" p="12px 14px" {...INSET}>
                 <Flex align="center" gap="10px" wrap="wrap">
-                  <Pill tone={st.tone}>{st.label}</Pill>
+                  <Pill tone={st.tone}>{tt(st.label)}</Pill>
                   <Text fontSize="13.5px" fontWeight="600" isTruncated>
                     {a.userName ?? a.userId}
                   </Text>
                   <Text fontSize="11.5px" color="TextSecondary" opacity={0.75}>
-                    {timeAgo(a.createdAt)}
+                    {timeAgo(a.createdAt, lang)}
                   </Text>
                   {a.status === 'pending' && (
                     <Flex ml="auto" gap="8px" flexShrink={0}>
@@ -405,7 +423,7 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
                         isLoading={decide.isLoading && decide.variables?.appealId === a.id}
                         onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'approve' })}
                       >
-                        Одобрить · разбан
+                        {tt('Одобрить · разбан')}
                       </Button>
                       <Button
                         size="sm"
@@ -417,13 +435,13 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
                         isLoading={decide.isLoading && decide.variables?.appealId === a.id}
                         onClick={() => decide.mutate({ guild, appealId: a.id, decision: 'deny' })}
                       >
-                        Отклонить
+                        {tt('Отклонить')}
                       </Button>
                     </Flex>
                   )}
                   {a.status !== 'pending' && a.decidedByName && (
                     <Text ml="auto" fontSize="11.5px" color="TextSecondary" flexShrink={0}>
-                      решение: {a.decidedByName}
+                      {tt('решение:')} {a.decidedByName}
                     </Text>
                   )}
                 </Flex>
@@ -445,13 +463,15 @@ const INITIAL_AUDIT = 10;
 
 function AuditActivity({ rows }: { rows: AuditEntry[] }) {
   const [showAll, setShowAll] = useState(false);
+  const lang = provider.useLang();
+  const tt = useText();
   const shown = showAll ? rows : rows.slice(0, INITIAL_AUDIT);
 
   return (
-    <Section icon={<Icon as={MdHistory} />} title="Активность дашборда" count={rows.length}>
+    <Section icon={<Icon as={MdHistory} />} title={tt('Активность дашборда')} count={rows.length}>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          Действий из дашборда пока нет.
+          {tt('Действий из дашборда пока нет.')}
         </Text>
       ) : (
         <Flex direction="column" gap="8px">
@@ -460,9 +480,9 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
               <Box flex="1" minW={0}>
                 <Text fontSize="13.5px" isTruncated>
                   <Text as="span" fontWeight="600">
-                    {e.actorName ?? 'Кто-то'}
+                    {e.actorName ?? tt('Кто-то')}
                   </Text>{' '}
-                  {describeAudit(e)}
+                  {describeAudit(e, lang)}
                 </Text>
                 {isModerationAction(e.action) && e.detail && (
                   <Text fontSize="11.5px" color="TextSecondary" noOfLines={1}>
@@ -471,13 +491,13 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
                 )}
               </Box>
               <Text fontSize="11.5px" color="TextSecondary" flexShrink={0}>
-                {timeAgo(e.createdAt)}
+                {timeAgo(e.createdAt, lang)}
               </Text>
             </Flex>
           ))}
           {rows.length > INITIAL_AUDIT && (
             <Button size="sm" variant="ghost" alignSelf="center" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Свернуть' : `Показать все (${rows.length})`}
+              {showAll ? tt('Свернуть') : `${tt('Показать все')} (${rows.length})`}
             </Button>
           )}
         </Flex>
@@ -502,6 +522,7 @@ function ModerationSkeleton() {
 
 const ModerationPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
+  const tt = useText();
   const query = useModerationQuery(guild);
   const audit = useAuditQuery(guild);
 
@@ -509,10 +530,10 @@ const ModerationPage: NextPageWithLayout = () => {
     <Flex direction="column" gap="16px">
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
-          МОДЕРАЦИЯ
+          {tt('МОДЕРАЦИЯ')}
         </Text>
         <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
-          Предупреждения, наказания и апелляции
+          {tt('Предупреждения, наказания и апелляции')}
         </Heading>
       </Box>
       <QueryStatus

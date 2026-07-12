@@ -15,6 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { AiTwotoneCalendar as CalendarIcon } from 'react-icons/ai';
 import { useController } from 'react-hook-form';
+import { useFormText } from '@/config/translations/form-text';
 
 export function DatePicker(props: CalendarProps) {
   return (
@@ -58,6 +59,7 @@ export const SmallDatePickerForm: ControlledInput<DatePickerFormProps, CalendarP
     fieldState,
   } = useController(controller);
 
+  const ft = useFormText();
   const text = field.value?.toLocaleString(undefined, {
     dateStyle: 'short',
   });
@@ -67,7 +69,7 @@ export const SmallDatePickerForm: ControlledInput<DatePickerFormProps, CalendarP
       <Popover>
         <PopoverTrigger>
           <InputGroup>
-            <Input value={text ?? ''} placeholder="Select a Date" variant="main" readOnly />
+            <Input value={text ?? ''} placeholder={ft('Select a Date')} variant="main" readOnly />
             <InputRightElement zIndex={0}>
               <CalendarIcon />
             </InputRightElement>

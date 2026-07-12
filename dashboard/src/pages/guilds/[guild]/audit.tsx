@@ -27,6 +27,9 @@ import {
   formatDateTime,
   timeAgo,
 } from '@/utils/audit';
+import { provider } from '@/config/translations/provider';
+import { useText } from '@/config/translations/ui-text';
+import type { Languages } from '@/config/translations/provider';
 import type { AuditEntry } from '@/config/types/custom-types';
 
 // Render this many rows at a time (with a "Show more") rather than mounting the
@@ -42,7 +45,7 @@ const PERIODS: Record<string, { label: string; days: number | null }> = {
 
 function matchesSearch(e: AuditEntry, q: string): boolean {
   if (!q) return true;
-  const hay = [e.actorName, e.action, e.target, e.detail, describeAudit(e)]
+  const hay = [e.actorName, e.action, e.target, e.detail, describeAudit(e, 'ru'), describeAudit(e, 'en')]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -68,19 +71,19 @@ function downloadCsv(filename: string, csv: string) {
   URL.revokeObjectURL(url);
 }
 
-function AuditRow({ e }: { e: AuditEntry }) {
+function AuditRow({ e, lang }: { e: AuditEntry; lang: Languages }) {
   return (
     <Flex align="flex-start" justify="space-between" gap={3} rounded="11px" p="12px 14px" bg="secondaryGray.100" _dark={{ bg: 'navy.600' }}>
       <Flex gap={3} minW={0} align="flex-start">
         <Badge colorScheme={auditActionColor(e.action)} rounded="20px" px="9px" mt="1px" flexShrink={0}>
-          {actionLabel(e.action)}
+          {actionLabel(e.action, lang)}
         </Badge>
         <Box minW={0}>
           <Text fontSize="sm">
             <Text as="span" fontWeight="600">
               {e.actorName ?? 'Someone'}
             </Text>{' '}
-            {describeAudit(e)}
+            {describeAudit(e, lang)}
           </Text>
           {e.detail && (
             <Text fontSize="xs" color="TextSecondary" noOfLines={2}>
@@ -91,7 +94,7 @@ function AuditRow({ e }: { e: AuditEntry }) {
       </Flex>
       <Box textAlign="right" flexShrink={0}>
         <Text fontSize="xs" color="TextSecondary">
-          {timeAgo(e.createdAt)}
+          {timeAgo(e.createdAt, lang)}
         </Text>
         <Text fontSize="xs" color="TextSecondary" opacity={0.7}>
           {formatDateTime(e.createdAt)}
@@ -121,6 +124,8 @@ const AuditPage: NextPageWithLayout = () => {
   const [action, setAction] = useState('all');
   const [period, setPeriod] = useState('all');
   const [visible, setVisible] = useState(PAGE);
+  const lang = provider.useLang();
+  const tt = useText();
 
   const rows = useMemo(() => query.data ?? [], [query.data]);
   // The distinct action types present, so the dropdown only offers real values.
@@ -148,14 +153,13 @@ const AuditPage: NextPageWithLayout = () => {
     <Flex direction="column" gap="18px">
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
-          ЖУРНАЛ
+          {tt('ЖУРНАЛ')}
         </Text>
         <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
-          Активность дашборда
+          {tt('Активность дашборда')}
         </Heading>
         <Text fontSize="13.5px" color="TextSecondary" mt="4px">
-          Каждое действие из этого дашборда — модерация, изменения функций и настроек — с автором и
-          временем.
+          {tt('Каждое действие из этого дашборда — модерация, изменения функций и настроек — с автором и временем.')}
         </Text>
       </Box>
 
@@ -168,7 +172,7 @@ const AuditPage: NextPageWithLayout = () => {
               </InputLeftElement>
               <Input
                 variant="main"
-                placeholder="Поиск по автору, действию, деталям…"
+                placeholder={tt('Поиск по автору, действию, деталям…')}
                 value={search}
                 onChange={(ev) => setSearch(ev.target.value)}
               />
@@ -180,10 +184,10 @@ const AuditPage: NextPageWithLayout = () => {
               value={action}
               onChange={(ev) => setAction(ev.target.value)}
             >
-              <option value="all">Все действия</option>
+              <option value="all">{tt('Все действия')}</option>
               {actionOptions.map((a) => (
                 <option key={a} value={a}>
-                  {actionLabel(a)}
+                  {actionLabel(a, lang)}
                 </option>
               ))}
             </Select>
@@ -196,13 +200,13 @@ const AuditPage: NextPageWithLayout = () => {
             >
               {Object.entries(PERIODS).map(([key, { label }]) => (
                 <option key={key} value={key}>
-                  {label}
+                  {tt(label)}
                 </option>
               ))}
             </Select>
 
             <Text fontSize="sm" color="TextSecondary">
-              {filtered.length} из {rows.length}
+              {filtered.length} {tt('из')} {rows.length}
             </Text>
 
             <Button
@@ -218,22 +222,22 @@ const AuditPage: NextPageWithLayout = () => {
                 )
               }
             >
-              Экспорт CSV
+              {tt('Экспорт CSV')}
             </Button>
           </Flex>
 
           {rows.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              Действий из дашборда пока нет.
+              {tt('Действий из дашборда пока нет.')}
             </Text>
           ) : filtered.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              Ничего не найдено по фильтрам.
+              {tt('Ничего не найдено по фильтрам.')}
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
               {filtered.slice(0, visible).map((e) => (
-                <AuditRow key={e.id} e={e} />
+                <AuditRow key={e.id} e={e} lang={lang} />
               ))}
               {filtered.length > visible && (
                 <Button
@@ -243,7 +247,7 @@ const AuditPage: NextPageWithLayout = () => {
                   mt={1}
                   onClick={() => setVisible((v) => v + PAGE)}
                 >
-                  Показать ещё ({filtered.length - visible})
+                  {tt('Показать ещё')} ({filtered.length - visible})
                 </Button>
               )}
             </Flex>
@@ -251,7 +255,7 @@ const AuditPage: NextPageWithLayout = () => {
 
           {filtersActive && filtered.length > 0 && (
             <Text fontSize="xs" color="TextSecondary" mt={3} textAlign="center">
-              В экспорт войдут отфильтрованные записи: {filtered.length}.
+              {tt('В экспорт войдут отфильтрованные записи:')} {filtered.length}.
             </Text>
           )}
         </Box>

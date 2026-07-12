@@ -4,11 +4,10 @@ import Router, { useRouter } from 'next/router';
 /**
  * Supported languages
  */
-export type Languages = 'en' | 'cn' | 'ru';
+export type Languages = 'en' | 'ru';
 export const { languages, names } = initLanguages<Languages>({
   en: 'English',
   ru: 'Русский',
-  cn: '中文',
 });
 
 export const provider = initI18n<Languages>({

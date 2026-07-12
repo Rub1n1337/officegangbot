@@ -29,7 +29,9 @@ import { NextPageWithLayout } from '@/pages/_app';
 import { useTicketsQuery, useTicketSearchQuery, useTicketTranscriptQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { ErrorPanel } from '@/components/panel/ErrorPanel';
-import { timeAgo, formatDateTime } from '@/utils/audit';
+import { timeAgo } from '@/utils/audit';
+import { provider } from '@/config/translations/provider';
+import { useText } from '@/config/translations/ui-text';
 import type { Ticket, TicketPriority } from '@/config/types/custom-types';
 
 // Render this many rows at a time (with a "Show more") rather than mounting the
@@ -47,10 +49,11 @@ const PRIORITY: Record<TicketPriority, { label: string; color: string }> = {
 };
 
 function PriorityBadge({ priority }: { priority: TicketPriority }) {
+  const tt = useText();
   const p = PRIORITY[priority] ?? PRIORITY.medium;
   return (
     <Badge colorScheme={p.color} rounded="md" flexShrink={0}>
-      {p.label}
+      {tt(p.label)}
     </Badge>
   );
 }
@@ -65,13 +68,14 @@ function TranscriptModal({
   onClose: () => void;
 }) {
   const query = useTicketTranscriptQuery(guild, ticketId);
+  const tt = useText();
   const open = ticketId !== null;
 
   return (
     <Modal isOpen={open} onClose={onClose} size="2xl" scrollBehavior="inside" isCentered>
       <ModalOverlay />
       <ModalContent bg="CardBackground">
-        <ModalHeader>Транскрипт тикета</ModalHeader>
+        <ModalHeader>{tt('Транскрипт тикета')}</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
           {query.isLoading && (
@@ -81,20 +85,20 @@ function TranscriptModal({
           )}
           {query.isError && (
             <ErrorPanel retry={() => query.refetch()} isRetrying={query.isFetching}>
-              Не удалось загрузить транскрипт.
+              {tt('Не удалось загрузить транскрипт.')}
             </ErrorPanel>
           )}
           {query.data && (
             <Flex direction="column" gap={3}>
               <Flex gap={2} wrap="wrap" align="center" fontSize="sm" color="TextSecondary">
                 <PriorityBadge priority={query.data.priority} />
-                <Text>Открыл {query.data.openerName ?? 'неизвестно'}</Text>
-                {query.data.closedByName && <Text>· закрыл {query.data.closedByName}</Text>}
+                <Text>{tt('Открыл')} {query.data.openerName ?? tt('неизвестно')}</Text>
+                {query.data.closedByName && <Text>· {tt('закрыл')} {query.data.closedByName}</Text>}
               </Flex>
               {query.data.closeComment && (
                 <Box rounded="11px" p={3} {...INSET}>
                   <Text fontSize="xs" color="TextSecondary" mb={1}>
-                    Комментарий при закрытии
+                    {tt('Комментарий при закрытии')}
                   </Text>
                   <Text fontSize="sm">{query.data.closeComment}</Text>
                 </Box>
@@ -111,7 +115,7 @@ function TranscriptModal({
                 maxH="55vh"
                 overflowY="auto"
               >
-                {query.data.transcript ?? 'Транскрипт для этого тикета не сохранён.'}
+                {query.data.transcript ?? tt('Транскрипт для этого тикета не сохранён.')}
               </Box>
             </Flex>
           )}
@@ -122,6 +126,8 @@ function TranscriptModal({
 }
 
 function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
+  const lang = provider.useLang();
+  const tt = useText();
   return (
     <Flex align="flex-start" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
       <Flex gap="12px" flex="1" minW={0} align="flex-start">
@@ -132,12 +138,12 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
               {t.openerName ?? t.openerId}
             </Text>
             <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="20px" px="9px" flexShrink={0}>
-              {t.status === 'open' ? 'открыт' : 'закрыт'}
+              {t.status === 'open' ? tt('открыт') : tt('закрыт')}
             </Badge>
           </Flex>
           <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, sm: 1 }} mt="2px">
-            Открыт {timeAgo(t.openedAt)}
-            {t.closedAt && ` · закрыт ${timeAgo(t.closedAt)}`}
+            {tt('Открыт')} {timeAgo(t.openedAt, lang)}
+            {t.closedAt && ` · ${tt('закрыт')} ${timeAgo(t.closedAt, lang)}`}
             {t.closedByName && `, ${t.closedByName}`}
           </Text>
           {t.closeComment && (
@@ -155,12 +161,12 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
           borderColor="CardBorder"
           onClick={() => onView(t.id)}
           flexShrink={0}
-          aria-label="Открыть транскрипт"
+          aria-label={tt('Открыть транскрипт')}
           _hover={{ borderColor: 'brand.400' }}
         >
           <Icon as={MdDescription} />
           <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
-            Транскрипт
+            {tt('Транскрипт')}
           </Box>
         </Button>
       )}
@@ -192,12 +198,13 @@ function TranscriptHits({
   isLoading: boolean;
   onView: (id: number) => void;
 }) {
+  const tt = useText();
   if (query.length < 2) return null;
   return (
     <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
       <Flex align="center" gap="10px" mb="14px">
         <Icon as={MdSearch} color="brand.200" boxSize="20px" />
-        <Heading fontSize="15px" fontWeight="700">Найдено в транскриптах</Heading>
+        <Heading fontSize="15px" fontWeight="700">{tt('Найдено в транскриптах')}</Heading>
         {hits.length > 0 && (
           <Box as="span" fontSize="12px" fontWeight="700" rounded="20px" px="9px" color="TextSecondary" bg="blackAlpha.100" _dark={{ bg: 'whiteAlpha.100' }}>
             {hits.length}
@@ -210,7 +217,7 @@ function TranscriptHits({
         </Flex>
       ) : hits.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          В транскриптах нет совпадений по «{query}».
+          {tt('В транскриптах нет совпадений по')} «{query}».
         </Text>
       ) : (
         <Flex direction="column" gap={2}>
@@ -244,12 +251,12 @@ function TranscriptHits({
                   borderColor="CardBorder"
                   onClick={() => onView(t.id)}
                   flexShrink={0}
-                  aria-label="Открыть транскрипт"
+                  aria-label={tt('Открыть транскрипт')}
                   _hover={{ borderColor: 'brand.400' }}
                 >
                   <Icon as={MdDescription} />
                   <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
-                    Транскрипт
+                    {tt('Транскрипт')}
                   </Box>
                 </Button>
               )}
@@ -268,6 +275,7 @@ const TicketsPage: NextPageWithLayout = () => {
   const [status, setStatus] = useState<'all' | 'open' | 'closed'>('all');
   const [selected, setSelected] = useState<number | null>(null);
   const [visible, setVisible] = useState(PAGE);
+  const tt = useText();
   const { onClose } = useDisclosure();
 
   // Debounce the transcript-search request so it doesn't fire on every keystroke.
@@ -313,21 +321,20 @@ const TicketsPage: NextPageWithLayout = () => {
         <Flex align="center" gap="12px" wrap="wrap">
           <Box>
             <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
-              ТИКЕТЫ
+              {tt('ТИКЕТЫ')}
             </Text>
             <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
-              Поддержка
+              {tt('Поддержка')}
             </Heading>
           </Box>
           {openCount > 0 && (
             <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px="11px" py="4px" fontSize="12px">
-              {openCount} открыто
+              {openCount} {tt('открыто')}
             </Badge>
           )}
         </Flex>
         <Text fontSize="13.5px" color="TextSecondary" mt="4px">
-          Тикеты поддержки с приоритетом, комментариями при закрытии и полными транскриптами
-          закрытых обращений.
+          {tt('Тикеты поддержки с приоритетом, комментариями при закрытии и полными транскриптами закрытых обращений.')}
         </Text>
       </Box>
 
@@ -341,7 +348,7 @@ const TicketsPage: NextPageWithLayout = () => {
                 </InputLeftElement>
                 <Input
                   variant="main"
-                  placeholder="Поиск по тикетам и транскриптам…"
+                  placeholder={tt('Поиск по тикетам и транскриптам…')}
                   value={search}
                   onChange={(ev) => setSearch(ev.target.value)}
                 />
@@ -352,23 +359,23 @@ const TicketsPage: NextPageWithLayout = () => {
                 value={status}
                 onChange={(ev) => setStatus(ev.target.value as 'all' | 'open' | 'closed')}
               >
-                <option value="all">Все статусы</option>
-                <option value="open">Открытые</option>
-                <option value="closed">Закрытые</option>
+                <option value="all">{tt('Все статусы')}</option>
+                <option value="open">{tt('Открытые')}</option>
+                <option value="closed">{tt('Закрытые')}</option>
               </Select>
             </Flex>
             <Text fontSize="sm" color="TextSecondary">
-              {filtered.length} из {rows.length}
+              {filtered.length} {tt('из')} {rows.length}
             </Text>
           </Flex>
 
           {rows.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              Тикеты ещё не открывались.
+              {tt('Тикеты ещё не открывались.')}
             </Text>
           ) : filtered.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              Ничего не найдено по фильтрам.
+              {tt('Ничего не найдено по фильтрам.')}
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
@@ -383,7 +390,7 @@ const TicketsPage: NextPageWithLayout = () => {
                   mt={1}
                   onClick={() => setVisible((v) => v + PAGE)}
                 >
-                  Показать ещё ({filtered.length - visible})
+                  {tt('Показать ещё')} ({filtered.length - visible})
                 </Button>
               )}
             </Flex>

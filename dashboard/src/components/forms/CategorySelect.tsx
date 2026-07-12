@@ -11,6 +11,7 @@ import { Override } from '@/utils/types';
 import { ControlledInput } from './types';
 import { FormCard } from './Form';
 import { useController } from 'react-hook-form';
+import { useFormText } from '@/config/translations/form-text';
 
 const render = (channel: GuildChannel): Option => ({
   label: channel.name,
@@ -33,6 +34,7 @@ type Props = Override<
 export const CategorySelect = forwardRef<SelectInstance<Option, false>, Props>(
   ({ value, onChange, ...rest }, ref) => {
     const guild = useRouter().query.guild as string;
+    const ft = useFormText();
     const channelsQuery = useGuildChannelsQuery(guild);
     const isLoading = channelsQuery.isLoading;
 
@@ -46,7 +48,7 @@ export const CategorySelect = forwardRef<SelectInstance<Option, false>, Props>(
       <SelectField<Option>
         isDisabled={isLoading}
         isLoading={isLoading}
-        placeholder="Select a category"
+        placeholder={ft('Select a category')}
         value={selected != null ? render(selected) : null}
         options={categories.map(render)}
         onChange={(e) => e != null && onChange(e.value)}
