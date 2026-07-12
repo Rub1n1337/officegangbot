@@ -1,5 +1,7 @@
-import { Box, Drawer, DrawerBody, DrawerContent, DrawerOverlay, Flex } from '@chakra-ui/react';
+import { Box, Drawer, DrawerBody, DrawerContent, DrawerOverlay, Flex, usePrefersReducedMotion } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react';
 import { ReactNode } from 'react';
+import { useRouter } from 'next/router';
 import { usePageStore } from '@/stores';
 import { IrisSidebar } from './iris-sidebar';
 import { IrisHeader } from './iris-header';
@@ -8,8 +10,14 @@ import { IrisHeader } from './iris-header';
 // header and its own scroll area. Below xl the sidebar collapses into a drawer
 // opened from the header's menu button. Scoped to guild pages so the /user
 // pages keep the original layout.
+// Screen-enter motion from the mockup: fade + 6px rise, 0.25s ease. Re-runs on
+// every route change via the key below.
+const screenIn = keyframes`from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}`;
+
 export default function IrisGuildLayout({ children }: { children: ReactNode }) {
   const [isOpen, setOpen] = usePageStore((s) => [s.sidebarIsOpen, s.setSidebarIsOpen]);
+  const route = useRouter().asPath;
+  const reduceMotion = usePrefersReducedMotion();
 
   return (
     <Box
@@ -38,7 +46,14 @@ export default function IrisGuildLayout({ children }: { children: ReactNode }) {
       <Flex direction="column" overflow="hidden" h="100%">
         <IrisHeader onOpenSidebar={() => setOpen(true)} />
         <Box flex="1" overflowY="auto">
-          <Box maxW="1240px" mx="auto" px={{ base: '20px', md: '28px' }} py={{ base: '22px', md: '26px' }}>
+          <Box
+            key={route}
+            maxW="1240px"
+            mx="auto"
+            px={{ base: '20px', md: '28px' }}
+            py={{ base: '22px', md: '26px' }}
+            animation={reduceMotion ? undefined : `${screenIn} .25s ease`}
+          >
             {children}
           </Box>
         </Box>

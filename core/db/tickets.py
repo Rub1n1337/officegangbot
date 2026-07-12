@@ -82,6 +82,15 @@ class _TicketsMixin:
             )
         return dict(row) if row else None
 
+    async def count_open_tickets(self, guild_id: int) -> int:
+        """Number of currently open tickets — cheap enough for the stats poll."""
+        async with self.pool.acquire() as conn:
+            n = await conn.fetchval(
+                "SELECT COUNT(*) FROM tickets WHERE guild_id = $1 AND status = 'open'",
+                guild_id,
+            )
+        return int(n or 0)
+
     async def get_tickets(self, guild_id: int, limit: int = 100) -> List[Dict[str, Any]]:
         """Returns recent tickets for a guild (open first, then most recent),
         without the (potentially large) transcript body."""

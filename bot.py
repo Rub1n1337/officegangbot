@@ -553,8 +553,13 @@ class MyBot(commands.Bot):
 
         enabled_features = []
         top_xp = []
+        open_tickets = 0
         if self.db:
             enabled_features = await self.db.get_enabled_features(guild_id)
+            try:
+                open_tickets = await self.db.count_open_tickets(guild_id)
+            except Exception as e:
+                logger.warning(f"get_guild_stats open-ticket count failed for {guild_id}: {e}")
             try:
                 rows = await self.db.get_leaderboard(guild_id, limit=5)
                 for row in rows:
@@ -579,6 +584,7 @@ class MyBot(commands.Bot):
             "role_count": len(guild.roles),
             "latency_ms": round(self.latency * 1000, 2),
             "enabled_feature_count": len(enabled_features),
+            "open_tickets": open_tickets,
             "top_xp": top_xp,
         }
 
