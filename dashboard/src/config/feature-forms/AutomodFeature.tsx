@@ -10,11 +10,6 @@ import {
   Icon,
   IconButton,
   Input,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
   Select,
   Switch,
   Tag,
@@ -36,6 +31,7 @@ import {
   MdScience,
 } from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
+import { NumberStepper } from '@/components/forms/NumberStepper';
 import { ChannelMultiSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleMultiSelectForm } from '@/components/forms/RoleSelect';
 import { useFormText } from '@/config/translations/form-text';
@@ -232,20 +228,7 @@ function NumberRule({
         <Text fontWeight="600">{title}</Text>
         <Text fontSize="sm" color="TextSecondary">{description}</Text>
       </Box>
-      <NumberInput
-        value={value}
-        min={min}
-        max={max}
-        onChange={(_, num) => onChange(Number.isNaN(num) ? value : num)}
-        w="90px"
-        flexShrink={0}
-      >
-        <NumberInputField />
-        <NumberInputStepper>
-          <NumberIncrementStepper />
-          <NumberDecrementStepper />
-        </NumberInputStepper>
-      </NumberInput>
+      <NumberStepper value={value} min={min} max={max} onChange={onChange} />
     </Flex>
   );
 }
