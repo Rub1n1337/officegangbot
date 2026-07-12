@@ -14,6 +14,10 @@ const nextConfig = {
       { source: '/auth', destination: '/auth/signin', permanent: false },
       { source: '/user', destination: '/user/home', permanent: false },
       { source: '/', destination: '/user/home', permanent: false },
+      // The guild landing is the Iris Overview (settings); the old index page
+      // (Getting Started banner + legacy feature grid) is removed. ':guild'
+      // matches a single segment, so /guilds/:guild/settings etc. are untouched.
+      { source: '/guilds/:guild', destination: '/guilds/:guild/settings', permanent: false },
     ];
   },
   // Baseline security headers, applied to every route. Deliberately excludes a
