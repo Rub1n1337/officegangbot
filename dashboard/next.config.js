@@ -2,10 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   // Locale routing for the dashboard UI language. Default locale (en) keeps clean
-  // URLs; other locales get a path prefix (/ru, /cn). API routes are not prefixed.
+  // URLs; ru gets a path prefix (/ru). API routes are not prefixed.
   // localeDetection off so visitors aren't auto-redirected by Accept-Language.
   i18n: {
-    locales: ['en', 'cn', 'ru'],
+    locales: ['en', 'ru'],
     defaultLocale: 'en',
     localeDetection: false,
   },

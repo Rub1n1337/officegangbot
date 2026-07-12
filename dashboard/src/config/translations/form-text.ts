@@ -8,6 +8,8 @@ import { provider } from './provider';
 const RU: Record<string, string> = {
   // --- Shared ---------------------------------------------------------------
   Channel: 'Канал',
+  'Select a category': 'Выберите категорию',
+  'Select a Date': 'Выберите дату',
   Role: 'Роль',
   Level: 'Уровень',
   Message: 'Сообщение',
@@ -293,6 +295,8 @@ const RU: Record<string, string> = {
   'Role that can see and respond to ticket channels':
     'Роль, которая видит тикеты и может отвечать в них',
   'Ticket category': 'Категория тикетов',
+  'in Discord to post the “Open Ticket” panel in the channel of your choice.':
+    'в Discord, чтобы отправить панель «Открыть тикет» в нужный канал.',
   'New ticket channels are created under this category':
     'Новые каналы тикетов создаются в этой категории',
 

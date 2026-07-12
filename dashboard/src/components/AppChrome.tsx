@@ -15,6 +15,7 @@ import { useRouter } from 'next/router';
 import { useGuilds } from '@/api/hooks';
 import { getFeatures } from '@/utils/common';
 import { config } from '@/config/common';
+import { useText } from '@/config/translations/ui-text';
 import { searchSettings } from '@/config/settings-index';
 
 /** Custom event other components can dispatch to open the command palette. */
@@ -80,31 +81,32 @@ function CommandPalette() {
   const guildId = (router.query.guild as string) || undefined;
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
+  const tt = useText();
 
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [];
     if (guildId) {
-      list.push({ id: 'overview', label: 'Overview', hint: 'Stats', href: `/guilds/${guildId}/settings` });
-      list.push({ id: 'moderation', label: 'Moderation', hint: 'Panel', href: `/guilds/${guildId}/moderation` });
-      list.push({ id: 'analytics', label: 'Analytics', hint: 'Trends', href: `/guilds/${guildId}/analytics` });
-      list.push({ id: 'members', label: 'Members', hint: 'Lookup', href: `/guilds/${guildId}/members` });
+      list.push({ id: 'overview', label: tt('Обзор'), hint: tt('Статистика'), href: `/guilds/${guildId}/settings` });
+      list.push({ id: 'moderation', label: tt('Модерация'), hint: tt('Панель'), href: `/guilds/${guildId}/moderation` });
+      list.push({ id: 'analytics', label: tt('Аналитика'), hint: tt('Тренды'), href: `/guilds/${guildId}/analytics` });
+      list.push({ id: 'members', label: tt('Участники'), hint: tt('Поиск'), href: `/guilds/${guildId}/members` });
       for (const f of getFeatures()) {
         list.push({
           id: `f-${f.id}`,
           label: String(f.name),
-          hint: 'Feature',
+          hint: tt('Функция'),
           href: `/guilds/${guildId}/features/${f.id}`,
         });
       }
     }
-    list.push({ id: 'home', label: 'Switch server', hint: 'Home', href: '/user/home' });
+    list.push({ id: 'home', label: tt('Сменить сервер'), hint: tt('Главная'), href: '/user/home' });
     for (const g of guilds.data ?? []) {
       if (config.guild.filter(g) && g.id !== guildId) {
-        list.push({ id: `g-${g.id}`, label: g.name, hint: 'Server', href: `/guilds/${g.id}` });
+        list.push({ id: `g-${g.id}`, label: g.name, hint: tt('Сервер'), href: `/guilds/${g.id}` });
       }
     }
     return list;
-  }, [guildId, guilds.data]);
+  }, [guildId, guilds.data, tt]);
 
   const needle = q.trim().toLowerCase();
   // Individual settings only surface when the admin is typing — they'd clutter
@@ -115,10 +117,10 @@ function CommandPalette() {
     return searchSettings(needle).map((s, i) => ({
       id: `s-${s.feature}-${i}`,
       label: s.label,
-      hint: 'Setting',
+      hint: tt('Настройка'),
       href: `/guilds/${guildId}/features/${s.feature}`,
     }));
-  }, [guildId, needle]);
+  }, [guildId, needle, tt]);
   const filtered = needle
     ? [...commands.filter((c) => c.label.toLowerCase().includes(needle)), ...settingHits]
     : commands;
@@ -176,7 +178,7 @@ function CommandPalette() {
             ref={inputRef}
             variant="unstyled"
             px={2}
-            placeholder="Jump to a server or feature…"
+            placeholder={tt('Перейти к серверу или функции…')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onInputKey}
@@ -185,7 +187,7 @@ function CommandPalette() {
         <Box maxH="340px" overflowY="auto" py={2}>
           {filtered.length === 0 ? (
             <Text px={5} py={3} color="TextSecondary" fontSize="sm">
-              No matches.
+              {tt('Ничего не найдено.')}
             </Text>
           ) : (
             filtered.map((c, i) => (

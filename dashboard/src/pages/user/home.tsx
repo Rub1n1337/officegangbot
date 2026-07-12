@@ -18,6 +18,7 @@ import {
 import { IoSearch, IoAddCircleOutline } from 'react-icons/io5';
 import { useState } from 'react';
 import { config } from '@/config/common';
+import { useText } from '@/config/translations/ui-text';
 import { useGuilds, useMyBotGuilds } from '@/api/hooks';
 import { NextPageWithLayout } from '@/pages/_app';
 import AppLayout from '@/components/layout/app';
@@ -30,6 +31,7 @@ const HomePage: NextPageWithLayout = () => {
 };
 
 export function GuildSelect() {
+  const tt = useText();
   const guilds = useGuilds();
   const botGuilds = useMyBotGuilds();
   const [search, setSearch] = useState('');
@@ -39,9 +41,9 @@ export function GuildSelect() {
       <ErrorPanel
         retry={() => guilds.refetch()}
         isRetrying={guilds.isFetching}
-        hint="Couldn't reach Discord — check your connection and try again."
+        hint={tt('Не удалось связаться с Discord — проверьте соединение и попробуйте снова.')}
       >
-        Couldn&apos;t load your servers
+        {tt('Не удалось загрузить ваши серверы')}
       </ErrorPanel>
     );
 
@@ -66,13 +68,12 @@ export function GuildSelect() {
     return (
       <Flex direction="column" align="center" gap={3} py={16} textAlign="center">
         <Icon as={IoAddCircleOutline} boxSize={10} color="TextSecondary" />
-        <Heading size="md">No servers to manage yet</Heading>
+        <Heading size="md">{tt('Пока нет серверов для управления')}</Heading>
         <Text color="TextSecondary" maxW="sm">
-          You need the Administrator permission on a server to configure the bot there. Invite it to
-          a server you own to get started.
+          {tt('Чтобы настраивать бота на сервере, нужны права администратора. Пригласите его на свой сервер, чтобы начать.')}
         </Text>
         <Button as="a" href={config.inviteUrl} target="_blank" variant="action" mt={1}>
-          Invite the bot
+          {tt('Пригласить бота')}
         </Button>
       </Flex>
     );
@@ -97,14 +98,14 @@ export function GuildSelect() {
         <Input
           variant="main"
           pl="2.75rem"
-          placeholder="Search servers…"
+          placeholder={tt('Поиск серверов…')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </InputGroup>
 
       {filtered.length === 0 ? (
-        <Text color="TextSecondary">No servers match “{search}”.</Text>
+        <Text color="TextSecondary">{tt('Нет серверов по запросу')} «{search}».</Text>
       ) : (
         <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={3}>
           {filtered.map((guild) => {

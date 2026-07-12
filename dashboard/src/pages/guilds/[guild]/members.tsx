@@ -44,6 +44,8 @@ import { useDebounce } from '@/utils/useDebounce';
 import { toRGB } from '@/utils/common';
 import type { ModerateAction } from '@/api/bot';
 import type { MemberDetail } from '@/config/types/custom-types';
+import { provider, type Languages } from '@/config/translations/provider';
+import { useText } from '@/config/translations/ui-text';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -52,8 +54,9 @@ function fmtDate(iso: string | null): string {
   return d.toLocaleDateString('ru-RU', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-// Russian plural for warnings: 1 предупреждение, 2 предупреждения, 5 предупреждений.
-function pluralStrikes(n: number): string {
+// Russian plural: 1 активный страйк, 2 активных страйка, 5 активных страйков.
+function pluralStrikes(n: number, lang: Languages): string {
+  if (lang !== 'ru') return n === 1 ? 'active strike' : 'active strikes';
   const m10 = n % 10;
   const m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return 'активный страйк';
@@ -105,6 +108,7 @@ function ModerateBar({
   moderatorName?: string;
 }) {
   const mutation = useModerateMemberMutation();
+  const tt = useText();
   const [pending, setPending] = useState<ModerateAction | null>(null);
   const [reason, setReason] = useState('');
   const [minutes, setMinutes] = useState(60);
@@ -154,32 +158,32 @@ function ModerateBar({
   return (
     <Box borderTop="1px solid" borderColor="CardBorder" pt="16px">
       <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb="10px">
-        Действия
+        {tt('Действия')}
       </Text>
       <Wrap spacing="8px">
         <WrapItem>
           <Button {...safeBtn} onClick={() => open('warn')} isDisabled={!member.inServer}>
-            Предупредить
+            {tt('Предупредить')}
           </Button>
         </WrapItem>
         <WrapItem>
           <Button {...safeBtn} onClick={() => open('mute')} isDisabled={!member.inServer}>
-            Мут
+            {tt('Мут')}
           </Button>
         </WrapItem>
         <WrapItem>
           <Button {...safeBtn} onClick={() => open('unmute')} isDisabled={!member.inServer}>
-            Снять мут
+            {tt('Снять мут')}
           </Button>
         </WrapItem>
         <WrapItem>
           <Button {...dangerBtn} onClick={() => open('kick')} isDisabled={!member.inServer}>
-            Кик
+            {tt('Кик')}
           </Button>
         </WrapItem>
         <WrapItem>
           <Button {...dangerBtn} onClick={() => open('ban')}>
-            Бан
+            {tt('Бан')}
           </Button>
         </WrapItem>
       </Wrap>
@@ -193,12 +197,12 @@ function ModerateBar({
         <AlertDialogOverlay>
           <AlertDialogContent bg="CardBackground" mx={4}>
             <AlertDialogHeader>
-              {pending ? ACTION_RU[pending] : ''} — {member.displayName}?
+              {pending ? tt(ACTION_RU[pending]) : ''} — {member.displayName}?
             </AlertDialogHeader>
             <AlertDialogBody>
               {pending !== 'unmute' && (
                 <Textarea
-                  placeholder="Причина (необязательно)"
+                  placeholder={tt('Причина (необязательно)')}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   mb={pending === 'mute' ? 3 : 0}
@@ -206,21 +210,21 @@ function ModerateBar({
               )}
               {pending === 'mute' && (
                 <Select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
-                  <option value={10}>10 минут</option>
-                  <option value={60}>1 час</option>
-                  <option value={1440}>1 день</option>
-                  <option value={10080}>7 дней</option>
+                  <option value={10}>10 {tt('минут')}</option>
+                  <option value={60}>1 {tt('час')}</option>
+                  <option value={1440}>1 {tt('день')}</option>
+                  <option value={10080}>7 {tt('дней')}</option>
                 </Select>
               )}
               {danger && (
                 <Text fontSize="sm" color="red.400" mt={3}>
-                  Это нельзя отменить из дашборда.
+                  {tt('Это нельзя отменить из дашборда.')}
                 </Text>
               )}
             </AlertDialogBody>
             <AlertDialogFooter>
               <Button ref={cancelRef} onClick={() => setPending(null)} variant="ghost">
-                Отмена
+                {tt('Отмена')}
               </Button>
               <Button
                 colorScheme={danger ? 'red' : 'brand'}
@@ -228,7 +232,7 @@ function ModerateBar({
                 isLoading={mutation.isLoading}
                 onClick={confirm}
               >
-                {pending ? ACTION_RU[pending] : ''}
+                {pending ? tt(ACTION_RU[pending]) : ''}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -251,6 +255,8 @@ function DetailCard({
   moderatorId?: string;
   moderatorName?: string;
 }) {
+  const lang = provider.useLang();
+  const tt = useText();
   return (
     <Flex
       direction="column"
@@ -270,7 +276,7 @@ function DetailCard({
           </Heading>
           <Text fontSize="13px" color="TextSecondary">
             @{data.name}
-            {data.inServer && ` · присоединился ${fmtDate(data.joinedAt)}`}
+            {data.inServer && ` · ${tt('присоединился')} ${fmtDate(data.joinedAt)}`}
           </Text>
         </Box>
         <Button
@@ -283,22 +289,22 @@ function DetailCard({
           onClick={onBack}
           _hover={{ bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
         >
-          Назад
+          {tt('Назад')}
         </Button>
       </Flex>
 
       <Flex gap="10px" wrap="wrap">
         <Pill color="brand.200" bg="brandAlpha.100">
-          Уровень {data.level} · {data.xp.toLocaleString('ru-RU')} XP
+          {tt('Уровень')} {data.level} · {data.xp.toLocaleString('ru-RU')} XP
         </Pill>
         {(data.activeStrikes ?? 0) > 0 && (
           <Pill color="orange.400" bg="rgba(245,177,76,0.14)">
-            {data.activeStrikes} {pluralStrikes(data.activeStrikes)}
+            {data.activeStrikes} {pluralStrikes(data.activeStrikes, lang)}
           </Pill>
         )}
         {!data.inServer && (
           <Pill color="TextSecondary" bg="blackAlpha.100" dark={{ bg: 'whiteAlpha.100' }}>
-            Не на сервере
+            {tt('Не на сервере')}
           </Pill>
         )}
       </Flex>
@@ -306,7 +312,7 @@ function DetailCard({
       {data.roles.length > 0 && (
         <Box>
           <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb="8px">
-            Роли
+            {tt('Роли')}
           </Text>
           <Wrap>
             {data.roles.map((r) => {
@@ -334,10 +340,10 @@ function DetailCard({
       )}
 
       <Box>
-        <SectionLabel icon={IoWarning}>Предупреждения ({data.warnings.length})</SectionLabel>
+        <SectionLabel icon={IoWarning}>{tt('Предупреждения')} ({data.warnings.length})</SectionLabel>
         {data.warnings.length === 0 ? (
           <Text fontSize="13px" color="TextSecondary">
-            Предупреждений нет.
+            {tt('Предупреждений нет.')}
           </Text>
         ) : (
           <Flex direction="column" gap="8px">
@@ -354,10 +360,10 @@ function DetailCard({
       </Box>
 
       <Box>
-        <SectionLabel icon={IoDocumentText}>Заметки модераторов ({data.notes?.length ?? 0})</SectionLabel>
+        <SectionLabel icon={IoDocumentText}>{tt('Заметки модераторов')} ({data.notes?.length ?? 0})</SectionLabel>
         {!data.notes || data.notes.length === 0 ? (
           <Text fontSize="13px" color="TextSecondary">
-            Заметок нет. Добавьте через /note в Discord — участник их не видит.
+            {tt('Заметок нет. Добавьте через /note в Discord — участник их не видит.')}
           </Text>
         ) : (
           <Flex direction="column" gap="8px">
@@ -374,10 +380,10 @@ function DetailCard({
       </Box>
 
       <Box>
-        <SectionLabel icon={IoFileTrayFull}>Недавние кейсы ({data.cases?.length ?? 0})</SectionLabel>
+        <SectionLabel icon={IoFileTrayFull}>{tt('Недавние кейсы')} ({data.cases?.length ?? 0})</SectionLabel>
         {!data.cases || data.cases.length === 0 ? (
           <Text fontSize="13px" color="TextSecondary">
-            Кейсов модерации нет.
+            {tt('Кейсов модерации нет.')}
           </Text>
         ) : (
           <Flex direction="column" gap="8px">
@@ -388,7 +394,7 @@ function DetailCard({
                     #{c.caseNumber} · {c.action}
                   </Text>
                   <Text fontSize="11.5px" color="TextSecondary" noOfLines={1}>
-                    {c.reason ?? 'Без причины'} · {c.moderatorName ?? '—'}
+                    {c.reason ?? tt('Без причины')} · {c.moderatorName ?? '—'}
                   </Text>
                 </Box>
                 <Text fontSize="11.5px" color="TextSecondary" flexShrink={0}>
@@ -412,6 +418,7 @@ function DetailCard({
 
 const MembersPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
+  const tt = useText();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const debounced = useDebounce(query, 300);
@@ -428,10 +435,10 @@ const MembersPage: NextPageWithLayout = () => {
     <Flex direction="column" gap="18px">
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
-          УЧАСТНИКИ
+          {tt('УЧАСТНИКИ')}
         </Text>
         <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
-          Поиск и модерация
+          {tt('Поиск и модерация')}
         </Heading>
       </Box>
 
@@ -446,7 +453,7 @@ const MembersPage: NextPageWithLayout = () => {
           rounded="12px"
           pl="2.75rem"
           h="46px"
-          placeholder="Поиск по имени или @нику…"
+          placeholder={tt('Поиск по имени или @нику…')}
           _hover={{ borderColor: 'brand.400' }}
           _focusVisible={{ borderColor: 'brand.400', boxShadow: 'none' }}
           value={query}
@@ -469,10 +476,10 @@ const MembersPage: NextPageWithLayout = () => {
             moderatorName={moderatorName}
           />
         ) : (
-          <Text color="TextSecondary">Не удалось загрузить участника.</Text>
+          <Text color="TextSecondary">{tt('Не удалось загрузить участника.')}</Text>
         )
       ) : !hasQuery ? (
-        <Text color="TextSecondary">Введите минимум 2 символа для поиска.</Text>
+        <Text color="TextSecondary">{tt('Введите минимум 2 символа для поиска.')}</Text>
       ) : search.isLoading ? (
         <Flex direction="column" gap={2}>
           <Skeleton h="56px" rounded="xl" />
@@ -480,7 +487,7 @@ const MembersPage: NextPageWithLayout = () => {
           <Skeleton h="56px" rounded="xl" />
         </Flex>
       ) : (search.data?.length ?? 0) === 0 ? (
-        <Text color="TextSecondary">Никого не найдено по «{debounced}».</Text>
+        <Text color="TextSecondary">{tt('Никого не найдено по')} «{debounced}».</Text>
       ) : (
         <Flex direction="column" gap={2}>
           {search.data!.map((m) => (

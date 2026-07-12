@@ -33,7 +33,7 @@ export function NumberStepper({
       flexShrink={0}
     >
       <IconButton
-        aria-label="Меньше"
+        aria-label="decrease"
         icon={<Icon as={MdRemove} boxSize="16px" />}
         size="xs"
         w="28px"
@@ -49,7 +49,7 @@ export function NumberStepper({
         {suffix ?? ''}
       </Text>
       <IconButton
-        aria-label="Больше"
+        aria-label="increase"
         icon={<Icon as={MdAdd} boxSize="16px" />}
         size="xs"
         w="28px"

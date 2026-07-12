@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { useGuilds } from '@/api/hooks';
 import { iconUrl } from '@/api/discord';
 import { config } from '@/config/common';
+import { useText } from '@/config/translations/ui-text';
 
 // Server-switcher popover (Iris): lists the admin guilds from the existing
 // guilds hook and routes to /guilds/[id]. Replaces the plain link the sidebar
@@ -17,6 +18,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
   const router = useRouter();
   const guilds = useGuilds();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const tt = useText();
 
   const list = useMemo(
     () => (guilds.data ?? []).filter((g) => config.guild.filter(g)),
@@ -57,7 +59,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
           )}
           <Box flex="1" minW={0} lineHeight="1.2">
             <Text fontSize="13px" fontWeight="600" noOfLines={1}>{current?.name ?? '—'}</Text>
-            <Text fontSize="11px" color="TextSecondary">Сменить сервер</Text>
+            <Text fontSize="11px" color="TextSecondary">{tt('Сменить сервер')}</Text>
           </Box>
           <Icon as={MdUnfoldMore} boxSize="18px" color="TextSecondary" />
         </Flex>
@@ -74,7 +76,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
         >
           <PopoverBody p="6px">
             <Text fontSize="10.5px" fontWeight="700" letterSpacing="0.1em" color="TextSecondary" px="10px" pt="6px" pb="4px">
-              ВАШИ СЕРВЕРЫ
+              {tt('ВАШИ СЕРВЕРЫ')}
             </Text>
             <Box maxH="300px" overflowY="auto">
               {list.map((g) => {
@@ -128,7 +130,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
                 onClick={onClose}
               >
                 <Icon as={MdAddCircleOutline} boxSize="18px" />
-                Добавить на другой сервер
+                {tt('Добавить на другой сервер')}
               </Flex>
             </Box>
           </PopoverBody>

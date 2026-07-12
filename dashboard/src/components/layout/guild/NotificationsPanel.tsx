@@ -6,6 +6,8 @@ import { MdNotifications, MdConfirmationNumber, MdOutlineHowToReg } from 'react-
 import { useEffect, useMemo, useState } from 'react';
 import { useTicketsQuery, useModerationQuery } from '@/api/hooks';
 import { timeAgo } from '@/utils/audit';
+import { provider } from '@/config/translations/provider';
+import { useText } from '@/config/translations/ui-text';
 
 // Notifications popover (Iris README §10). There is no realtime event feed,
 // so the list is derived from real signals we already have per guild:
@@ -47,6 +49,8 @@ function PanelContent({
 }) {
   const tickets = useTicketsQuery(guild);
   const moderation = useModerationQuery(guild);
+  const lang = provider.useLang();
+  const tt = useText();
   const [read, setRead] = useState<Set<string>>(() => readSet(guild));
 
   const items = useMemo<Item[]>(() => {
@@ -57,7 +61,7 @@ function PanelContent({
           id: `t-${t.id}`,
           icon: MdConfirmationNumber,
           tone: 'accent',
-          title: `Новый тикет — ${t.openerName ?? t.openerId}`,
+          title: `${tt('Новый тикет')} — ${t.openerName ?? t.openerId}`,
           when: t.openedAt,
         });
     }
@@ -67,12 +71,12 @@ function PanelContent({
           id: `a-${a.id}`,
           icon: MdOutlineHowToReg,
           tone: 'amber',
-          title: `Апелляция на бан — ${a.userName ?? a.userId}`,
+          title: `${tt('Апелляция на бан')} — ${a.userName ?? a.userId}`,
           when: a.createdAt,
         });
     }
     return out.sort((x, y) => Date.parse(y.when ?? '') - Date.parse(x.when ?? ''));
-  }, [tickets.data, moderation.data]);
+  }, [tickets.data, moderation.data, tt]);
 
   const unread = items.filter((i) => !read.has(i.id)).length;
   useEffect(() => onUnread(unread), [unread, onUnread]);
@@ -94,10 +98,10 @@ function PanelContent({
     <>
       <Flex align="center" justify="space-between" p="12px 14px" borderBottom="1px solid" borderColor="CardBorder">
         <Text fontSize="14px" fontWeight="700">
-          Уведомления
+          {tt('Уведомления')}
         </Text>
         <Button size="xs" variant="ghost" color="brand.200" onClick={markAll} isDisabled={unread === 0}>
-          Прочитать всё
+          {tt('Прочитать всё')}
         </Button>
       </Flex>
       <Box maxH="320px" overflowY="auto" p="6px">
@@ -107,7 +111,7 @@ function PanelContent({
           </Flex>
         ) : items.length === 0 ? (
           <Text fontSize="13px" color="TextSecondary" textAlign="center" py="20px">
-            Пока тихо — открытых тикетов и апелляций нет.
+            {tt('Пока тихо — открытых тикетов и апелляций нет.')}
           </Text>
         ) : (
           items.map((n) => (
@@ -140,7 +144,7 @@ function PanelContent({
                   {n.title}
                 </Text>
                 <Text fontSize="11.5px" color="TextSecondary">
-                  {timeAgo(n.when)}
+                  {timeAgo(n.when, lang)}
                 </Text>
               </Box>
               {!read.has(n.id) && <Box w="7px" h="7px" rounded="full" bg="Brand" flexShrink={0} />}
@@ -150,7 +154,7 @@ function PanelContent({
       </Box>
       <Flex p="8px" borderTop="1px solid" borderColor="CardBorder" justify="center">
         <Button size="sm" variant="ghost" color="TextSecondary" onClick={onClose}>
-          Закрыть
+          {tt('Закрыть')}
         </Button>
       </Flex>
     </>
@@ -159,6 +163,7 @@ function PanelContent({
 
 export function NotificationsBell({ guild }: { guild: string }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const tt = useText();
   // Queries mount only after the first open, so pages don't pay the RPC cost.
   const [armed, setArmed] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -177,7 +182,7 @@ export function NotificationsBell({ guild }: { guild: string }) {
       <PopoverTrigger>
         <Flex
           as="button"
-          title="Уведомления"
+          title={tt('Уведомления')}
           w="38px"
           h="38px"
           rounded="11px"

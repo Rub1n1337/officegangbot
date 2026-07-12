@@ -70,11 +70,11 @@ export const useTicketsFeature: UseFormRender<TicketsFeature> = (data, onSubmit)
         </FormControl>
         <Box bg="CardBackground" rounded="xl" p={4}>
           <Text fontSize="sm" color="TextSecondary">
-            After saving, run{' '}
+            {ft('After saving, run')}{' '}
             <Text as="span" fontWeight="600" color="TextPrimary">
               /ticket_setup
             </Text>{' '}
-            in Discord to post the “Open Ticket” panel in the channel of your choice.
+            {ft('in Discord to post the “Open Ticket” panel in the channel of your choice.')}
           </Text>
         </Box>
       </Flex>

@@ -10,6 +10,7 @@ import { NextPageWithLayout } from '@/pages/_app';
 import AppLayout from '@/components/layout/app';
 import { useLogoutMutation } from '@/utils/auth/hooks';
 import { useSelfUser } from '@/api/hooks';
+import { useText } from '@/config/translations/ui-text';
 
 // Iris profile screen (handoff README §11): back link, avatar header,
 // Discord-account card, preferences (appearance + language segmented,
@@ -79,6 +80,7 @@ const ProfilePage: NextPageWithLayout = () => {
   const { colorMode, setColorMode } = useColorMode();
   const { lang, setLang } = useLang();
   const [devMode, setDevMode] = useSettingsStore((s) => [s.devMode, s.setDevMode]);
+  const tt = useText();
 
   return (
     <Flex direction="column" gap="20px" maxW="720px" mx="auto" w="full">
@@ -93,7 +95,7 @@ const ProfilePage: NextPageWithLayout = () => {
         w="fit-content"
       >
         <Icon as={MdArrowBack} boxSize="17px" />
-        Назад
+        {tt('Назад')}
       </Flex>
 
       {/* Header */}
@@ -104,7 +106,7 @@ const ProfilePage: NextPageWithLayout = () => {
             {user.username}
           </Heading>
           <Text fontSize="13.5px" color="TextSecondary" mt="2px">
-            @{user.username} · Администратор
+            @{user.username} · {tt('Администратор')}
           </Text>
         </Box>
       </Flex>
@@ -112,7 +114,7 @@ const ProfilePage: NextPageWithLayout = () => {
       {/* Discord account */}
       <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
         <Text fontSize="15px" fontWeight="700" mb="14px">
-          Аккаунт Discord
+          {tt('Аккаунт Discord')}
         </Text>
         <Flex align="center" gap="12px" rounded="11px" p="14px" {...INSET}>
           <Flex w="40px" h="40px" rounded="11px" align="center" justify="center" bg="#5865F2" color="white" flexShrink={0}>
@@ -123,7 +125,7 @@ const ProfilePage: NextPageWithLayout = () => {
               {user.username}
             </Text>
             <Text fontSize="12px" color="TextSecondary">
-              Подключён · ID {user.id}
+              {tt('Подключён')} · ID {user.id}
             </Text>
           </Box>
           <Box
@@ -138,7 +140,7 @@ const ProfilePage: NextPageWithLayout = () => {
             _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }}
             flexShrink={0}
           >
-            Привязан
+            {tt('Привязан')}
           </Box>
         </Flex>
       </Box>
@@ -146,26 +148,26 @@ const ProfilePage: NextPageWithLayout = () => {
       {/* Preferences */}
       <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
         <Text fontSize="15px" fontWeight="700" mb="14px">
-          Настройки
+          {tt('Настройки')}
         </Text>
         <Flex direction="column" gap="10px">
           <PrefRow
-            title="Оформление"
-            desc="Тема интерфейса дашборда"
+            title={tt('Оформление')}
+            desc={tt('Тема интерфейса дашборда')}
             control={
               <Segmented
                 value={colorMode}
                 options={[
-                  { value: 'dark', label: 'Тёмная' },
-                  { value: 'light', label: 'Светлая' },
+                  { value: 'dark', label: tt('Тёмная') },
+                  { value: 'light', label: tt('Светлая') },
                 ]}
                 onChange={(v) => setColorMode(v)}
               />
             }
           />
           <PrefRow
-            title="Язык"
-            desc="Язык интерфейса дашборда"
+            title={tt('Язык')}
+            desc={tt('Язык интерфейса дашборда')}
             control={
               <Segmented
                 value={lang}
@@ -175,8 +177,8 @@ const ProfilePage: NextPageWithLayout = () => {
             }
           />
           <PrefRow
-            title="Режим разработчика"
-            desc="Показывать отладочную информацию"
+            title={tt('Режим разработчика')}
+            desc={tt('Показывать отладочную информацию')}
             control={<Switch isChecked={devMode} onChange={(e) => setDevMode(e.target.checked)} />}
           />
         </Flex>
@@ -193,7 +195,7 @@ const ProfilePage: NextPageWithLayout = () => {
         isLoading={logout.isLoading}
         onClick={() => logout.mutate()}
       >
-        Выйти из аккаунта
+        {tt('Выйти из аккаунта')}
       </Button>
     </Flex>
   );

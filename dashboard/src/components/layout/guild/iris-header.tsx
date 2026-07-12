@@ -10,6 +10,7 @@ import { useRouter } from 'next/router';
 import { iconUrl, avatarUrl } from '@/api/discord';
 import { useGuildPreview, useGuildStatsQuery, useSelfUserQuery } from '@/api/hooks';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
+import { useText } from '@/config/translations/ui-text';
 
 const pulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}`;
 
@@ -52,6 +53,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   const stats = useGuildStatsQuery(guildId).data;
   const user = useSelfUserQuery().data;
   const { colorMode, toggleColorMode } = useColorMode();
+  const tt = useText();
 
   const online = stats?.online ?? false;
 
@@ -82,7 +84,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
     >
       {/* Mobile: open sidebar */}
       <Flex display={{ base: 'flex', xl: 'none' }}>
-        <IconBtn onClick={() => onOpenSidebar?.()} title="Меню">
+        <IconBtn onClick={() => onOpenSidebar?.()} title={tt('Меню')}>
           <Icon as={MdMenu} boxSize="19px" />
         </IconBtn>
       </Flex>
@@ -124,7 +126,9 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
             bg={online ? 'green.400' : 'secondaryGray.500'}
             animation={online ? `${pulse} 2.4s infinite` : undefined}
           />
-          {online ? `${(stats?.member_count ?? 0).toLocaleString('ru-RU')} участников` : 'Бот офлайн'}
+          {online
+            ? `${(stats?.member_count ?? 0).toLocaleString('ru-RU')} ${tt('участников')}`
+            : tt('Бот офлайн')}
         </Flex>
       </Box>
 
@@ -147,12 +151,12 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE))}
         >
           <Icon as={MdSearch} boxSize="17px" />
-          Быстрый переход
+          {tt('Быстрый переход')}
           <Box as="span" ml="auto" fontSize="11px" border="1px solid" borderColor="CardBorder" rounded="6px" px="6px">
             ⌘K
           </Box>
         </Flex>
-        <IconBtn onClick={onToggleTheme} title="Сменить тему">
+        <IconBtn onClick={onToggleTheme} title={tt('Сменить тему')}>
           <Icon as={colorMode === 'light' ? MdDarkMode : MdLightMode} boxSize="19px" />
         </IconBtn>
         <NotificationsBell guild={guildId} />
@@ -160,7 +164,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
         <Flex
           as={Link}
           href="/user/profile"
-          title="Профиль"
+          title={tt('Профиль')}
           w="38px"
           h="38px"
           rounded="full"

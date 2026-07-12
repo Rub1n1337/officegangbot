@@ -18,11 +18,12 @@ import { useAnalyticsQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { StyledChart } from '@/components/chart/StyledChart';
 import type { AnalyticsData, DayCount, ModActionDay } from '@/config/types/custom-types';
+import { useText } from '@/config/translations/ui-text';
 
 const PERIODS = [
-  { value: 7, label: 'Last 7 days' },
-  { value: 30, label: 'Last 30 days' },
-  { value: 90, label: 'Last 90 days' },
+  { value: 7, label: 'За 7 дней' },
+  { value: 30, label: 'За 30 дней' },
+  { value: 90, label: 'За 90 дней' },
 ];
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -108,10 +109,10 @@ function ChartCard({
 
 // The heatmap is 7 rows (weekdays) × 24 columns (hours). ApexCharts draws the
 // first series at the bottom, so reverse to put Monday on top.
-function heatmapSeries(cells: AnalyticsData['heatmap']) {
+function heatmapSeries(cells: AnalyticsData['heatmap'], tt: (ru: string) => string) {
   const byKey = new Map(cells.map((c) => [c.weekday * 24 + c.hour, c.count]));
   return WEEKDAYS.map((name, wd) => ({
-    name,
+    name: tt(name),
     data: Array.from({ length: 24 }, (_, h) => ({ x: `${h}`, y: byKey.get(wd * 24 + h) ?? 0 })),
   })).reverse();
 }
@@ -130,15 +131,15 @@ function pivotActions(rows: ModActionDay[]) {
 }
 
 // Align opened/closed ticket counts to one shared, sorted set of days.
-function ticketSeries(opened: DayCount[], closed: DayCount[]) {
+function ticketSeries(opened: DayCount[], closed: DayCount[], tt: (ru: string) => string) {
   const days = Array.from(new Set([...opened, ...closed].map((r) => r.day))).sort();
   const o = new Map(opened.map((r) => [r.day, r.count]));
   const c = new Map(closed.map((r) => [r.day, r.count]));
   return {
     categories: days.map(shortDay),
     series: [
-      { name: 'Opened', data: days.map((d) => o.get(d) ?? 0) },
-      { name: 'Closed', data: days.map((d) => c.get(d) ?? 0) },
+      { name: tt('Открыто'), data: days.map((d) => o.get(d) ?? 0) },
+      { name: tt('Закрыто'), data: days.map((d) => c.get(d) ?? 0) },
     ],
   };
 }
@@ -161,11 +162,12 @@ function AnalyticsSkeleton() {
 }
 
 function AnalyticsBody({ data }: { data: AnalyticsData }) {
-  const heatmap = useMemo(() => heatmapSeries(data.heatmap), [data.heatmap]);
+  const tt = useText();
+  const heatmap = useMemo(() => heatmapSeries(data.heatmap, tt), [data.heatmap, tt]);
   const actions = useMemo(() => pivotActions(data.modActionsByDay), [data.modActionsByDay]);
   const tickets = useMemo(
-    () => ticketSeries(data.ticketsOpenedByDay, data.ticketsClosedByDay),
-    [data.ticketsOpenedByDay, data.ticketsClosedByDay]
+    () => ticketSeries(data.ticketsOpenedByDay, data.ticketsClosedByDay, tt),
+    [data.ticketsOpenedByDay, data.ticketsClosedByDay, tt]
   );
 
   const totalMod = sum(data.modActionsByDay);
@@ -177,21 +179,21 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
   return (
     <Flex direction="column" gap={5}>
       <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
-        <StatCard label="Действия модерации" value={totalMod.toLocaleString('ru-RU')} hint={`за ${data.days} дней`} />
-        <StatCard label="Нарушения AutoMod" value={totalAutomod.toLocaleString('ru-RU')} hint={`за ${data.days} дней`} />
-        <StatCard label="Открыто тикетов" value={totalOpened.toLocaleString('ru-RU')} hint={`за ${data.days} дней`} />
+        <StatCard label={tt('Действия модерации')} value={totalMod.toLocaleString('ru-RU')} hint={`${tt('за')} ${data.days} ${tt('дней')}`} />
+        <StatCard label={tt('Нарушения AutoMod')} value={totalAutomod.toLocaleString('ru-RU')} hint={`${tt('за')} ${data.days} ${tt('дней')}`} />
+        <StatCard label={tt('Открыто тикетов')} value={totalOpened.toLocaleString('ru-RU')} hint={`${tt('за')} ${data.days} ${tt('дней')}`} />
         <StatCard
-          label="Среднее время закрытия"
-          value={data.avgTicketResolutionHours != null ? `${data.avgTicketResolutionHours}ч` : '—'}
-          hint={data.avgTicketResolutionHours != null ? 'открыт → закрыт' : 'нет закрытых тикетов'}
+          label={tt('Среднее время закрытия')}
+          value={data.avgTicketResolutionHours != null ? `${data.avgTicketResolutionHours}${tt('ч')}` : '—'}
+          hint={data.avgTicketResolutionHours != null ? tt('открыт → закрыт') : tt('нет закрытых тикетов')}
         />
       </SimpleGrid>
 
       <ChartCard
-        title="Хитмап активности"
-        subtitle="Сообщения по дням недели и часам (UTC). Только агрегатные счётчики — содержимое не хранится."
+        title={tt('Хитмап активности')}
+        subtitle={tt('Сообщения по дням недели и часам (UTC). Только агрегатные счётчики — содержимое не хранится.')}
         isEmpty={heatmapEmpty}
-        emptyText="Активности пока нет. Счётчики начинают копиться с этого момента."
+        emptyText={tt('Активности пока нет. Счётчики начинают копиться с этого момента.')}
       >
         <StyledChart
           type="heatmap"
@@ -208,17 +210,17 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
               tickAmount: 12,
               labels: { rotate: 0 },
             },
-            tooltip: { y: { formatter: (v: number) => `${v} сообщений` } },
+            tooltip: { y: { formatter: (v: number) => `${v} ${tt('сообщений')}` } },
           }}
         />
       </ChartCard>
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={5}>
         <ChartCard
-          title="Действия модерации по времени"
-          subtitle="Из нумерованных кейсов модерации, стопкой по типу действия."
+          title={tt('Действия модерации по времени')}
+          subtitle={tt('Из нумерованных кейсов модерации, стопкой по типу действия.')}
           isEmpty={actions.series.length === 0}
-          emptyText="Кейсов модерации за период нет."
+          emptyText={tt('Кейсов модерации за период нет.')}
         >
           <StyledChart
             type="bar"
@@ -235,10 +237,10 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
         </ChartCard>
 
         <ChartCard
-          title="Тикеты: открыто и закрыто"
-          subtitle="Ежедневный объём открытий/закрытий за период."
+          title={tt('Тикеты: открыто и закрыто')}
+          subtitle={tt('Ежедневный объём открытий/закрытий за период.')}
           isEmpty={tickets.series[0].data.length === 0}
-          emptyText="Активности по тикетам за период нет."
+          emptyText={tt('Активности по тикетам за период нет.')}
         >
           <StyledChart
             type="bar"
@@ -258,11 +260,11 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
 
       <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
         <Heading fontSize="15px" fontWeight="700" mb="18px">
-          Топ модераторов
+          {tt('Топ модераторов')}
         </Heading>
         {data.topModerators.length === 0 ? (
           <Text fontSize="sm" color="TextSecondary">
-            Кейсов модерации за период нет.
+            {tt('Кейсов модерации за период нет.')}
           </Text>
         ) : (
           <Flex direction="column" gap="15px">
@@ -290,20 +292,20 @@ const AnalyticsPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const [days, setDays] = useState(30);
   const query = useAnalyticsQuery(guild, days);
+  const tt = useText();
 
   return (
     <Flex direction="column" gap="18px">
       <Flex align="flex-end" justify="space-between" gap="12px" wrap="wrap">
         <Box>
           <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
-            АНАЛИТИКА
+            {tt('АНАЛИТИКА')}
           </Text>
           <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
-            Тренды и модерация
+            {tt('Тренды и модерация')}
           </Heading>
           <Text fontSize="13.5px" color="TextSecondary" mt="4px">
-            Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений —
-            содержимое, автор и время не хранятся.
+            {tt('Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений — содержимое, автор и время не хранятся.')}
           </Text>
         </Box>
         <Select
@@ -317,7 +319,7 @@ const AnalyticsPage: NextPageWithLayout = () => {
         >
           {PERIODS.map((p) => (
             <option key={p.value} value={p.value}>
-              {p.label}
+              {tt(p.label)}
             </option>
           ))}
         </Select>

@@ -34,6 +34,7 @@ import { getFeatures } from '@/utils/common';
 import { featureCategories } from '@/config/features';
 import { useFeatureMeta } from '@/config/feature-meta';
 import type { CustomFeatures, GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
+import { useText } from '@/config/translations/ui-text';
 
 // Iris metric card: label, big value, optional hint. Soft surface with a
 // hover lift, matching the mockup's overview stat tiles.
@@ -100,15 +101,16 @@ function XpBarChart({ rows }: { rows: GuildStatsTopXp[] }) {
 }
 
 function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
+  const tt = useText();
   return (
     <Box bg="CardBackground" rounded="2xl" p={5}>
       <Flex align="center" gap={2} mb={4}>
         <Icon as={FaCrown} color="Brand" />
-        <Heading size="sm">Top members by XP</Heading>
+        <Heading size="sm">{tt('Топ участников по XP')}</Heading>
       </Flex>
       {rows.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
-          No XP data yet. Enable the Levels feature and let members chat to populate the leaderboard.
+          {tt('Данных XP пока нет. Включите функцию «Уровни» — таблица заполнится по мере общения участников.')}
         </Text>
       ) : (
         <XpBarChart rows={rows} />
@@ -118,21 +120,22 @@ function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
 }
 
 function OverviewMetrics({ stats }: { stats: GuildStats }) {
+  const tt = useText();
   return (
     <Box
       display="grid"
       gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))"
       gap="16px"
     >
-      <IrisStat label="Участников" value={stats.member_count.toLocaleString('ru-RU')} />
+      <IrisStat label={tt('Участников')} value={stats.member_count.toLocaleString('ru-RU')} />
       <IrisStat
-        label="Каналов"
+        label={tt('Каналов')}
         value={stats.channel_count}
-        hint={`${stats.text_channels} текстовых · ${stats.voice_channels} голосовых`}
+        hint={`${stats.text_channels} ${tt('текстовых')} · ${stats.voice_channels} ${tt('голосовых')}`}
       />
-      <IrisStat label="Ролей" value={stats.role_count} />
-      <IrisStat label="Функций включено" value={stats.enabled_feature_count} />
-      <IrisStat label="Задержка бота" value={`${Math.round(stats.latency_ms)} мс`} />
+      <IrisStat label={tt('Ролей')} value={stats.role_count} />
+      <IrisStat label={tt('Функций включено')} value={stats.enabled_feature_count} />
+      <IrisStat label={tt('Задержка бота')} value={`${Math.round(stats.latency_ms)} ${tt('мс')}`} />
     </Box>
   );
 }
@@ -165,6 +168,7 @@ const pulse = keyframes`
 // Live indicator: a pulsing dot + a ticking "updated Ns ago", driven by the
 // stats query's auto-refetch (every 8s).
 function LiveIndicator({ updatedAt }: { updatedAt: number }) {
+  const tt = useText();
   const [, setTick] = useState(0);
   const reduceMotion = usePrefersReducedMotion();
   useEffect(() => {
@@ -185,7 +189,7 @@ function LiveIndicator({ updatedAt }: { updatedAt: number }) {
         LIVE
       </Text>
       <Text fontSize="xs" color="TextSecondary">
-        updated {secs}s ago
+        {tt('обновлено')} {secs}{tt('с назад')}
       </Text>
     </Flex>
   );
@@ -199,6 +203,7 @@ const GRADIENT = 'linear(135deg, #8B7CFF, #6E56F5)';
 // Iris highlight banner: a setup nudge while core features are missing, a
 // positive note once they're all on.
 function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
+  const tt = useText();
   const enabled = new Set(enabledFeatures);
   const core = getFeatures().filter((f) => CORE_SETUP_FEATURES.includes(f.id));
   const missing = core.filter((f) => !enabled.has(f.id));
@@ -223,13 +228,13 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
       <Box flex="1" minW={0}>
         <Text fontSize="14.5px" fontWeight="700">
           {allDone
-            ? 'Базовые функции настроены'
-            : `Базовая настройка: ${core.length - missing.length} из ${core.length}`}
+            ? tt('Базовые функции настроены')
+            : `${tt('Базовая настройка:')} ${core.length - missing.length} ${tt('из')} ${core.length}`}
         </Text>
         <Text fontSize="13px" color="TextSecondary" mt="2px">
           {allDone
-            ? 'Загляни в аналитику или добавь новые функции ниже.'
-            : 'Включи ключевые функции, чтобы бот заработал в полную силу.'}
+            ? tt('Загляни в аналитику или добавь новые функции ниже.')
+            : tt('Включи ключевые функции, чтобы бот заработал в полную силу.')}
         </Text>
       </Box>
       <Button
@@ -245,7 +250,7 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
         _hover={{ filter: 'brightness(1.08)' }}
         rightIcon={<Icon as={MdArrowForward} boxSize="17px" />}
       >
-        {allDone ? 'Аналитика' : 'Продолжить'}
+        {allDone ? tt('Аналитика') : tt('Продолжить')}
       </Button>
     </Flex>
   );
@@ -266,6 +271,7 @@ function FeatureCard({
   meta: ReturnType<typeof useFeatureMeta>;
 }) {
   const m = meta.feature(feature.id, feature.name, feature.description);
+  const tt = useText();
   return (
     <Flex
       direction="column"
@@ -315,7 +321,7 @@ function FeatureCard({
             rounded="10px"
             leftIcon={<Icon as={MdTune} boxSize="16px" />}
           >
-            Настроить
+            {tt('Настроить')}
           </Button>
         ) : (
           <Button
@@ -329,7 +335,7 @@ function FeatureCard({
             _hover={{ filter: 'brightness(1.08)' }}
             leftIcon={<Icon as={MdAdd} boxSize="16px" />}
           >
-            Включить
+            {tt('Включить')}
           </Button>
         )}
       </Flex>
@@ -341,6 +347,7 @@ function FeatureCard({
 function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFeatures: string[] }) {
   const enabled = new Set(enabledFeatures);
   const meta = useFeatureMeta();
+  const tt = useText();
   const [filter, setFilter] = useState<'all' | 'on' | 'off'>('all');
   const all = getFeatures();
   const enabledCount = all.filter((f) => enabled.has(f.id)).length;
@@ -357,10 +364,10 @@ function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFea
       <Flex align="center" justify="space-between" wrap="wrap" gap="12px">
         <Flex align="center" gap="11px">
           <Heading fontSize="18px" fontWeight="700">
-            Функции
+            {tt('Функции')}
           </Heading>
           <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px="10px" py="3px" fontSize="12px">
-            {enabledCount} включено
+            {enabledCount} {tt('включено')}
           </Badge>
         </Flex>
         <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p="3px" gap="2px">
@@ -376,7 +383,7 @@ function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFea
                 ? { color: 'white', bg: 'Brand' }
                 : { variant: 'ghost', color: 'TextSecondary' })}
             >
-              {p.label}
+              {tt(p.label)}
             </Button>
           ))}
         </Flex>
@@ -405,11 +412,12 @@ function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFea
 // not the dashboard UI language.
 function BotLanguage({ guild, locale }: { guild: string; locale: string }) {
   const mutation = useSetLocaleMutation();
+  const tt = useText();
   const current = locale === 'ru' ? 'ru' : 'en';
   return (
     <Flex align="center" gap={2}>
       <Text fontSize="xs" color="TextSecondary">
-        Bot language
+        {tt('Язык бота')}
       </Text>
       <ButtonGroup size="sm" isAttached variant="outline" isDisabled={mutation.isLoading}>
         {(['en', 'ru'] as const).map((l) => (
@@ -435,6 +443,7 @@ function BotLanguage({ guild, locale }: { guild: string; locale: string }) {
 // normal validated update path, so ids stay untouched.
 function ConfigTransfer({ guild }: { guild: string }) {
   const { session } = useSession();
+  const tt = useText();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'export' | 'import' | null>(null);
@@ -464,7 +473,7 @@ function ConfigTransfer({ guild }: { guild: string }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      notify('Export failed — try again.', 'error');
+      notify(tt('Экспорт не удался — попробуйте ещё раз.'), 'error');
     } finally {
       setBusy(null);
     }
@@ -478,7 +487,7 @@ function ConfigTransfer({ guild }: { guild: string }) {
       return;
     }
     const names = Object.keys(parsed.features).join(', ');
-    if (!window.confirm(`Import settings for: ${names}?\nChannel/role assignments are not affected.`)) {
+    if (!window.confirm(`${tt('Импортировать настройки для:')} ${names}?\n${tt('Назначения каналов и ролей не затрагиваются.')}`)) {
       return;
     }
     setBusy('import');
@@ -500,19 +509,18 @@ function ConfigTransfer({ guild }: { guild: string }) {
     }
     client.invalidateQueries(['feature', guild]);
     if (failed.length === 0) {
-      notify(`Imported: ${names}.`, 'success');
+      notify(`${tt('Импортировано:')} ${names}.`, 'success');
     } else {
-      notify(`Imported with errors — failed: ${failed.join(', ')}.`, 'warning');
+      notify(`${tt('Импортировано с ошибками — не удалось:')} ${failed.join(', ')}.`, 'warning');
     }
     setBusy(null);
   };
 
   return (
     <Box bg="CardBackground" rounded="2xl" p={5}>
-      <Heading size="sm">Config export / import</Heading>
+      <Heading size="sm">{tt('Экспорт / импорт конфигурации')}</Heading>
       <Text fontSize="sm" color="TextSecondary" mt={1} mb={4}>
-        Transfers texts, thresholds, toggles and AutoMod rules between servers. Channel and role
-        assignments are never included — they don’t exist on another server.
+        {tt('Переносит тексты, пороги, переключатели и правила AutoMod между серверами. Назначения каналов и ролей не включаются — на другом сервере их не существует.')}
       </Text>
       <Flex gap={3} wrap="wrap">
         <Button
@@ -523,7 +531,7 @@ function ConfigTransfer({ guild }: { guild: string }) {
           isDisabled={busy != null}
           onClick={doExport}
         >
-          Export JSON
+          {tt('Экспорт JSON')}
         </Button>
         <Button
           size="sm"
@@ -533,7 +541,7 @@ function ConfigTransfer({ guild }: { guild: string }) {
           isDisabled={busy != null}
           onClick={() => fileRef.current?.click()}
         >
-          Import JSON
+          {tt('Импорт JSON')}
         </Button>
         <input
           ref={fileRef}
@@ -555,6 +563,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
   const statsQuery = useGuildStatsQuery(guild);
+  const tt = useText();
 
   // Bot isn't a member of this guild — show a friendly invite prompt instead of
   // a raw stats error.
@@ -569,13 +578,13 @@ const GuildOverviewPage: NextPageWithLayout = () => {
       <Flex align="flex-end" justify="space-between" gap="12px" wrap="wrap">
         <Box>
           <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
-            ОБЗОР
+            {tt('ОБЗОР')}
           </Text>
           <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
-            Здоровье сервера
+            {tt('Здоровье сервера')}
           </Heading>
           <Text fontSize="13.5px" color="TextSecondary" mt="4px">
-            Ключевые метрики и функции бота — на одном экране.
+            {tt('Ключевые метрики и функции бота — на одном экране.')}
           </Text>
         </Box>
         <Flex align="center" gap={3}>
@@ -583,7 +592,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
             <LiveIndicator updatedAt={statsQuery.dataUpdatedAt} />
           ) : statsQuery.data ? (
             <Badge colorScheme="red" rounded="md" px={2}>
-              Бот офлайн
+              {tt('Бот офлайн')}
             </Badge>
           ) : null}
           {infoQuery.data && <BotLanguage guild={guild} locale={infoQuery.data.locale ?? 'en'} />}

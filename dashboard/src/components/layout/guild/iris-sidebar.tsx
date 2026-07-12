@@ -20,6 +20,7 @@ import { useGuildInfoQuery, useSelfUserQuery } from '@/api/hooks';
 import { getFeatures } from '@/utils/common';
 import { useFeatureMeta } from '@/config/feature-meta';
 import { guild as view } from '@/config/translations/guild';
+import { useText } from '@/config/translations/ui-text';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 import { Params } from '@/pages/guilds/[guild]/features/[feature]';
 
@@ -75,6 +76,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const info = useGuildInfoQuery(guildId);
   const user = useSelfUserQuery().data;
   const t = view.useTranslations();
+  const tt = useText();
   const meta = useFeatureMeta();
 
   const enabled = new Set(info.data?.enabledFeatures ?? []);
@@ -121,7 +123,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
             OfficeGangBot
           </Text>
           <Text fontSize="11px" color="TextSecondary">
-            Панель управления
+            {tt('Панель управления')}
           </Text>
         </Box>
       </Flex>
@@ -149,7 +151,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
         }}
       >
         <Icon as={MdSearch} boxSize="18px" />
-        Поиск…
+        {tt('Поиск…')}
         <Box
           as="span"
           ml="auto"
@@ -186,7 +188,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
             color="TextSecondary"
             m="16px 4px 6px"
           >
-            ВКЛЮЧЁННЫЕ ФУНКЦИИ
+            {tt('ВКЛЮЧЁННЫЕ ФУНКЦИИ')}
           </Text>
           <Flex direction="column" gap="1px">
             {enabledFeatures.map((f) => (
@@ -243,7 +245,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
               {user.username}
             </Text>
             <Text fontSize="11px" color="TextSecondary">
-              Администратор
+              {tt('Администратор')}
             </Text>
           </Box>
           <Link href="/user/profile" onClick={(e) => e.stopPropagation()}>
