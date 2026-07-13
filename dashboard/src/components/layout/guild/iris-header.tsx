@@ -156,6 +156,16 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
             ⌘K
           </Box>
         </Flex>
+        {/* Mobile: the wide Quick-jump field is hidden below md — give the
+            palette a visible trigger. */}
+        <Flex display={{ base: 'flex', md: 'none' }}>
+          <IconBtn
+            onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE))}
+            title={tt('Быстрый переход')}
+          >
+            <Icon as={MdSearch} boxSize="19px" />
+          </IconBtn>
+        </Flex>
         <IconBtn onClick={onToggleTheme} title={tt('Сменить тему')}>
           <Icon as={colorMode === 'light' ? MdDarkMode : MdLightMode} boxSize="19px" />
         </IconBtn>

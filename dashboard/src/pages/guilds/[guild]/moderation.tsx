@@ -328,6 +328,14 @@ function Strikes({ data }: { data: ModerationStrikes }) {
           : ` · ${tt('не затухают')}`}
         {policy && ` · ${policy}`}
       </Text>
+      {/* What the pill colours mean — new moderators shouldn't have to guess. */}
+      {data.enabled && data.users.length > 0 && (
+        <Flex gap="14px" mb="12px" fontSize="11.5px" color="TextSecondary" wrap="wrap">
+          <Flex align="center" gap="5px"><Box w="8px" h="8px" rounded="full" bg="red.400" /> {tt('порог достигнут')}</Flex>
+          <Flex align="center" gap="5px"><Box w="8px" h="8px" rounded="full" bg="orange.400" /> {tt('1 до порога')}</Flex>
+          <Flex align="center" gap="5px"><Box w="8px" h="8px" rounded="full" bg="yellow.400" /> {tt('активные')}</Flex>
+        </Flex>
+      )}
       {data.users.length === 0 ? (
         <Text fontSize="sm" color="TextSecondary">
           {tt('Ни у кого нет активных страйков.')}

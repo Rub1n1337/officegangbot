@@ -46,6 +46,10 @@ export const EmojiInput = forwardRef<HTMLInputElement, EmojiInputProps>(
                 variant="ghost"
                 fontSize="lg"
                 onClick={onToggle}
+                // Warm the ~100KB emoji-mart chunk while the pointer is still
+                // on its way, so opening the picker doesn't show a spinner.
+                onMouseEnter={() => void import('./EmojiMartPicker')}
+                onFocus={() => void import('./EmojiMartPicker')}
                 aria-label="Pick an emoji"
               >
                 😀

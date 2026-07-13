@@ -419,8 +419,17 @@ function DetailCard({
 const MembersPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const tt = useText();
+  const router = useRouter();
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
+  // The selected member lives in the URL (?user=…): the detail view is
+  // shareable, survives refresh, and the browser Back button closes it.
+  const selected = (router.query.user as string) ?? null;
+  const setSelected = (userId: string | null) => {
+    const q = { ...router.query };
+    if (userId) q.user = userId;
+    else delete q.user;
+    void router.push({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+  };
   const debounced = useDebounce(query, 300);
 
   const self = useSelfUserQuery();
