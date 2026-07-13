@@ -148,7 +148,7 @@ export function GuildSelect() {
                     </Text>
                     {botReachable && isPresent && (
                       <Text fontSize="xs" color="TextSecondary">
-                        {memberCounts.get(guild.id)?.toLocaleString()} members
+                        {memberCounts.get(guild.id)?.toLocaleString()} {tt('участников')}
                       </Text>
                     )}
                   </Box>
@@ -159,7 +159,7 @@ export function GuildSelect() {
                       flexShrink={0}
                       textTransform="none"
                     >
-                      {isPresent ? 'Active' : 'Add bot'}
+                      {isPresent ? tt('Активен') : tt('Добавить бота')}
                     </Badge>
                   )}
                 </CardHeader>
