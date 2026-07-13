@@ -19,6 +19,8 @@ import { QueryStatus } from '@/components/panel/QueryPanel';
 import { StyledChart } from '@/components/chart/StyledChart';
 import type { AnalyticsData, DayCount, ModActionDay } from '@/config/types/custom-types';
 import { useText } from '@/config/translations/ui-text';
+import { MdDownload } from 'react-icons/md';
+import { Button, Icon as ChakraIcon } from '@chakra-ui/react';
 
 const PERIODS = [
   { value: 7, label: 'За 7 дней' },
@@ -107,10 +109,19 @@ function ChartCard({
   );
 }
 
-// The heatmap is 7 rows (weekdays) × 24 columns (hours). ApexCharts draws the
-// first series at the bottom, so reverse to put Monday on top.
+// The heatmap is 7 rows (weekdays) × 24 columns (hours). Counters are stored
+// in UTC; shift each cell by the browser's UTC offset so the chart reads in
+// the viewer's local time. ApexCharts draws the first series at the bottom,
+// so reverse to put Monday on top.
 function heatmapSeries(cells: AnalyticsData['heatmap'], tt: (ru: string) => string) {
-  const byKey = new Map(cells.map((c) => [c.weekday * 24 + c.hour, c.count]));
+  const offsetH = Math.round(-new Date().getTimezoneOffset() / 60);
+  const byKey = new Map(
+    cells.map((c) => {
+      const shifted = c.weekday * 24 + c.hour + offsetH;
+      const key = ((shifted % 168) + 168) % 168; // wrap within the week
+      return [key, c.count];
+    })
+  );
   return WEEKDAYS.map((name, wd) => ({
     name: tt(name),
     data: Array.from({ length: 24 }, (_, h) => ({ x: `${h}`, y: byKey.get(wd * 24 + h) ?? 0 })),
@@ -161,6 +172,31 @@ function AnalyticsSkeleton() {
   );
 }
 
+function analyticsToCsv(data: AnalyticsData): string {
+  const esc = (v: unknown) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = ['Section,Day,Key,Count'];
+  for (const r of data.modActionsByDay) lines.push(['mod_actions', r.day, r.action, r.count].map(esc).join(','));
+  for (const r of data.automodByDay) lines.push(['automod', r.day, '', r.count].map(esc).join(','));
+  for (const r of data.ticketsOpenedByDay) lines.push(['tickets_opened', r.day, '', r.count].map(esc).join(','));
+  for (const r of data.ticketsClosedByDay) lines.push(['tickets_closed', r.day, '', r.count].map(esc).join(','));
+  return '﻿' + lines.join('\r\n');
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function AnalyticsBody({ data }: { data: AnalyticsData }) {
   const tt = useText();
   const heatmap = useMemo(() => heatmapSeries(data.heatmap, tt), [data.heatmap, tt]);
@@ -191,7 +227,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
 
       <ChartCard
         title={tt('Хитмап активности')}
-        subtitle={tt('Сообщения по дням недели и часам (UTC). Только агрегатные счётчики — содержимое не хранится.')}
+        subtitle={tt('Сообщения по дням недели и часам (ваше местное время). Только агрегатные счётчики — содержимое не хранится.')}
         isEmpty={heatmapEmpty}
         emptyText={tt('Активности пока нет. Счётчики начинают копиться с этого момента.')}
       >
@@ -323,6 +359,22 @@ const AnalyticsPage: NextPageWithLayout = () => {
             </option>
           ))}
         </Select>
+        <Button
+          size="sm"
+          variant="outline"
+          rounded="10px"
+          leftIcon={<ChakraIcon as={MdDownload} />}
+          isDisabled={!query.data}
+          onClick={() =>
+            query.data &&
+            downloadCsv(
+              `analytics-${guild}-${days}d-${new Date().toISOString().slice(0, 10)}.csv`,
+              analyticsToCsv(query.data)
+            )
+          }
+        >
+          {tt('Экспорт CSV')}
+        </Button>
       </Flex>
 
       <QueryStatus query={query} loading={<AnalyticsSkeleton />} error="Failed to load analytics.">

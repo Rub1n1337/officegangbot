@@ -121,9 +121,43 @@ function CommandPalette() {
       href: `/guilds/${guildId}/features/${s.feature}`,
     }));
   }, [guildId, needle, tt]);
+  // Recently visited pages (persisted per browser) lead the default list, so
+  // reopening the palette jumps straight back to where the admin just was.
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      setRecent(JSON.parse(localStorage.getItem('palette-recent') ?? '[]'));
+    } catch {
+      setRecent([]);
+    }
+  }, [isOpen]);
+  useEffect(() => {
+    const path = router.asPath;
+    if (!path.startsWith('/guilds/')) return;
+    try {
+      const prev: string[] = JSON.parse(localStorage.getItem('palette-recent') ?? '[]');
+      const next = [path, ...prev.filter((p) => p !== path)].slice(0, 3);
+      localStorage.setItem('palette-recent', JSON.stringify(next));
+    } catch {
+      /* private mode — recents just won't persist */
+    }
+  }, [router.asPath]);
+
+  const recentCommands = useMemo<Command[]>(
+    () =>
+      recent
+        .filter((p) => p !== router.asPath)
+        .map((p) => {
+          const match = commands.find((c) => c.href === p);
+          return match ? { ...match, id: `r-${p}`, hint: tt('НЕДАВНИЕ') } : null;
+        })
+        .filter((c): c is Command => c != null),
+    [recent, commands, router.asPath, tt]
+  );
+
   const filtered = needle
     ? [...commands.filter((c) => c.label.toLowerCase().includes(needle)), ...settingHits]
-    : commands;
+    : [...recentCommands, ...commands.filter((c) => !recentCommands.some((r) => r.href === c.href))];
 
   // Open on ⌘K / Ctrl+K, or on the custom event.
   useEffect(() => {

@@ -276,6 +276,13 @@ const EN: Record<string, string> = {
     'No dashboard actions yet. Anything you change here will show up in this log.',
   'Сегодня': 'Today',
   'Вчера': 'Yesterday',
+
+  // --- Feature improvements ------------------------------------------------------
+  'Любой приоритет': 'Any priority',
+  'Импортировать настройки?': 'Import settings?',
+  'Будут обновлены:': 'Will be updated:',
+  'Импортировать': 'Import',
+  'НЕДАВНИЕ': 'RECENT',
 };
 
 export function useText() {
