@@ -13,6 +13,7 @@ import json
 import random
 import datetime
 import asyncio
+import time
 
 
 def get_xp_for_level(level: int) -> int:
@@ -424,6 +425,11 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             if not self._dirty_guilds or not self.bot.db:
                 return
 
+            # The lock is held through the upsert: releasing it between the
+            # snapshot and the write let /prestige (which resets XP in the DB
+            # and clears the buffer under this same lock) lose the race — the
+            # flush would write the pre-prestige XP back. The upsert is one
+            # fast bulk statement, so holding the lock is cheap.
             async with self._xp_lock:
                 dirty = set(self._dirty_guilds)
                 snapshot = {
@@ -435,20 +441,19 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                     if guild_id in self._write_buffer
                 }
 
-            records = []
-            for guild_id, users in snapshot.items():
-                for user_id_str, data in users.items():
-                    records.append({
-                        'guild_id': guild_id,
-                        'user_id': int(user_id_str),
-                        'xp': data.get('xp', 0),
-                        'level': data.get('level', 0),
-                        'display_name': data.get('display_name', '')
-                    })
+                records = []
+                for guild_id, users in snapshot.items():
+                    for user_id_str, data in users.items():
+                        records.append({
+                            'guild_id': guild_id,
+                            'user_id': int(user_id_str),
+                            'xp': data.get('xp', 0),
+                            'level': data.get('level', 0),
+                            'display_name': data.get('display_name', '')
+                        })
 
-            if records:
-                await self.bot.db.bulk_upsert_xp(records)
-                async with self._xp_lock:
+                if records:
+                    await self.bot.db.bulk_upsert_xp(records)
                     for guild_id, users in snapshot.items():
                         guild_buffer = self._write_buffer.get(guild_id)
                         if not guild_buffer:
@@ -464,7 +469,18 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
                         else:
                             del self._write_buffer[guild_id]
                             self._dirty_guilds.discard(guild_id)
-                logger.info(f"XP flush: {len(records)} records to PostgreSQL")
+                    logger.info(f"XP flush: {len(records)} records to PostgreSQL")
+
+            # Fallback in-memory cooldown map (used only when Redis is down)
+            # has no TTL of its own — prune entries older than two minutes so
+            # it can't grow without bound on a busy server.
+            cutoff = time.time() - 120
+            for gid in list(self._xp_cooldowns.keys()):
+                cds = self._xp_cooldowns[gid]
+                for uid in [u for u, ts in cds.items() if ts < cutoff]:
+                    del cds[uid]
+                if not cds:
+                    del self._xp_cooldowns[gid]
 
         except Exception as e:
             logger.error(f"flush_xp_cache crashed: {e}", exc_info=True)
@@ -473,14 +489,18 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
     async def before_flush_xp(self):
         await self.bot.wait_until_ready()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.flush_xp_cache.cancel()
         self.award_voice_xp.cancel()
-        # Best-effort final flush on a graceful unload so buffered XP isn't lost
-        # on a normal restart. Skipped if the pool is already closing/closed.
+        # Final flush on a graceful unload so buffered XP isn't lost on a
+        # normal restart. Awaited (bounded) — a fire-and-forget task could be
+        # cancelled by bot.close() before it wrote anything.
         pool = getattr(self.bot.db, "_pool", None) if self.bot.db else None
         if pool and not getattr(pool, "_closing", False) and not getattr(pool, "_closed", False):
-            asyncio.create_task(self._emergency_flush())
+            try:
+                await asyncio.wait_for(self._emergency_flush(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("XP emergency flush timed out during cog_unload")
 
     async def _emergency_flush(self):
         """Best-effort flush of buffered XP on unload."""

@@ -19,7 +19,8 @@ class _BaseDB:
         # Per-guild enabled-features cache. get_enabled_features is called on
         # every message (automod/filter/levels), so hitting Postgres each time
         # would hammer the DB on busy servers. Invalidated on set_feature_enabled.
-        self._enabled_features_cache: Dict[int, List[str]] = {}
+        # guild_id -> (features, stored_at) — TTL-bounded in settings mixin.
+        self._enabled_features_cache: Dict[int, tuple] = {}
         # Per-guild AutoMod content-filter config (read on every message when
         # AutoMod is on). Invalidated on set_automod_config.
         self._automod_cache: Dict[int, Dict[str, Any]] = {}

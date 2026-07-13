@@ -42,8 +42,14 @@ class _ScheduledMixin:
         `now`, for the Scheduled Messages cog to post."""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT id, guild_id, channel_id, content, scheduled_at, repeat "
-                "FROM scheduled_messages WHERE enabled AND scheduled_at <= $1",
+                # Filter by the feature toggle here: without it, a due message
+                # in a guild with the feature off was re-fetched (and its
+                # feature flag re-checked) every minute, forever.
+                "SELECT sm.id, sm.guild_id, sm.channel_id, sm.content, sm.scheduled_at, sm.repeat "
+                "FROM scheduled_messages sm "
+                "JOIN guilds g ON g.guild_id = sm.guild_id "
+                "WHERE sm.enabled AND sm.scheduled_at <= $1 "
+                "AND 'scheduled-messages' = ANY(g.enabled_features)",
                 now,
             )
             return [dict(r) for r in rows]

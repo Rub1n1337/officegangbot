@@ -34,6 +34,8 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
+        if member.bot:
+            return  # bots don't get greeted or auto-roled
         await self._send_welcome_message(member)
         await self._assign_auto_role(member)
 

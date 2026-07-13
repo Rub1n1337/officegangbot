@@ -101,14 +101,18 @@ class AnalyticsCog(commands.Cog):
     async def before_flush_activity(self):
         await self.bot.wait_until_ready()
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.flush_activity.cancel()
         self.snapshot_members.cancel()
-        # Best-effort final flush on a graceful unload so buffered counts survive
-        # a normal restart. Skipped if the pool is already closing/closed.
+        # Final flush on a graceful unload so buffered counts survive a normal
+        # restart. Awaited (bounded) — a fire-and-forget task could be
+        # cancelled by bot.close() before it wrote anything.
         pool = getattr(self.bot.db, "_pool", None) if self.bot.db else None
         if pool and not getattr(pool, "_closing", False) and not getattr(pool, "_closed", False):
-            asyncio.create_task(self._emergency_flush())
+            try:
+                await asyncio.wait_for(self._emergency_flush(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("Activity emergency flush timed out during cog_unload")
 
     async def _emergency_flush(self):
         """Best-effort flush of buffered activity on unload."""

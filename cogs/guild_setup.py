@@ -296,15 +296,21 @@ class SetupView(discord.ui.View):
             self.stop()
             return
         try:
-            for key, column in SETTING_COLUMNS.items():
-                value = self.data.get(key)
-                if value is not None:
-                    await self.bot.db.set_guild_setting(self.guild_id, column, value)
-            # The welcome system only fires when the "welcome-message" feature is
-            # in enabled_features (not just the columns). If an admin picked a
-            # welcome channel here, turn the system on so it actually works.
-            if self.data.get("welcome_channel_id"):
-                await self.bot.db.set_feature_enabled(self.guild_id, "welcome-message", True)
+            # One transaction for the whole wizard: a mid-save failure must not
+            # leave half the settings applied. The welcome system only fires
+            # when the "welcome-message" feature is in enabled_features, so if
+            # an admin picked a welcome channel here, it's enabled in the same
+            # transaction.
+            to_save = {
+                column: self.data.get(key)
+                for key, column in SETTING_COLUMNS.items()
+                if self.data.get(key) is not None
+            }
+            await self.bot.db.save_settings_atomic(
+                self.guild_id,
+                to_save,
+                enable_feature="welcome-message" if self.data.get("welcome_channel_id") else None,
+            )
         except Exception as e:
             logger.error(f"Setup save failed for guild {self.guild_id}: {e}", exc_info=True)
             await interaction.response.edit_message(
