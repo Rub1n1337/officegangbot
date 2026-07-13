@@ -250,6 +250,8 @@ const EN: Record<string, string> = {
   'Пригласить бота': 'Invite the bot',
   'Поиск серверов…': 'Search servers…',
   'Нет серверов по запросу': 'No servers match',
+  'Активен': 'Active',
+  'Добавить бота': 'Add bot',
 
   // --- Command palette --------------------------------------------------------------
   'Обзор': 'Overview',
