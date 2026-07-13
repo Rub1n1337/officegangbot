@@ -286,6 +286,13 @@ const EN: Record<string, string> = {
   'Импортировать': 'Import',
   'НЕДАВНИЕ': 'RECENT',
   'Сообщения · 7д': 'Messages · 7d',
+  'порог достигнут': 'at threshold',
+  '1 до порога': '1 below threshold',
+  'активные': 'active',
+  'Технические детали для отчётов об ошибках (ответы API и т.п.)':
+    'Technical details for bug reports (API responses etc.)',
+  'Активности пока нет. Хитмап считает сообщения по дням недели и часам — первые точки появятся, как только на сервере начнут общаться (обычно в течение часа).':
+    'No activity yet. The heatmap counts messages by weekday and hour — the first cells appear once people start chatting (usually within the hour).',
   'история копится с этого момента': 'history starts accumulating now',
 };
 

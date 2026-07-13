@@ -73,7 +73,7 @@ function TranscriptModal({
   const open = ticketId !== null;
 
   return (
-    <Modal isOpen={open} onClose={onClose} size="2xl" scrollBehavior="inside" isCentered>
+    <Modal isOpen={open} onClose={onClose} size={{ base: 'full', md: '2xl' }} scrollBehavior="inside" isCentered>
       <ModalOverlay />
       <ModalContent bg="CardBackground">
         <ModalHeader>{tt('Транскрипт тикета')}</ModalHeader>

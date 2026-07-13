@@ -36,7 +36,9 @@ const main = definePartsStyle({
       _invalid: {
         borderColor: 'red.400',
       },
-      borderColor: 'whiteAlpha.200',
+      // whiteAlpha.200 on the dark inset was ~1.4:1 — below the WCAG 3:1
+      // minimum for UI component boundaries.
+      borderColor: 'whiteAlpha.300',
       _hover: { borderColor: 'brand.400' },
       _focus: { borderColor: 'brand.400', boxShadow: 'none' },
     },

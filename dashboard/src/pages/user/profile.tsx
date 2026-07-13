@@ -178,7 +178,7 @@ const ProfilePage: NextPageWithLayout = () => {
           />
           <PrefRow
             title={tt('Режим разработчика')}
-            desc={tt('Показывать отладочную информацию')}
+            desc={tt('Технические детали для отчётов об ошибках (ответы API и т.п.)')}
             control={<Switch isChecked={devMode} onChange={(e) => setDevMode(e.target.checked)} />}
           />
         </Flex>
