@@ -2,7 +2,7 @@
 """Connection pool, schema init and shared helpers (mixin for DatabaseManager)."""
 import asyncpg
 import os
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from core.logger import logger
 
 
