@@ -64,7 +64,15 @@ app = FastAPI(
 # (X-Actor-Id, injected server-side by the proxy) when present, else fall
 # back to the client IP. Health check is intentionally left unlimited.
 def _limiter_key(request: Request) -> str:
-    return request.headers.get("x-actor-id") or get_remote_address(request)
+    actor = request.headers.get("x-actor-id")
+    if actor:
+        return actor
+    # No actor (direct API-key callers, or a proxy that failed to resolve the
+    # identity): scope the IP bucket by guild so one guild's traffic can't
+    # starve another behind a shared egress IP.
+    guild = request.path_params.get("guild_id") if request.path_params else None
+    ip = get_remote_address(request)
+    return f"{ip}:{guild}" if guild else ip
 
 limiter = Limiter(key_func=_limiter_key)
 app.state.limiter = limiter

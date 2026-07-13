@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 from core.logger import logger
+from core.permissions import bot_can_act_on
 from core.i18n import t
 from core.content_filter import contains_invite, first_disallowed_link, build_words_pattern, first_banned_word
 from core.automod_rules import compile_rules, first_match
@@ -83,6 +84,18 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
             action = "mute"
 
         escalated = None
+        # Same hierarchy rule as the manual commands: never the owner or anyone
+        # at/above the bot. Discord would refuse anyway (403); skipping cleanly
+        # avoids the attempt and the noisy Forbidden log.
+        if action and not bot_can_act_on(
+            target_id=member.id,
+            target_top_role_pos=member.top_role.position,
+            bot_id=self.bot.user.id,
+            bot_top_role_pos=guild.me.top_role.position,
+            owner_id=guild.owner_id,
+        ):
+            logger.info(f"AutoMod: escalation ({action}) skipped for {member} — protected by hierarchy")
+            action = None
         try:
             if action == "ban":
                 await guild.ban(member, reason=f"AutoMod: {count} strikes")

@@ -10,17 +10,17 @@ export const config = {
 const botApiUrl = process.env.BOT_API_URL ?? 'http://localhost:8000';
 
 // In production the proxy forwards the X-API-Key and X-Actor-* headers to the
-// bot API, so that hop must be TLS. Warn loudly if it's plain http to a non-local
-// host (a misconfigured BOT_API_URL) — those secrets would otherwise travel in
-// the clear.
-if (
+// bot API, so that hop must be TLS. A plain-http BOT_API_URL to a non-local
+// host would send those secrets in the clear — refuse to proxy at all
+// (checked per request in the handler), not just log.
+const botApiUrlInsecure =
   process.env.NODE_ENV === 'production' &&
   botApiUrl.startsWith('http://') &&
-  !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(botApiUrl)
-) {
+  !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(botApiUrl);
+if (botApiUrlInsecure) {
   console.error(
-    `[bot-proxy] BOT_API_URL is plain http (${botApiUrl}) in production — the API ` +
-      `key and actor headers are sent unencrypted. Use an https:// URL.`
+    `[bot-proxy] BOT_API_URL is plain http (${botApiUrl}) in production — refusing ` +
+      `to proxy: the API key and actor headers would travel unencrypted. Use https://.`
   );
 }
 
@@ -181,6 +181,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!apiKey) {
     return res.status(500).json({ detail: 'BOT_API_KEY is not configured' });
   }
+  if (botApiUrlInsecure) {
+    return res.status(500).json({ detail: 'BOT_API_URL must be https in production' });
+  }
 
   // The bot API holds the static X-API-Key; the proxy is the only thing that
   // reaches it. Require a logged-in user here, and for guild-scoped paths verify
@@ -220,6 +223,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(403).json({ detail: 'You are not an administrator of this guild' });
   }
 
+  // Defense in depth: the guild id in the *final* upstream URL must be exactly
+  // the guild the admin check above authorized — if URL normalization ever
+  // diverged from the segment check, this catches it.
+  const targetUrl = buildTargetUrl(req);
+  const upstreamGuildId = guildIdFromPath(
+    new URL(targetUrl).pathname.split('/').filter(Boolean)
+  );
+  if (upstreamGuildId !== guildId) {
+    return res.status(400).json({ detail: 'Invalid path' });
+  }
+
   try {
     const method = req.method ?? 'GET';
     const rawBody = method === 'GET' || method === 'HEAD' ? undefined : await readRawBody(req);
@@ -229,7 +243,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // — without it all requests share one per-IP bucket behind Vercel. Cached
     // per token for a minute, so this adds no extra Discord calls in practice.
     const actor = await getActor(accessToken);
-    const upstream = await fetch(buildTargetUrl(req), {
+    const upstream = await fetch(targetUrl, {
       method,
       headers: buildHeaders(req, apiKey, body != null, actor),
       body: body as any,

@@ -23,7 +23,7 @@ def _member(uid=2, pos=1):
 def _guild(member=None, bot_pos=5, owner_id=999):
     return SimpleNamespace(
         id=1,
-        me=SimpleNamespace(top_role=SimpleNamespace(position=bot_pos)),
+        me=SimpleNamespace(id=1, top_role=SimpleNamespace(position=bot_pos)),
         owner_id=owner_id,
         get_member=lambda uid: member,
         ban=AsyncMock(),

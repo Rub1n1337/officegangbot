@@ -7,6 +7,7 @@ import discord
 from discord.ext import commands
 
 from core.logger import logger
+from core.permissions import bot_can_act_on
 
 MAX_TIMEOUT_SECONDS = 28 * 24 * 3600 - 60  # Discord timeout ceiling (~28 days).
 
@@ -60,6 +61,17 @@ class AntiRaidCog(commands.Cog, name="🚨 Anti-Raid"):
 
     async def _act(self, member: discord.Member, action: str, duration: int):
         reason = "Anti-raid: join spike detected"
+        guild = member.guild
+        # Hierarchy guard (matches the manual moderation commands).
+        if action in ("ban", "kick", "timeout") and not bot_can_act_on(
+            target_id=member.id,
+            target_top_role_pos=member.top_role.position,
+            bot_id=self.bot.user.id,
+            bot_top_role_pos=guild.me.top_role.position,
+            owner_id=guild.owner_id,
+        ):
+            logger.info(f"Anti-raid: {action} skipped for {member} — protected by hierarchy")
+            return
         try:
             if action == "ban":
                 await member.ban(reason=reason, delete_message_seconds=0)
