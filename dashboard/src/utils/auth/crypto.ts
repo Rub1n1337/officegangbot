@@ -7,6 +7,15 @@ import { ENC_PREFIX } from './session-edge';
 // plaintext in the browser. When it's unset, we fall back to the previous
 // plaintext behaviour so existing deployments keep working.
 
+// Without SESSION_SECRET the Discord tokens sit base64-plaintext in the
+// cookie — tolerated for legacy deployments, but loudly wrong in production.
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  console.error(
+    '[auth] SESSION_SECRET is not set in production — session cookies (Discord ' +
+      'access/refresh tokens) are stored WITHOUT encryption. Set SESSION_SECRET.'
+  );
+}
+
 function key(): Buffer | null {
   const secret = process.env.SESSION_SECRET;
   if (!secret) return null;

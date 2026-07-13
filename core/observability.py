@@ -12,6 +12,7 @@ when the variables aren't set:
 """
 import asyncio
 import os
+import re
 import time
 from collections import deque
 from typing import Deque, Dict, Optional
@@ -23,6 +24,43 @@ from core.logger import logger
 # ---------------------------------------------------------------------------
 
 _sentry_initialized = False
+
+
+SECRET_PATTERNS = [
+    # Connection strings and tokens that could ride along in log messages.
+    re.compile(r"postgres(?:ql)?://[^\s'\"]+"),
+    re.compile(r"rediss?://[^\s'\"]+"),
+    re.compile(r"https?://[^\s'\"]*discord[^\s'\"]*token=[^\s'\"]+"),
+    # Discord bot token shape (base64 id . 6 chars . 27+ chars).
+    re.compile(r"[A-Za-z0-9_-]{23,28}" + re.escape(".") + r"[A-Za-z0-9_-]{6}" + re.escape(".") + r"[A-Za-z0-9_-]{20,}"),
+]
+
+
+def _scrub_text(text):
+    if not isinstance(text, str):
+        return text
+    for pat in SECRET_PATTERNS:
+        text = pat.sub("[redacted]", text)
+    return text
+
+
+def _scrub_event(event, hint):
+    """Sentry before_send: mask DSNs/tokens that may leak through log lines."""
+    try:
+        if event.get("message"):
+            event["message"] = _scrub_text(event["message"])
+        logentry = event.get("logentry")
+        if isinstance(logentry, dict) and logentry.get("message"):
+            logentry["message"] = _scrub_text(logentry["message"])
+        for crumb in (event.get("breadcrumbs") or {}).get("values", []):
+            if isinstance(crumb, dict) and crumb.get("message"):
+                crumb["message"] = _scrub_text(crumb["message"])
+        for exc in (event.get("exception") or {}).get("values", []):
+            if isinstance(exc, dict) and exc.get("value"):
+                exc["value"] = _scrub_text(exc["value"])
+    except Exception:
+        pass  # scrubbing must never block error delivery
+    return event
 
 
 def init_sentry() -> bool:
@@ -49,6 +87,7 @@ def init_sentry() -> bool:
             or "production",
             release=os.getenv("RAILWAY_GIT_COMMIT_SHA") or None,
             traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0")),
+            before_send=_scrub_event,
         )
         _sentry_initialized = True
         logger.info("Sentry error tracking initialized.")

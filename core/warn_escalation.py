@@ -8,6 +8,7 @@ from typing import Optional
 import discord
 
 from core.logger import logger
+from core.permissions import bot_can_act_on
 
 MUTE_MINUTES = 10  # timeout duration when escalating to a mute (matches AutoMod strikes)
 
@@ -34,6 +35,16 @@ async def maybe_escalate_warning(db, guild: discord.Guild, member: Optional[disc
         return None
 
     reason = f"Warning escalation: {count} warnings"
+    # Hierarchy guard (matches the manual moderation commands).
+    if not bot_can_act_on(
+        target_id=member.id,
+        target_top_role_pos=member.top_role.position,
+        bot_id=guild.me.id,
+        bot_top_role_pos=guild.me.top_role.position,
+        owner_id=guild.owner_id,
+    ):
+        logger.info(f"Warn escalation ({action}) skipped for {member} — protected by hierarchy")
+        return None
     try:
         if action == "ban":
             await guild.ban(member, reason=reason)
