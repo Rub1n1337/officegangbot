@@ -108,8 +108,10 @@ class AntiRaidCog(commands.Cog, name="🚨 Anti-Raid"):
                 timestamp=datetime.datetime.now(datetime.timezone.utc),
             )
             await channel.send(embed=embed)
-        except discord.HTTPException:
-            pass
+        except discord.HTTPException as e:
+            # A raid alert the admins never see is exactly when they need it —
+            # at least leave a trace in the logs.
+            logger.warning(f"Anti-raid: raid alert could not be posted in guild {guild.id}: {e}")
 
 
 async def setup(bot: commands.Bot):

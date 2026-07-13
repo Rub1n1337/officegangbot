@@ -46,6 +46,7 @@ async def _capture_transcript(channel: discord.TextChannel, guild: discord.Guild
     """Reads the channel's message history (oldest first) into a plain-text
     transcript. Best-effort: returns whatever could be read."""
     entries = []
+    incomplete = False
     try:
         async for msg in channel.history(limit=500, oldest_first=True):
             content = msg.content or ("[embed]" if msg.embeds else "")
@@ -55,9 +56,12 @@ async def _capture_transcript(channel: discord.TextChannel, guild: discord.Guild
                 "content": content,
                 "attachments": [a.url for a in msg.attachments],
             })
-    except discord.HTTPException:
-        pass
+    except discord.HTTPException as e:
+        incomplete = True
+        logger.warning(f"Transcript capture incomplete for channel {channel.id}: {e}")
     header = f"Transcript — #{channel.name} — {guild.name}"
+    if incomplete:
+        header += " [INCOMPLETE — some messages could not be retrieved]"
     return build_transcript(entries, header)
 
 
