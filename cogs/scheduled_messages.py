@@ -47,6 +47,13 @@ class ScheduledMessagesCog(commands.Cog, name="📅 Scheduled Messages"):
 
         guild = self.bot.get_guild(m["guild_id"])
         channel = guild.get_channel(int(m["channel_id"])) if guild else None
+        if guild is not None and channel is None:
+            # Cold cache after a restart — fall back to an API fetch so the
+            # scheduled post isn't silently skipped.
+            try:
+                channel = await guild.fetch_channel(int(m["channel_id"]))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                channel = None
         if channel is not None:
             try:
                 await channel.send(str(m["content"])[:2000])

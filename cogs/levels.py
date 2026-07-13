@@ -184,6 +184,12 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         fallback channel (the message's channel) when none is set."""
         level_up_channel_id = await self.bot.db.get_guild_setting(guild.id, 'level_up_channel_id')
         channel = guild.get_channel(int(level_up_channel_id)) if level_up_channel_id else fallback_channel
+        if level_up_channel_id and channel is None:
+            # Cold cache after a restart — fetch so the announcement still lands.
+            try:
+                channel = await guild.fetch_channel(int(level_up_channel_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                channel = fallback_channel
         if not channel:
             return
         loc = await self.bot.db.get_locale(guild.id)

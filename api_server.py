@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Optional, Literal
+import json
 import os
 import secrets
 from urllib.parse import unquote
@@ -57,8 +58,15 @@ app = FastAPI(
     openapi_url=None,
 )
 
-# Rate limiting (per client IP). Health check is intentionally left unlimited.
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiting. Behind the dashboard proxy every request arrives from a
+# Vercel egress IP, so a pure per-IP key made all admins share one bucket
+# (false 429s) while giving no per-user isolation. Key by the acting admin
+# (X-Actor-Id, injected server-side by the proxy) when present, else fall
+# back to the client IP. Health check is intentionally left unlimited.
+def _limiter_key(request: Request) -> str:
+    return request.headers.get("x-actor-id") or get_remote_address(request)
+
+limiter = Limiter(key_func=_limiter_key)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -507,11 +515,24 @@ async def disable_feature(request: Request, guild_id: str, feature: str):
     data = await _rpc("disable_feature", guild_id=guild_id, feature=feature, **_actor(request))
     return data
 
+# Feature payloads are small (toggles, thresholds, short texts, id lists);
+# 256 KiB is far above any legitimate config and keeps junk out of the RPC.
+MAX_FEATURE_BODY_BYTES = 256 * 1024
+
+
 @app.patch("/guilds/{guild_id}/features/{feature}", dependencies=[Depends(verify_api_key)])
 @limiter.limit("10/minute")
 async def update_feature(request: Request, guild_id: str, feature: str):
     """Updates feature settings for a guild."""
-    body = await request.json()
+    raw = await request.body()
+    if len(raw) > MAX_FEATURE_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Feature payload too large")
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Feature payload must be a JSON object")
     data = await _rpc("update_feature", guild_id=guild_id, feature=feature, options=body, **_actor(request))
     return data
 

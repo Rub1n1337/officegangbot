@@ -157,7 +157,11 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
 
         log_channel = ctx.guild.get_channel(int(log_channel_id))
         if not log_channel:
-            return
+            # Cold cache after a restart — fetch so the punishment log isn't lost.
+            try:
+                log_channel = await ctx.guild.fetch_channel(int(log_channel_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return
 
         timestamp = discord.utils.utcnow()
         title = f"{action}" + (f" · Case #{case_number}" if case_number is not None else "")
