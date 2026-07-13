@@ -299,10 +299,42 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         # by custom_id after a restart — displayed labels come from posted views).
         bot.add_view(OpenTicketView())
         bot.add_view(TicketControlView())
+        # Channels whose subject is already captured (or checked) this session,
+        # so the on_message listener doesn't query the DB per message.
+        self._subject_done: set[int] = set()
         self.auto_close_loop.start()
 
     def cog_unload(self):
         self.auto_close_loop.cancel()
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Captures the opener's first message as the ticket subject (shown in
+        the dashboard's ticket list). Cheap guard: ticket channels are named
+        ticket-*, and each channel is checked at most once per session."""
+        if (
+            message.author.bot
+            or not message.guild
+            or not self.bot.db
+            or not isinstance(message.channel, discord.TextChannel)
+            or not message.channel.name.startswith("ticket-")
+            or message.channel.id in self._subject_done
+        ):
+            return
+        ticket = await self.bot.db.get_open_ticket_by_channel(message.channel.id)
+        if ticket is None:
+            self._subject_done.add(message.channel.id)
+            return
+        if ticket.get("subject"):
+            self._subject_done.add(message.channel.id)
+            return
+        if int(ticket["opener_id"]) != message.author.id:
+            return  # wait for the opener's own first message
+        text = (message.content or "").strip()
+        if not text:
+            return  # attachments-only message — wait for text
+        await self.bot.db.set_ticket_subject(message.channel.id, text)
+        self._subject_done.add(message.channel.id)
 
     async def _close_orphaned_record(self, guild_id: int, channel_id: int):
         """Closes the DB record for a ticket whose channel no longer exists —

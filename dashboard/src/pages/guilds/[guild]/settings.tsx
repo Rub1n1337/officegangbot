@@ -42,9 +42,65 @@ import { useFeatureMeta } from '@/config/feature-meta';
 import type { CustomFeatures, GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 import { useText } from '@/config/translations/ui-text';
 
+// Thin accent sparkline for the KPI tiles (mockup: 2px polyline). Renders
+// nothing until there are at least two points, so fresh guilds simply show
+// the plain number while history accumulates.
+function Sparkline({ points }: { points: number[] }) {
+  if (points.length < 2) return null;
+  const w = 120;
+  const h = 26;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const step = w / (points.length - 1);
+  const path = points
+    .map((v, i) => `${(i * step).toFixed(1)},${(h - 3 - ((v - min) / span) * (h - 6)).toFixed(1)}`)
+    .join(' ');
+  return (
+    <Box as="svg" viewBox={`0 0 ${w} ${h}`} w="120px" h="26px" mt="8px" aria-hidden>
+      <polyline points={path} fill="none" stroke="var(--chakra-colors-brand-400)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Box>
+  );
+}
+
+// Green/red delta chip next to a KPI label.
+function DeltaChip({ delta, suffix = '' }: { delta: number; suffix?: string }) {
+  if (!Number.isFinite(delta) || delta === 0) return null;
+  const up = delta > 0;
+  return (
+    <Box
+      as="span"
+      fontSize="11px"
+      fontWeight="700"
+      rounded="20px"
+      px="8px"
+      py="1px"
+      color={up ? 'green.500' : 'red.400'}
+      bg={up ? 'rgba(63,208,126,0.13)' : 'rgba(241,106,106,0.12)'}
+      _dark={{ color: up ? 'green.400' : 'red.400' }}
+    >
+      {up ? '▲' : '▼'}{Math.abs(delta)}{suffix}
+    </Box>
+  );
+}
+
 // Iris metric card: label, big value, optional hint. Soft surface with a
 // hover lift, matching the mockup's overview stat tiles.
-function IrisStat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+function IrisStat({
+  label,
+  value,
+  hint,
+  delta,
+  deltaSuffix,
+  spark,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: string;
+  delta?: number;
+  deltaSuffix?: string;
+  spark?: number[];
+}) {
   return (
     <Box
       bg="CardBackground"
@@ -56,12 +112,16 @@ function IrisStat({ label, value, hint }: { label: string; value: ReactNode; hin
       transition="transform .18s ease, border-color .18s ease"
       _hover={{ transform: 'translateY(-4px)', borderColor: 'brand.400' }}
     >
-      <Text fontSize="12px" color="TextSecondary" fontWeight="500">
-        {label}
-      </Text>
+      <Flex align="center" gap="8px">
+        <Text fontSize="12px" color="TextSecondary" fontWeight="500">
+          {label}
+        </Text>
+        {delta != null && <DeltaChip delta={delta} suffix={deltaSuffix} />}
+      </Flex>
       <Text fontSize="27px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="9px">
         {value}
       </Text>
+      {spark && <Sparkline points={spark} />}
       {hint && (
         <Text fontSize="11px" color="TextSecondary" mt="6px">
           {hint}
@@ -127,13 +187,39 @@ function TopXp({ rows }: { rows: GuildStatsTopXp[] }) {
 
 function OverviewMetrics({ stats }: { stats: GuildStats }) {
   const tt = useText();
+  const history = stats.history ?? [];
+  const memberSeries = history
+    .map((d) => d.memberCount)
+    .filter((v): v is number => v != null);
+  // Delta vs ~7 days ago (or the oldest snapshot if history is shorter).
+  const memberBase = memberSeries.length >= 2
+    ? memberSeries[Math.max(0, memberSeries.length - 8)]
+    : null;
+  const memberDelta = memberBase != null ? stats.member_count - memberBase : undefined;
+  const msgSeries = history.map((d) => d.messages);
+  const last7 = msgSeries.slice(-7).reduce((a, b) => a + b, 0);
+  const prev7 = msgSeries.slice(-14, -7).reduce((a, b) => a + b, 0);
+  const msgDelta = prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : undefined;
   return (
     <Box
       display="grid"
       gridTemplateColumns="repeat(auto-fit, minmax(210px, 1fr))"
       gap="16px"
     >
-      <IrisStat label={tt('Участников')} value={stats.member_count.toLocaleString('ru-RU')} />
+      <IrisStat
+        label={tt('Участников')}
+        value={stats.member_count.toLocaleString('ru-RU')}
+        delta={memberDelta}
+        spark={memberSeries.length >= 2 ? memberSeries : undefined}
+      />
+      <IrisStat
+        label={tt('Сообщения · 7д')}
+        value={last7.toLocaleString('ru-RU')}
+        delta={msgDelta}
+        deltaSuffix="%"
+        spark={msgSeries.length >= 2 ? msgSeries : undefined}
+        hint={msgSeries.length < 2 ? tt('история копится с этого момента') : undefined}
+      />
       <IrisStat
         label={tt('Каналов')}
         value={stats.channel_count}

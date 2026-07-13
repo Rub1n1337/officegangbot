@@ -82,6 +82,16 @@ class _TicketsMixin:
             )
         return dict(row) if row else None
 
+    async def set_ticket_subject(self, channel_id: int, subject: str) -> bool:
+        """Sets the subject from the opener's first message; only once."""
+        async with self.pool.acquire() as conn:
+            res = await conn.execute(
+                "UPDATE tickets SET subject = $1 "
+                "WHERE channel_id = $2 AND status = 'open' AND subject IS NULL",
+                subject[:200], channel_id,
+            )
+        return res.endswith("1")
+
     async def count_open_tickets(self, guild_id: int) -> int:
         """Number of currently open tickets — cheap enough for the stats poll."""
         async with self.pool.acquire() as conn:
@@ -96,7 +106,7 @@ class _TicketsMixin:
         without the (potentially large) transcript body."""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT id, channel_id, opener_id, opener_name, priority, status, "
+                "SELECT id, channel_id, opener_id, opener_name, priority, status, subject, "
                 "opened_at, closed_at, closed_by_id, closed_by_name, close_comment, "
                 "(transcript IS NOT NULL) AS has_transcript "
                 "FROM tickets WHERE guild_id = $1 "
@@ -117,7 +127,7 @@ class _TicketsMixin:
         escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT id, channel_id, opener_id, opener_name, priority, status, "
+                "SELECT id, channel_id, opener_id, opener_name, priority, status, subject, "
                 "opened_at, closed_at, closed_by_id, closed_by_name, close_comment, "
                 "(transcript IS NOT NULL) AS has_transcript, "
                 "CASE WHEN position(lower($2) in lower(transcript)) > 0 THEN "
@@ -138,7 +148,7 @@ class _TicketsMixin:
         """Returns a single ticket's metadata + full transcript, scoped to guild."""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT id, opener_name, priority, status, opened_at, closed_at, "
+                "SELECT id, opener_name, priority, status, subject, opened_at, closed_at, "
                 "closed_by_name, close_comment, transcript "
                 "FROM tickets WHERE guild_id = $1 AND id = $2",
                 guild_id, int(ticket_id),

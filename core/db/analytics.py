@@ -26,6 +26,47 @@ class _AnalyticsMixin:
                 ],
             )
 
+    async def bulk_add_daily_messages(self, records) -> None:
+        """Upserts per-day message counts (aggregate only, for KPI sparklines).
+        records: [{"guild_id": int, "day": date, "delta": int}]"""
+        if not records:
+            return
+        async with self.pool.acquire() as conn:
+            await conn.executemany(
+                "INSERT INTO guild_metrics_daily (guild_id, day, messages) "
+                "VALUES ($1, $2, $3) "
+                "ON CONFLICT (guild_id, day) DO UPDATE "
+                "SET messages = guild_metrics_daily.messages + EXCLUDED.messages",
+                [(r["guild_id"], r["day"], r["delta"]) for r in records],
+            )
+
+    async def snapshot_member_counts(self, rows) -> None:
+        """Upserts today's member-count snapshot. rows: [(guild_id, count)]"""
+        if not rows:
+            return
+        async with self.pool.acquire() as conn:
+            await conn.executemany(
+                "INSERT INTO guild_metrics_daily (guild_id, day, member_count) "
+                "VALUES ($1, CURRENT_DATE, $2) "
+                "ON CONFLICT (guild_id, day) DO UPDATE "
+                "SET member_count = EXCLUDED.member_count",
+                list(rows),
+            )
+
+    async def get_daily_metrics(self, guild_id: int, days: int = 14):
+        """Last `days` of daily metrics, oldest first."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT day, messages, member_count FROM guild_metrics_daily "
+                "WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::int "
+                "ORDER BY day",
+                guild_id, int(days),
+            )
+        return [
+            {"day": r["day"].isoformat(), "messages": r["messages"], "memberCount": r["member_count"]}
+            for r in rows
+        ]
+
     async def get_analytics(self, guild_id: int, days: int = 30) -> Dict[str, Any]:
         """Aggregates dashboard analytics for a guild: the activity heatmap (from
         activity_buckets) plus moderation/ticket trends computed on the fly from

@@ -154,6 +154,12 @@ export type MemberDetail = {
   cases: MemberCase[];
 };
 
+export type GuildStatsDay = {
+  day: string;
+  messages: number;
+  memberCount: number | null;
+};
+
 export type GuildStats = {
   id: string;
   name: string;
@@ -167,6 +173,7 @@ export type GuildStats = {
   latency_ms: number;
   enabled_feature_count: number;
   open_tickets: number;
+  history: GuildStatsDay[];
   top_xp: GuildStatsTopXp[];
 };
 
@@ -244,6 +251,7 @@ export type Ticket = {
   openerId: string;
   openerName: string | null;
   priority: TicketPriority;
+  subject?: string | null;
   status: 'open' | 'closed';
   openedAt: string | null;
   closedAt: string | null;
@@ -259,6 +267,7 @@ export type TicketDetail = {
   id: number;
   openerName: string | null;
   priority: TicketPriority;
+  subject?: string | null;
   status: 'open' | 'closed';
   openedAt: string | null;
   closedAt: string | null;
