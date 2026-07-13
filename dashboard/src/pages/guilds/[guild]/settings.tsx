@@ -1,4 +1,10 @@
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Badge,
   Box,
   Button,
@@ -479,6 +485,11 @@ function ConfigTransfer({ guild }: { guild: string }) {
     }
   };
 
+  // Parsed import waiting for the admin's confirmation (Iris modal instead of
+  // the browser's window.confirm).
+  const [pendingImport, setPendingImport] = useState<Record<string, Record<string, unknown>> | null>(null);
+  const importCancelRef = useRef<HTMLButtonElement>(null);
+
   const doImport = async (text: string) => {
     if (!session) return;
     const parsed = parseImport(text);
@@ -486,13 +497,15 @@ function ConfigTransfer({ guild }: { guild: string }) {
       notify(parsed.error, 'error');
       return;
     }
-    const names = Object.keys(parsed.features).join(', ');
-    if (!window.confirm(`${tt('Импортировать настройки для:')} ${names}?\n${tt('Назначения каналов и ролей не затрагиваются.')}`)) {
-      return;
-    }
+    setPendingImport(parsed.features);
+  };
+
+  const runImport = async (features: Record<string, Record<string, unknown>>) => {
+    if (!session) return;
+    const names = Object.keys(features).join(', ');
     setBusy('import');
     const failed: string[] = [];
-    for (const [feature, subset] of Object.entries(parsed.features)) {
+    for (const [feature, subset] of Object.entries(features)) {
       try {
         // Merge over the guild's current payload so id fields (channels, roles,
         // exemptions) are preserved exactly as they are.
@@ -555,6 +568,46 @@ function ConfigTransfer({ guild }: { guild: string }) {
           }}
         />
       </Flex>
+
+      <AlertDialog
+        isOpen={pendingImport != null}
+        leastDestructiveRef={importCancelRef}
+        onClose={() => setPendingImport(null)}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="CardBackground" mx={4} rounded="16px">
+            <AlertDialogHeader>{tt('Импортировать настройки?')}</AlertDialogHeader>
+            <AlertDialogBody>
+              <Text fontSize="sm">
+                {tt('Будут обновлены:')}{' '}
+                <Text as="span" fontWeight="600">
+                  {pendingImport ? Object.keys(pendingImport).join(', ') : ''}
+                </Text>
+              </Text>
+              <Text fontSize="sm" color="TextSecondary" mt={2}>
+                {tt('Назначения каналов и ролей не затрагиваются.')}
+              </Text>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={importCancelRef} variant="ghost" onClick={() => setPendingImport(null)}>
+                {tt('Отмена')}
+              </Button>
+              <Button
+                colorScheme="brand"
+                ml={3}
+                onClick={() => {
+                  const f = pendingImport!;
+                  setPendingImport(null);
+                  void runImport(f);
+                }}
+              >
+                {tt('Импортировать')}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 }

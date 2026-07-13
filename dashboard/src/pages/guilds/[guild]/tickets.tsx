@@ -274,6 +274,7 @@ const TicketsPage: NextPageWithLayout = () => {
   const query = useTicketsQuery(guild);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'open' | 'closed'>('all');
+  const [priority, setPriority] = useState<'all' | TicketPriority>('all');
   const [selected, setSelected] = useState<number | null>(null);
   const [visible, setVisible] = useState(PAGE);
   const tt = useText();
@@ -293,6 +294,7 @@ const TicketsPage: NextPageWithLayout = () => {
     () =>
       rows.filter((t) => {
         if (status !== 'all' && t.status !== status) return false;
+        if (priority !== 'all' && t.priority !== priority) return false;
         if (!q) return true;
         const hay = [t.openerName, t.openerId, t.priority, t.status, t.closedByName, t.closeComment]
           .filter(Boolean)
@@ -300,7 +302,7 @@ const TicketsPage: NextPageWithLayout = () => {
           .toLowerCase();
         return hay.includes(q);
       }),
-    [rows, q, status]
+    [rows, q, status, priority]
   );
 
   const openCount = rows.filter((t) => t.status === 'open').length;
@@ -311,9 +313,9 @@ const TicketsPage: NextPageWithLayout = () => {
   const transcriptHits = useMemo(
     () =>
       (searchQuery.data ?? []).filter(
-        (t) => !shownIds.has(t.id) && (status === 'all' || t.status === status)
+        (t) => !shownIds.has(t.id) && (status === 'all' || t.status === status) && (priority === 'all' || t.priority === priority)
       ),
-    [searchQuery.data, shownIds, status]
+    [searchQuery.data, shownIds, status, priority]
   );
 
   return (
@@ -363,6 +365,19 @@ const TicketsPage: NextPageWithLayout = () => {
                 <option value="all">{tt('Все статусы')}</option>
                 <option value="open">{tt('Открытые')}</option>
                 <option value="closed">{tt('Закрытые')}</option>
+              </Select>
+              <Select
+                variant="main"
+                maxW={{ base: 'full', sm: '190px' }}
+                value={priority}
+                onChange={(ev) => setPriority(ev.target.value as 'all' | TicketPriority)}
+              >
+                <option value="all">{tt('Любой приоритет')}</option>
+                {(Object.keys(PRIORITY) as TicketPriority[]).map((pr) => (
+                  <option key={pr} value={pr}>
+                    {tt(PRIORITY[pr].label)}
+                  </option>
+                ))}
               </Select>
             </Flex>
             <Text fontSize="sm" color="TextSecondary">
