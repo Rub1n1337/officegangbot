@@ -24,6 +24,7 @@ import {
 import { MdConfirmationNumber, MdSearch, MdDescription } from 'react-icons/md';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
 import { useTicketsQuery, useTicketSearchQuery, useTicketTranscriptQuery } from '@/api/hooks';
@@ -370,9 +371,14 @@ const TicketsPage: NextPageWithLayout = () => {
           </Flex>
 
           {rows.length === 0 ? (
-            <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              {tt('Тикеты ещё не открывались.')}
-            </Text>
+            <Flex direction="column" align="center" gap={3} py={6}>
+              <Text fontSize="sm" color="TextSecondary" textAlign="center">
+                {tt('Тикеты ещё не открывались. Настройте функцию и опубликуйте панель командой /ticket_setup.')}
+              </Text>
+              <Button as={Link} href={`/guilds/${guild}/features/tickets`} size="sm" variant="outline" rounded="10px">
+                {tt('Настроить тикеты')}
+              </Button>
+            </Flex>
           ) : filtered.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
               {tt('Ничего не найдено по фильтрам.')}

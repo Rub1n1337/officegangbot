@@ -233,8 +233,8 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
         </Text>
         <Text fontSize="13px" color="TextSecondary" mt="2px">
           {allDone
-            ? tt('Загляни в аналитику или добавь новые функции ниже.')
-            : tt('Включи ключевые функции, чтобы бот заработал в полную силу.')}
+            ? tt('Загляните в аналитику или добавьте новые функции ниже.')
+            : tt('Включите ключевые функции, чтобы бот заработал в полную силу.')}
         </Text>
       </Box>
       <Button

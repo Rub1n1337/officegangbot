@@ -4,7 +4,7 @@ import {
 } from '@chakra-ui/react';
 import { MdNotifications, MdConfirmationNumber, MdOutlineHowToReg } from 'react-icons/md';
 import { useEffect, useMemo, useState } from 'react';
-import { useTicketsQuery, useModerationQuery } from '@/api/hooks';
+import { useTicketsQuery, useModerationQuery, useGuildStatsQuery } from '@/api/hooks';
 import { timeAgo } from '@/utils/audit';
 import { provider } from '@/config/translations/provider';
 import { useText } from '@/config/translations/ui-text';
@@ -181,6 +181,11 @@ export function NotificationsBell({ guild }: { guild: string }) {
   // Queries mount only after the first open, so pages don't pay the RPC cost.
   const [armed, setArmed] = useState(false);
   const [unread, setUnread] = useState(0);
+  // Before the first open there's no notification data yet — approximate the
+  // badge with the open-ticket count that already rides the header's stats
+  // poll (same react-query key, zero extra RPC).
+  const openTickets = useGuildStatsQuery(guild).data?.open_tickets ?? 0;
+  const badge = armed ? unread : openTickets;
 
   return (
     <Popover
@@ -210,7 +215,7 @@ export function NotificationsBell({ guild }: { guild: string }) {
           _hover={{ bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
         >
           <Icon as={MdNotifications} boxSize="19px" />
-          {unread > 0 && (
+          {badge > 0 && (
             <Flex
               position="absolute"
               top="4px"

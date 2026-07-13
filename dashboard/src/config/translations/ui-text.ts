@@ -199,8 +199,8 @@ const EN: Record<string, string> = {
   'с назад': 's ago',
   'Базовые функции настроены': 'Core features are set up',
   'Базовая настройка:': 'Core setup:',
-  'Загляни в аналитику или добавь новые функции ниже.': 'Check the analytics or add more features below.',
-  'Включи ключевые функции, чтобы бот заработал в полную силу.': 'Enable the key features to get the most out of the bot.',
+  'Загляните в аналитику или добавьте новые функции ниже.': 'Check the analytics or add more features below.',
+  'Включите ключевые функции, чтобы бот заработал в полную силу.': 'Enable the key features to get the most out of the bot.',
   'Аналитика': 'Analytics',
   'Продолжить': 'Continue',
   'Настроить': 'Configure',
@@ -264,6 +264,18 @@ const EN: Record<string, string> = {
   'Настройка': 'Setting',
   'Перейти к серверу или функции…': 'Jump to a server or feature…',
   'Ничего не найдено.': 'No matches.',
+
+  // --- Home header / empty-state CTAs ------------------------------------------
+  'СЕРВЕРЫ': 'SERVERS',
+  'Выберите сервер': 'Pick a server',
+  'Серверы, где у вас есть права администратора.': 'Servers where you have administrator rights.',
+  'Настроить тикеты': 'Set up tickets',
+  'Тикеты ещё не открывались. Настройте функцию и опубликуйте панель командой /ticket_setup.':
+    'No tickets have been opened yet. Configure the feature and post the panel with /ticket_setup.',
+  'Действий из дашборда пока нет. Всё, что вы измените здесь, появится в этом журнале.':
+    'No dashboard actions yet. Anything you change here will show up in this log.',
+  'Сегодня': 'Today',
+  'Вчера': 'Yesterday',
 };
 
 export function useText() {
