@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { MdSmartToy, MdDarkMode, MdLightMode, MdPerson } from 'react-icons/md';
 import { avatarUrl } from '@/api/discord';
 import { useSelfUserQuery } from '@/api/hooks';
+import { QueryStatus } from '@/components/panel/QueryPanel';
+import { LoadingPanel } from '@/components/panel/LoadingPanel';
 import { useText } from '@/config/translations/ui-text';
 
 // Iris shell for the /user pages (server picker, profile). The mockup shows
@@ -13,7 +15,8 @@ import { useText } from '@/config/translations/ui-text';
 // the redesigned screens.
 export default function IrisUserLayout({ children }: { children: ReactNode }) {
   const { colorMode, toggleColorMode } = useColorMode();
-  const user = useSelfUserQuery().data;
+  const query = useSelfUserQuery();
+  const user = query.data;
   const tt = useText();
 
   return (
@@ -98,7 +101,12 @@ export default function IrisUserLayout({ children }: { children: ReactNode }) {
 
       <Box flex="1" overflowY="auto">
         <Box maxW="1080px" mx="auto" px={{ base: '20px', md: '28px' }} py={{ base: '22px', md: '26px' }}>
-          {children}
+          {/* Pages under this layout use useSelfUser() (non-null user), so —
+              like the old AppLayout — don't render them until the session
+              user has loaded. */}
+          <QueryStatus query={query} loading={<LoadingPanel />} error="Failed to load user info">
+            {children}
+          </QueryStatus>
         </Box>
       </Box>
     </Flex>
