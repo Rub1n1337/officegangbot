@@ -224,9 +224,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const method = req.method ?? 'GET';
     const rawBody = method === 'GET' || method === 'HEAD' ? undefined : await readRawBody(req);
     const body = rawBody && rawBody.length > 0 ? rawBody : undefined;
-    // Attribute mutating requests to the acting admin for the audit trail.
-    const mutating = method !== 'GET' && method !== 'HEAD';
-    const actor = mutating ? await getActor(accessToken) : null;
+    // The actor identity rides on every request: mutations need it for the
+    // audit trail, and the bot API keys its rate limiter per admin (X-Actor-Id)
+    // — without it all requests share one per-IP bucket behind Vercel. Cached
+    // per token for a minute, so this adds no extra Discord calls in practice.
+    const actor = await getActor(accessToken);
     const upstream = await fetch(buildTargetUrl(req), {
       method,
       headers: buildHeaders(req, apiKey, body != null, actor),

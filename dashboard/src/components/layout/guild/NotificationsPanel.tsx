@@ -81,6 +81,20 @@ function PanelContent({
   const unread = items.filter((i) => !read.has(i.id)).length;
   useEffect(() => onUnread(unread), [unread, onUnread]);
 
+  // The stored read-set would otherwise grow forever (ids of long-closed
+  // tickets/appeals never leave localStorage) — prune it to the ids that are
+  // still in the list once the data is in.
+  useEffect(() => {
+    if (tickets.isLoading || moderation.isLoading) return;
+    const live = new Set(items.map((i) => i.id));
+    const pruned = Array.from(read).filter((id) => live.has(id));
+    if (pruned.length !== read.size) {
+      const s = new Set(pruned);
+      setRead(s);
+      saveSet(guild, s);
+    }
+  }, [items, tickets.isLoading, moderation.isLoading, read, guild]);
+
   const markOne = (id: string) => {
     const s = new Set(read);
     s.add(id);
