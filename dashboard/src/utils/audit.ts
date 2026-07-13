@@ -117,7 +117,7 @@ export function actionLabel(action: string, lang: Languages = 'ru'): string {
 
 /** Serialize audit entries to CSV (RFC-4180 quoting) for export. Prefixed with a
  * BOM so Excel reads the UTF-8 correctly. */
-export function auditToCsv(entries: AuditEntry[]): string {
+export function auditToCsv(entries: AuditEntry[], lang: Languages = 'ru'): string {
   const esc = (v: string | null | undefined): string => {
     const s = v == null ? '' : String(v);
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -126,7 +126,7 @@ export function auditToCsv(entries: AuditEntry[]): string {
   const lines = [header.join(',')];
   for (const e of entries) {
     lines.push(
-      [e.createdAt ?? '', e.actorName ?? '', e.action, describeAudit(e), e.target ?? '', e.detail ?? '']
+      [e.createdAt ?? '', e.actorName ?? '', e.action, describeAudit(e, lang), e.target ?? '', e.detail ?? '']
         .map(esc)
         .join(',')
     );

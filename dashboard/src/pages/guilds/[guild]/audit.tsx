@@ -218,7 +218,7 @@ const AuditPage: NextPageWithLayout = () => {
               onClick={() =>
                 downloadCsv(
                   `audit-${guild}-${new Date().toISOString().slice(0, 10)}.csv`,
-                  auditToCsv(filtered)
+                  auditToCsv(filtered, lang)
                 )
               }
             >
