@@ -124,6 +124,13 @@ export function iconUrl(guild: Guild): string | undefined {
 }
 
 export function avatarUrl(user: UserInfo) {
+  // Users without a custom avatar have user.avatar = null — the CDN URL would
+  // 404 and render as a broken image. Fall back to Discord's own default
+  // avatar (index derived from the user id, same formula Discord uses).
+  if (!user.avatar) {
+    const index = Number((BigInt(user.id) >> BigInt(22)) % BigInt(6));
+    return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+  }
   return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}?size=512`;
 }
 
