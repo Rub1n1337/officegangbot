@@ -1,6 +1,6 @@
 import { Box, Drawer, DrawerBody, DrawerContent, DrawerOverlay, Flex, usePrefersReducedMotion } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { usePageStore } from '@/stores';
 import { IrisSidebar } from './iris-sidebar';
@@ -18,6 +18,34 @@ export default function IrisGuildLayout({ children }: { children: ReactNode }) {
   const [isOpen, setOpen] = usePageStore((s) => [s.sidebarIsOpen, s.setSidebarIsOpen]);
   const route = useRouter().asPath;
   const reduceMotion = usePrefersReducedMotion();
+
+  // Mobile: swipe right from the left edge opens the sidebar drawer (the
+  // Drawer's own swipe-to-close already works via its overlay).
+  useEffect(() => {
+    let startX = -1;
+    let startY = -1;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      startX = t.clientX <= 24 ? t.clientX : -1;
+      startY = t.clientY;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (startX < 0) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = Math.abs(t.clientY - startY);
+      if (dx > 60 && dy < 40) {
+        setOpen(true);
+        startX = -1;
+      }
+    };
+    window.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', onStart);
+      window.removeEventListener('touchmove', onMove);
+    };
+  }, [setOpen]);
 
   return (
     <Box

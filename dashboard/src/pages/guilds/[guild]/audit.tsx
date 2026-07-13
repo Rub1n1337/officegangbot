@@ -52,6 +52,19 @@ function matchesSearch(e: AuditEntry, q: string): boolean {
   return hay.includes(q);
 }
 
+// Day header for the timeline: Today / Yesterday / a local date.
+function dayLabel(iso: string | null, tt: (ru: string) => string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const today = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(today) - startOf(d)) / 86_400_000);
+  if (diffDays === 0) return tt('Сегодня');
+  if (diffDays === 1) return tt('Вчера');
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 function withinPeriod(e: AuditEntry, days: number | null): boolean {
   if (days == null) return true;
   if (!e.createdAt) return false;
@@ -228,7 +241,7 @@ const AuditPage: NextPageWithLayout = () => {
 
           {rows.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
-              {tt('Действий из дашборда пока нет.')}
+              {tt('Действий из дашборда пока нет. Всё, что вы измените здесь, появится в этом журнале.')}
             </Text>
           ) : filtered.length === 0 ? (
             <Text fontSize="sm" color="TextSecondary" py={4} textAlign="center">
@@ -236,9 +249,27 @@ const AuditPage: NextPageWithLayout = () => {
             </Text>
           ) : (
             <Flex direction="column" gap={2}>
-              {filtered.slice(0, visible).map((e) => (
-                <AuditRow key={e.id} e={e} lang={lang} />
-              ))}
+              {filtered.slice(0, visible).map((e, i, arr) => {
+                const label = dayLabel(e.createdAt, tt);
+                const prev = i > 0 ? dayLabel(arr[i - 1].createdAt, tt) : null;
+                return (
+                  <Box key={e.id}>
+                    {label !== prev && (
+                      <Text
+                        fontSize="11px"
+                        fontWeight="700"
+                        letterSpacing="0.08em"
+                        textTransform="uppercase"
+                        color="TextSecondary"
+                        m={i === 0 ? '0 4px 6px' : '14px 4px 6px'}
+                      >
+                        {label}
+                      </Text>
+                    )}
+                    <AuditRow e={e} lang={lang} />
+                  </Box>
+                );
+              })}
               {filtered.length > visible && (
                 <Button
                   size="sm"

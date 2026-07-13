@@ -7,7 +7,7 @@ import { avatarUrl } from '@/api/discord';
 import { languages, names, useLang } from '@/config/translations/provider';
 import { useSettingsStore } from '@/stores';
 import { NextPageWithLayout } from '@/pages/_app';
-import AppLayout from '@/components/layout/app';
+import IrisUserLayout from '@/components/layout/iris-user-layout';
 import { useLogoutMutation } from '@/utils/auth/hooks';
 import { useSelfUser } from '@/api/hooks';
 import { useText } from '@/config/translations/ui-text';
@@ -201,6 +201,6 @@ const ProfilePage: NextPageWithLayout = () => {
   );
 };
 
-ProfilePage.getLayout = (p) => <AppLayout>{p}</AppLayout>;
+ProfilePage.getLayout = (p) => <IrisUserLayout>{p}</IrisUserLayout>;
 
 export default ProfilePage;

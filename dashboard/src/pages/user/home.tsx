@@ -21,13 +21,29 @@ import { config } from '@/config/common';
 import { useText } from '@/config/translations/ui-text';
 import { useGuilds, useMyBotGuilds } from '@/api/hooks';
 import { NextPageWithLayout } from '@/pages/_app';
-import AppLayout from '@/components/layout/app';
+import IrisUserLayout from '@/components/layout/iris-user-layout';
 import { iconUrl } from '@/api/discord';
 import { ErrorPanel } from '@/components/panel/ErrorPanel';
 import Link from 'next/link';
 
 const HomePage: NextPageWithLayout = () => {
-  return <GuildSelect />;
+  const tt = useText();
+  return (
+    <Flex direction="column" gap="18px">
+      <Box>
+        <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
+          {tt('СЕРВЕРЫ')}
+        </Text>
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+          {tt('Выберите сервер')}
+        </Heading>
+        <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+          {tt('Серверы, где у вас есть права администратора.')}
+        </Text>
+      </Box>
+      <GuildSelect />
+    </Flex>
+  );
 };
 
 export function GuildSelect() {
@@ -156,5 +172,5 @@ export function GuildSelect() {
   );
 }
 
-HomePage.getLayout = (c) => <AppLayout>{c}</AppLayout>;
+HomePage.getLayout = (c) => <IrisUserLayout>{c}</IrisUserLayout>;
 export default HomePage;
