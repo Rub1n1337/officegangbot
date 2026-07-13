@@ -136,13 +136,14 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
         <Box minW={0}>
           <Flex align="center" gap="8px" wrap="wrap">
             <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
-              {t.openerName ?? t.openerId}
+              {t.subject || (t.openerName ?? t.openerId)}
             </Text>
             <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="20px" px="9px" flexShrink={0}>
               {t.status === 'open' ? tt('открыт') : tt('закрыт')}
             </Badge>
           </Flex>
           <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, sm: 1 }} mt="2px">
+            {t.subject && `${t.openerName ?? t.openerId} · `}
             {tt('Открыт')} {timeAgo(t.openedAt, lang)}
             {t.closedAt && ` · ${tt('закрыт')} ${timeAgo(t.closedAt, lang)}`}
             {t.closedByName && `, ${t.closedByName}`}
@@ -296,7 +297,7 @@ const TicketsPage: NextPageWithLayout = () => {
         if (status !== 'all' && t.status !== status) return false;
         if (priority !== 'all' && t.priority !== priority) return false;
         if (!q) return true;
-        const hay = [t.openerName, t.openerId, t.priority, t.status, t.closedByName, t.closeComment]
+        const hay = [t.subject, t.openerName, t.openerId, t.priority, t.status, t.closedByName, t.closeComment]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();

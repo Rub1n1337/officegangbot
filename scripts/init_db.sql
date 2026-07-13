@@ -183,6 +183,8 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tickets_guild ON tickets(guild_id, status);
+-- First message from the opener, shown as the ticket's subject in lists.
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS subject TEXT;
 -- Hot lookup: get/close/set-priority all resolve the open ticket by channel id.
 CREATE INDEX IF NOT EXISTS idx_tickets_channel ON tickets(channel_id);
 -- At most one open ticket record per channel.
@@ -439,6 +441,17 @@ BEGIN
         ALTER TABLE mod_roles ADD PRIMARY KEY (guild_id, role_id, role_type);
     END IF;
 END $$;
+
+-- Daily per-guild metrics for the dashboard's KPI sparklines: message volume
+-- (aggregate count only) and a member-count snapshot. One row per guild/day.
+CREATE TABLE IF NOT EXISTS guild_metrics_daily (
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    day DATE NOT NULL,
+    messages INT NOT NULL DEFAULT 0,
+    member_count INT,
+    PRIMARY KEY (guild_id, day)
+);
+ALTER TABLE guild_metrics_daily ENABLE ROW LEVEL SECURITY;
 
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;

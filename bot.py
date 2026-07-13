@@ -554,12 +554,18 @@ class MyBot(commands.Bot):
         enabled_features = []
         top_xp = []
         open_tickets = 0
+        history = []
         if self.db:
             enabled_features = await self.db.get_enabled_features(guild_id)
             try:
                 open_tickets = await self.db.count_open_tickets(guild_id)
             except Exception as e:
                 logger.warning(f"get_guild_stats open-ticket count failed for {guild_id}: {e}")
+            try:
+                # Daily metrics for the overview KPI sparklines (last 14 days).
+                history = await self.db.get_daily_metrics(guild_id, days=14)
+            except Exception as e:
+                logger.warning(f"get_guild_stats daily metrics failed for {guild_id}: {e}")
             try:
                 rows = await self.db.get_leaderboard(guild_id, limit=5)
                 for row in rows:
@@ -585,6 +591,7 @@ class MyBot(commands.Bot):
             "latency_ms": round(self.latency * 1000, 2),
             "enabled_feature_count": len(enabled_features),
             "open_tickets": open_tickets,
+            "history": history,
             "top_xp": top_xp,
         }
 
@@ -782,6 +789,7 @@ class MyBot(commands.Bot):
                     "openerId": str(r["opener_id"]),
                     "openerName": r["opener_name"],
                     "priority": r["priority"],
+                    "subject": r["subject"],
                     "status": r["status"],
                     "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
                     "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
@@ -809,6 +817,7 @@ class MyBot(commands.Bot):
                     "openerId": str(r["opener_id"]),
                     "openerName": r["opener_name"],
                     "priority": r["priority"],
+                    "subject": r["subject"],
                     "status": r["status"],
                     "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
                     "closedAt": r["closed_at"].isoformat() if r["closed_at"] else None,
@@ -836,6 +845,7 @@ class MyBot(commands.Bot):
             "id": row["id"],
             "openerName": row["opener_name"],
             "priority": row["priority"],
+            "subject": row["subject"],
             "status": row["status"],
             "openedAt": row["opened_at"].isoformat() if row["opened_at"] else None,
             "closedAt": row["closed_at"].isoformat() if row["closed_at"] else None,

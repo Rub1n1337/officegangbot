@@ -283,6 +283,8 @@ const EN: Record<string, string> = {
   'Будут обновлены:': 'Will be updated:',
   'Импортировать': 'Import',
   'НЕДАВНИЕ': 'RECENT',
+  'Сообщения · 7д': 'Messages · 7d',
+  'история копится с этого момента': 'history starts accumulating now',
 };
 
 export function useText() {

@@ -21,8 +21,11 @@ class AnalyticsCog(commands.Cog):
         self.bot = bot
         # {(guild_id, weekday, hour): count}
         self._buffer: dict[tuple[int, int, int], int] = {}
+        # {(guild_id, date): count} — daily volume for the KPI sparklines.
+        self._daily: dict[tuple[int, object], int] = {}
         self._lock = asyncio.Lock()
         self.flush_activity.start()
+        self.snapshot_members.start()
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -31,8 +34,10 @@ class AnalyticsCog(commands.Cog):
         # message.created_at is timezone-aware UTC; bucket by weekday/hour.
         ts = message.created_at
         key = (message.guild.id, ts.weekday(), ts.hour)
+        day_key = (message.guild.id, ts.date())
         async with self._lock:
             self._buffer[key] = self._buffer.get(key, 0) + 1
+            self._daily[day_key] = self._daily.get(day_key, 0) + 1
 
     @tasks.loop(seconds=30)
     async def flush_activity(self):
@@ -43,6 +48,20 @@ class AnalyticsCog(commands.Cog):
             async with self._lock:
                 snapshot = self._buffer
                 self._buffer = {}
+                daily_snapshot = self._daily
+                self._daily = {}
+
+            if daily_snapshot:
+                try:
+                    await self.bot.db.bulk_add_daily_messages([
+                        {"guild_id": g, "day": d, "delta": delta}
+                        for (g, d), delta in daily_snapshot.items()
+                    ])
+                except Exception:
+                    async with self._lock:
+                        for (g, d), delta in daily_snapshot.items():
+                            self._daily[(g, d)] = self._daily.get((g, d), 0) + delta
+                    raise
 
             records = [
                 {"guild_id": g, "weekday": wd, "hour": hr, "delta": delta}
@@ -61,12 +80,30 @@ class AnalyticsCog(commands.Cog):
         except Exception as e:
             logger.error(f"flush_activity crashed: {e}", exc_info=True)
 
+    @tasks.loop(hours=1)
+    async def snapshot_members(self):
+        """Upserts today's member count per guild (for the members sparkline).
+        Hourly upsert of the same (guild, day) row — the last write of the day
+        wins, which is exactly the snapshot we want."""
+        try:
+            if not self.bot.db:
+                return
+            rows = [(g.id, g.member_count) for g in self.bot.guilds if g.member_count]
+            await self.bot.db.snapshot_member_counts(rows)
+        except Exception as e:
+            logger.error(f"snapshot_members crashed: {e}", exc_info=True)
+
+    @snapshot_members.before_loop
+    async def before_snapshot_members(self):
+        await self.bot.wait_until_ready()
+
     @flush_activity.before_loop
     async def before_flush_activity(self):
         await self.bot.wait_until_ready()
 
     def cog_unload(self):
         self.flush_activity.cancel()
+        self.snapshot_members.cancel()
         # Best-effort final flush on a graceful unload so buffered counts survive
         # a normal restart. Skipped if the pool is already closing/closed.
         pool = getattr(self.bot.db, "_pool", None) if self.bot.db else None
