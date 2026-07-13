@@ -24,7 +24,7 @@ from core.redis_manager import RedisManager
 from core.moderation_actions import perform_moderation
 from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
-from core.permissions import role_is_assignable
+from core.permissions import bot_can_act_on, role_is_assignable
 from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules, validate_pattern, MAX_RULES
 from core.leveling import sanitize_multiplier
@@ -954,15 +954,27 @@ class MyBot(commands.Bot):
         except (TypeError, ValueError):
             mod_id = 0
         # For a ban with appeals enabled, DM the appeal button *before* the
-        # ban (afterwards there's no shared guild to DM through).
+        # ban (afterwards there's no shared guild to DM through) — but only if
+        # the ban will actually be allowed: otherwise a hierarchy-blocked ban
+        # (target above the bot, the owner, …) would still tell the user "you
+        # were banned" with a working appeal button for a ban that never
+        # happened.
         if payload.get("act") == "ban" and await self.db.get_guild_setting(guild_id, "ban_appeals_enabled"):
-            target = guild.get_member(user_id) or self.get_user(user_id)
-            if target is None:
+            member = guild.get_member(user_id)
+            ban_allowed = member is None or bot_can_act_on(
+                target_id=member.id,
+                target_top_role_pos=member.top_role.position,
+                bot_id=self.user.id,
+                bot_top_role_pos=guild.me.top_role.position,
+                owner_id=guild.owner_id,
+            )
+            target = member or self.get_user(user_id)
+            if ban_allowed and target is None:
                 try:
                     target = await self.fetch_user(user_id)
                 except discord.HTTPException:
                     target = None
-            if target is not None:
+            if ban_allowed and target is not None:
                 loc = await self.db.get_locale(guild_id)
                 await send_ban_appeal_dm(guild, target, payload.get("reason") or "—", loc)
         result = await perform_moderation(
@@ -987,8 +999,18 @@ class MyBot(commands.Bot):
             )
         return result
 
+    # The canonical feature ids the dashboard can toggle — anything else is
+    # rejected so a raw API-key caller can't pollute enabled_features.
+    KNOWN_FEATURES = frozenset({
+        "rules", "welcome-message", "reaction-menus", "levels",
+        "scheduled-messages", "moderation", "logging", "automod",
+        "tickets", "anti-raid", "verification",
+    })
+
     async def _rpc_enable_feature(self, guild_id, payload):
         feature = payload.get("feature")
+        if feature not in self.KNOWN_FEATURES:
+            return {"error": f"Unknown feature: {feature}"}
         if not self.db:
             return {"error": "Database unavailable"}
         await self.db.set_feature_enabled(guild_id, feature, True)
@@ -998,6 +1020,8 @@ class MyBot(commands.Bot):
 
     async def _rpc_disable_feature(self, guild_id, payload):
         feature = payload.get("feature")
+        if feature not in self.KNOWN_FEATURES:
+            return {"error": f"Unknown feature: {feature}"}
         if not self.db:
             return {"error": "Database unavailable"}
         await self.db.set_feature_enabled(guild_id, feature, False)
