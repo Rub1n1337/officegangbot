@@ -46,6 +46,14 @@ const RU: Record<string, string> = {
   'When this many members join within the time window, raid mode activates: everyone in the wave (and anyone joining while it lasts) gets the chosen action. A raid alert is posted to your punishment log channel.':
     'Когда за окно времени заходит столько участников, включается режим рейда: ко всей волне (и к каждому, кто зайдёт, пока он активен) применяется выбранное действие. Оповещение о рейде публикуется в канал лога наказаний.',
   'Join threshold': 'Порог заходов',
+  'Next run:': 'Следующее срабатывание:',
+  'Add common safe domains': 'Добавить популярные безопасные домены',
+  'Minimum account age (days)': 'Минимальный возраст аккаунта (дни)',
+  'Only accounts younger than this get the action — spares legitimate join waves. 0 = act on everyone.':
+    'Действие применяется только к аккаунтам младше этого возраста — легитимные волны заходов не страдают. 0 = ко всем.',
+  'Ping role on raid alert': 'Роль для пинга при рейде',
+  'This role is mentioned in the raid alert so moderators notice it.':
+    'Эта роль упоминается в оповещении о рейде, чтобы модераторы его заметили.',
   'This many joins inside the window triggers raid mode.':
     'Столько заходов за окно включает режим рейда.',
   'Join window (seconds)': 'Окно заходов (секунды)',

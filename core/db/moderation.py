@@ -126,7 +126,8 @@ class _ModerationMixin:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 "SELECT antiraid_join_count, antiraid_join_window, antiraid_action, "
-                "antiraid_duration FROM guilds WHERE guild_id = $1",
+                "antiraid_duration, antiraid_min_account_age_days, antiraid_ping_role_id "
+                "FROM guilds WHERE guild_id = $1",
                 guild_id,
             )
         return {
@@ -134,10 +135,13 @@ class _ModerationMixin:
             "join_window": int(row["antiraid_join_window"]) if row and row["antiraid_join_window"] else 10,
             "action": (row["antiraid_action"] if row and row["antiraid_action"] else "timeout"),
             "duration": int(row["antiraid_duration"]) if row and row["antiraid_duration"] else 300,
+            "min_account_age_days": int(row["antiraid_min_account_age_days"] or 0) if row else 0,
+            "ping_role_id": int(row["antiraid_ping_role_id"]) if row and row["antiraid_ping_role_id"] else None,
         }
 
     async def set_antiraid_config(
-        self, guild_id: int, join_count: int, join_window: int, action: str, duration: int
+        self, guild_id: int, join_count: int, join_window: int, action: str, duration: int,
+        min_account_age_days: int = 0, ping_role_id: int = None,
     ) -> None:
         """Persists the guild's anti-raid config."""
         await self.ensure_guild(guild_id)
@@ -146,8 +150,11 @@ class _ModerationMixin:
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE guilds SET antiraid_join_count = $1, antiraid_join_window = $2, "
-                "antiraid_action = $3, antiraid_duration = $4, updated_at = NOW() WHERE guild_id = $5",
-                int(join_count), int(join_window), action, int(duration), guild_id,
+                "antiraid_action = $3, antiraid_duration = $4, "
+                "antiraid_min_account_age_days = $5, antiraid_ping_role_id = $6, "
+                "updated_at = NOW() WHERE guild_id = $7",
+                int(join_count), int(join_window), action, int(duration),
+                int(min_account_age_days), ping_role_id, guild_id,
             )
 
     async def clear_warnings(self, guild_id: int, user_id: int) -> int:

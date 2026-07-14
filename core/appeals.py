@@ -41,6 +41,40 @@ class AppealModal(discord.ui.Modal):
             await interaction.response.send_message(t(self.loc, "appeal.error"), ephemeral=True)
             return
         await interaction.response.send_message(t(self.loc, "appeal.submitted"), ephemeral=True)
+        # Surface the new appeal in the punishment log too — admins who don't
+        # open the dashboard regularly would otherwise never see it.
+        try:
+            await _notify_moderators(interaction.client, self.guild_id, interaction.user, text)
+        except Exception:
+            logger.exception(f"Failed to post appeal alert for guild {self.guild_id}")
+
+
+async def _notify_moderators(bot, guild_id: int, user, text: str) -> None:
+    """Best-effort embed to the punishment log when a new appeal arrives."""
+    db = getattr(bot, "db", None)
+    guild = bot.get_guild(guild_id)
+    if not db or not guild:
+        return
+    log_id = await db.get_guild_setting(guild_id, "punishment_log_id")
+    if not log_id:
+        return
+    channel = guild.get_channel(int(log_id))
+    if channel is None:
+        try:
+            channel = await guild.fetch_channel(int(log_id))
+        except discord.HTTPException:
+            return
+    embed = discord.Embed(
+        title="📝 New ban appeal",
+        description=text[:1000],
+        color=discord.Color.orange(),
+    )
+    embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+    embed.set_footer(text="Review it on the dashboard → Moderation")
+    try:
+        await channel.send(embed=embed)
+    except discord.HTTPException:
+        pass
 
 
 class AppealButton(

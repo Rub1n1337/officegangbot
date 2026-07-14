@@ -200,6 +200,8 @@ export type AntiRaidFeature = {
   joinWindow: number;
   action: 'timeout' | 'kick' | 'ban' | 'notify';
   duration: number;
+  minAccountAgeDays: number;
+  pingRole: string | null;
 };
 
 export type ReactionMenuItemConfig = {

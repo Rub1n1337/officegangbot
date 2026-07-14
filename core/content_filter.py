@@ -34,13 +34,21 @@ def normalize_domain(domain: str) -> str:
 
 
 def build_words_pattern(words: Iterable[str]):
-    """Compile a banned-words pattern (whole-word, case-insensitive) — the same
-    ``\\b(word1|word2)\\b`` semantics the standalone word filter used, so the
-    merge into AutoMod changes nothing about what matches."""
+    """Compile a banned-words pattern (whole-word, case-insensitive).
+
+    Boundaries are explicit lookarounds on word characters instead of ``\\b``:
+    ``\\b`` sits between a word char and a non-word char, so a banned word that
+    *starts or ends* with punctuation (``#slur``, ``bad!``) could never match
+    at the string edge. The lookarounds keep the whole-word semantics for
+    normal words and also work for punctuation-edged ones."""
     cleaned = [w.strip() for w in (words or []) if w and w.strip()]
     if not cleaned:
         return None
-    return re.compile(r"\b(" + "|".join(re.escape(w) for w in cleaned) + r")\b", re.IGNORECASE)
+    alts = "|".join(re.escape(w) for w in cleaned)
+    return re.compile(
+        r"(?<![A-Za-z0-9_])(" + alts + r")(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    )
 
 
 def first_banned_word(content: str, compiled) -> Optional[str]:

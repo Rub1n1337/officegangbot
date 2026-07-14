@@ -88,7 +88,7 @@ class _TicketsMixin:
             res = await conn.execute(
                 "UPDATE tickets SET subject = $1 "
                 "WHERE channel_id = $2 AND status = 'open' AND subject IS NULL",
-                subject[:200], channel_id,
+                (subject[:197] + "…") if len(subject) > 200 else subject, channel_id,
             )
         return res.endswith("1")
 

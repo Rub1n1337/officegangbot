@@ -49,7 +49,13 @@ async def _capture_transcript(channel: discord.TextChannel, guild: discord.Guild
     incomplete = False
     try:
         async for msg in channel.history(limit=500, oldest_first=True):
-            content = msg.content or ("[embed]" if msg.embeds else "")
+            content = msg.content or ""
+            if msg.embeds:
+                titles = ", ".join((e.title or "untitled") for e in msg.embeds[:3])
+                content = (content + f" [embeds: {titles}]").strip()
+            if msg.reactions:
+                marks = " ".join(f"{r.emoji}x{r.count}" for r in msg.reactions[:5])
+                content = (content + f" [reactions: {marks}]").strip()
             entries.append({
                 "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M"),
                 "author": f"{msg.author} ({msg.author.id})",

@@ -3,7 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Box, Flex, Icon, Select, Text } from '@chakra-ui/react';
 import { NumberStepper } from '@/components/forms/NumberStepper';
-import { MdGroupAdd, MdTimer, MdGavel, MdHourglassBottom } from 'react-icons/md';
+import { MdGroupAdd, MdTimer, MdGavel, MdHourglassBottom, MdVerifiedUser } from 'react-icons/md';
+import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { useFormText } from '@/config/translations/form-text';
 import type { AntiRaidFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
@@ -13,6 +14,8 @@ const schema = z.object({
   joinWindow: z.number().int().min(3).max(300),
   action: z.enum(['timeout', 'kick', 'ban', 'notify']),
   duration: z.number().int().min(60).max(86400),
+  minAccountAgeDays: z.number().int().min(0).max(365),
+  pingRole: z.string().optional(),
 });
 
 type Input = z.infer<typeof schema>;
@@ -52,12 +55,14 @@ export const useAntiRaidFeature: UseFormRender<AntiRaidFeature> = (data, onSubmi
       joinWindow: data.joinWindow ?? 10,
       action: data.action ?? 'timeout',
       duration: data.duration ?? 300,
+      minAccountAgeDays: data.minAccountAgeDays ?? 0,
+      pingRole: data.pingRole ?? undefined,
     },
   });
 
   const action = watch('action');
 
-  const numberField = (name: 'joinCount' | 'joinWindow' | 'duration', min: number, max: number) => (
+  const numberField = (name: 'joinCount' | 'joinWindow' | 'duration' | 'minAccountAgeDays', min: number, max: number) => (
     <NumberStepper
       value={watch(name)}
       min={min}
@@ -111,6 +116,20 @@ export const useAntiRaidFeature: UseFormRender<AntiRaidFeature> = (data, onSubmi
         >
           {numberField('duration', 60, 86400)}
         </Row>
+        <Row
+          icon={MdVerifiedUser}
+          title={ft('Minimum account age (days)')}
+          description={ft('Only accounts younger than this get the action — spares legitimate join waves. 0 = act on everyone.')}
+        >
+          {numberField('minAccountAgeDays', 0, 365)}
+        </Row>
+        <RoleSelectForm
+          control={{
+            label: ft('Ping role on raid alert'),
+            description: ft('This role is mentioned in the raid alert so moderators notice it.'),
+          }}
+          controller={{ control, name: 'pingRole' }}
+        />
         <Text fontSize="sm" color="TextSecondary">
           {ft(
             'Raid alerts require the Logging feature with a punishment log channel. Timeout is the safest default — bans and kicks can hit legitimate newcomers during false positives.'
@@ -125,6 +144,8 @@ export const useAntiRaidFeature: UseFormRender<AntiRaidFeature> = (data, onSubmi
           joinWindow: e.joinWindow,
           action: e.action,
           duration: e.duration,
+          minAccountAgeDays: e.minAccountAgeDays,
+          pingRole: e.pingRole ?? null,
         })
       );
       reset({

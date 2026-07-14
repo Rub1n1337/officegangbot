@@ -1,4 +1,6 @@
 # cogs/verification.py
+import random
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -8,6 +10,43 @@ from core.i18n import t
 from core.permissions import role_is_assignable
 from .utils import reply
 from typing import Optional
+
+
+class CaptchaModal(discord.ui.Modal):
+    """A tiny arithmetic captcha: a bare button press is trivially automated,
+    a modal answer is not. The expected sum lives server-side in the modal
+    instance for the duration of the interaction."""
+
+    def __init__(self, a: int, b: int, role: discord.Role, loc: str):
+        self.expected = a + b
+        self.role = role
+        self.loc = loc
+        super().__init__(title=t(loc, "verify.captcha_title"), timeout=300)
+        self.answer = discord.ui.TextInput(
+            label=t(loc, "verify.captcha_label", a=a, b=b),
+            required=True,
+            max_length=3,
+        )
+        self.add_item(self.answer)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        raw = (self.answer.value or "").strip()
+        if not raw.lstrip("-").isdigit() or int(raw) != self.expected:
+            return await interaction.response.send_message(
+                t(self.loc, "verify.captcha_wrong"), ephemeral=True
+            )
+        try:
+            await interaction.user.add_roles(self.role, reason="Verification gate (captcha passed)")
+        except (discord.Forbidden, discord.HTTPException) as e:
+            logger.warning(
+                f"Verification: couldn't grant {self.role.name} to {interaction.user} "
+                f"in {interaction.guild.name}: {e}"
+            )
+            return await interaction.response.send_message(
+                t(self.loc, "verify.grant_failed"), ephemeral=True
+            )
+        await interaction.response.send_message(t(self.loc, "verify.granted"), ephemeral=True)
+        logger.info(f"Verified {interaction.user} in {interaction.guild.name} (role {self.role.name})")
 
 
 class VerifyView(discord.ui.View):
@@ -44,14 +83,10 @@ class VerifyView(discord.ui.View):
         if role in member.roles:
             return await interaction.response.send_message(t(loc, "verify.already"), ephemeral=True)
 
-        try:
-            await member.add_roles(role, reason="Verification gate")
-        except (discord.Forbidden, discord.HTTPException) as e:
-            logger.warning(f"Verification: couldn't grant {role.name} to {member} in {guild.name}: {e}")
-            return await interaction.response.send_message(t(loc, "verify.grant_failed"), ephemeral=True)
-
-        await interaction.response.send_message(t(loc, "verify.granted"), ephemeral=True)
-        logger.info(f"Verified {member} in {guild.name} (role {role.name})")
+        # A bare button press is trivially automated by raid bots — gate the
+        # role behind a small arithmetic captcha in a modal instead.
+        a, b = random.randint(2, 9), random.randint(2, 9)
+        await interaction.response.send_modal(CaptchaModal(a, b, role, loc))
 
 
 class VerificationCog(commands.Cog, name="✅ Verification"):

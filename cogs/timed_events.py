@@ -94,6 +94,16 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                                 reason="Timed ban expired"
                             )
                             logger.info(f"Auto-unbanned {user_id} in {guild.name}")
+                            # Tell the user the ban is over — a month later the
+                            # original ban DM is long buried.
+                            try:
+                                user = await self.bot.fetch_user(user_id)
+                                await user.send(
+                                    f"✅ Your temporary ban in **{guild.name}** has expired. "
+                                    "You can rejoin now."
+                                )
+                            except discord.HTTPException:
+                                pass
                         except discord.NotFound:
                             pass
                     

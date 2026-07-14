@@ -38,6 +38,12 @@ import { useFormText } from '@/config/translations/form-text';
 import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
+// One-click starter set for the allowed-domains list.
+const COMMON_SAFE_DOMAINS = [
+  'youtube.com', 'youtu.be', 'github.com', 'discord.com', 'twitch.tv',
+  'x.com', 'twitter.com', 'reddit.com', 'imgur.com', 'tenor.com',
+];
+
 const schema = z.object({
   dryRun: z.boolean(),
   ignoredChannels: z.array(z.string()),
@@ -349,7 +355,23 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
               description: ft('Links to these domains (and their subdomains) are allowed.'),
             }}
             controller={{ control, name: 'allowedDomains' }}
-            render={({ field }) => <DomainsInput value={field.value ?? []} onChange={field.onChange} />}
+            render={({ field }) => (
+              <Flex direction="column" gap={2} align="flex-start">
+                <DomainsInput value={field.value ?? []} onChange={field.onChange} />
+                <Button
+                  size="xs"
+                  variant="outline"
+                  rounded="8px"
+                  onClick={() => {
+                    const current = new Set(field.value ?? []);
+                    for (const d of COMMON_SAFE_DOMAINS) current.add(d);
+                    field.onChange(Array.from(current).sort());
+                  }}
+                >
+                  {ft('Add common safe domains')}
+                </Button>
+              </Flex>
+            )}
           />
         )}
         <ToggleRule

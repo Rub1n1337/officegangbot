@@ -325,6 +325,8 @@ class MyBot(commands.Bot):
                 "joinWindow": int(settings.get("antiraid_join_window") or 10),
                 "action": settings.get("antiraid_action") or "timeout",
                 "duration": int(settings.get("antiraid_duration") or 300),
+                "minAccountAgeDays": int(settings.get("antiraid_min_account_age_days") or 0),
+                "pingRole": self._snowflake_or_none(settings.get("antiraid_ping_role_id")),
             },
             "levels": {
                 "channel": self._snowflake_or_none(settings.get("level_up_channel_id")),
@@ -1081,12 +1083,20 @@ class MyBot(commands.Bot):
             action = options.get("action")
             if action not in ("timeout", "kick", "ban", "notify"):
                 action = "timeout"
+            ping_role = None
+            if options.get("pingRole"):
+                try:
+                    ping_role = _validate_discord_id(options["pingRole"])
+                except ValueError:
+                    return {"error": "Invalid ping role id"}
             await self.db.set_antiraid_config(
                 guild_id,
                 self._clamp_int(options.get("joinCount"), 8, 3, 100),
                 self._clamp_int(options.get("joinWindow"), 10, 3, 300),
                 action,
                 self._clamp_int(options.get("duration"), 300, 60, 86400),
+                self._clamp_int(options.get("minAccountAgeDays"), 0, 0, 365),
+                ping_role,
             )
             return await self._get_feature_payload(guild_id, feature)
 
@@ -1467,6 +1477,24 @@ class MyBot(commands.Bot):
 
         # Same guard for the verification role — it's granted on every button
         # click, so reject one the bot can't assign up front.
+        # Saving rules into a channel the bot can't post to would look saved
+        # but never publish — reject it with an actionable error instead.
+        if feature == "rules" and options.get("channel"):
+            guild = self.get_guild(guild_id)
+            if guild:
+                try:
+                    ch_id = _validate_discord_id(options["channel"])
+                except ValueError:
+                    return {"error": "Invalid rules channel id"}
+                channel = guild.get_channel(ch_id)
+                if channel is None:
+                    try:
+                        channel = await guild.fetch_channel(ch_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        return {"error": "Rules channel not found or I can't access it"}
+                if not channel.permissions_for(guild.me).send_messages:
+                    return {"error": "I can't send messages in the rules channel — grant me permission first"}
+
         if feature == "verification" and options.get("role"):
             bad = self._unassignable_roles(self.get_guild(guild_id), [options["role"]])
             if bad:

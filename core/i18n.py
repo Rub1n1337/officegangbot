@@ -301,6 +301,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "verify.setup_sent": "✅ Verification panel posted in {channel}.",
         "verify.setup_no_perm": "❌ I can't post in that channel.",
         "verify.setup_bad_role": "❌ I can't grant that role — move my role above it (and it can't be a managed role).",
+        "verify.captcha_title": "Quick check",
+        "verify.captcha_label": "What is {a} + {b}?",
+        "verify.captcha_wrong": "❌ Wrong answer — press Verify and try again.",
+        "filter.bad_length": "❌ A filtered word must be 2–100 characters long.",
         # --- logs (staff-facing) ---
         "auditlog.deleted_desc": "**Message sent by {author} deleted in {channel}**",
         "auditlog.field_content": "Content",
@@ -605,6 +609,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "verify.setup_sent": "✅ Панель верификации отправлена в {channel}.",
         "verify.setup_no_perm": "❌ Я не могу писать в этот канал.",
         "verify.setup_bad_role": "❌ Я не могу выдавать эту роль — поднимите мою роль выше (и она не должна быть managed).",
+        "verify.captcha_title": "Быстрая проверка",
+        "verify.captcha_label": "Сколько будет {a} + {b}?",
+        "verify.captcha_wrong": "❌ Неверный ответ — нажмите «Верифицироваться» и попробуйте снова.",
+        "filter.bad_length": "❌ Слово фильтра должно быть длиной 2–100 символов.",
         # --- logs (staff-facing) ---
         "auditlog.deleted_desc": "**Сообщение от {author} удалено в {channel}**",
         "auditlog.field_content": "Содержимое",
