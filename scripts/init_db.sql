@@ -363,6 +363,10 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_join_count INTEGER DEFAULT 
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_join_window INTEGER DEFAULT 10;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_action VARCHAR(20) DEFAULT 'timeout';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_duration INTEGER DEFAULT 300;
+-- False-positive protection: only act on accounts younger than this (0 = act on all).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_min_account_age_days INTEGER DEFAULT 0;
+-- Optional role to ping in the raid alert.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS antiraid_ping_role_id BIGINT;
 -- AutoMod strike escalation: each violation records a strike; at the configured
 -- thresholds the member is muted / kicked / banned (0 = that tier disabled).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_strikes_enabled BOOLEAN DEFAULT FALSE;

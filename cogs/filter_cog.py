@@ -58,8 +58,12 @@ class FilterCog(commands.Cog, name="🚫 Filter"):
     @app_commands.describe(word="The word to add to the filter.")
     @has_permission("config")
     async def filter_add(self, ctx: commands.Context, word: str):
-        word = word.lower()
+        word = word.lower().strip()
         loc = await self.bot.db.get_locale(ctx.guild.id)
+
+        # A 1-char "word" would flag half the dictionary; an essay isn't a word.
+        if len(word) < 2 or len(word) > 100:
+            return await reply(ctx, t(loc, "filter.bad_length"), ephemeral=True)
 
         current_words = await self.bot.db.get_guild_setting(ctx.guild.id, 'filter_words') or []
         if word in current_words:

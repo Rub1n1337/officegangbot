@@ -200,6 +200,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             color=discord.Color.gold()
         )
         embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text=guild.name, icon_url=guild.icon.url if guild.icon else None)
         try:
             await channel.send(embed=embed)
         except discord.Forbidden:
@@ -314,7 +315,12 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             for offset, row in enumerate(chunk):
                 rank = page * per_page + offset
                 member = ctx.guild.get_member(row['user_id'])
-                name = member.display_name if member else (row.get('display_name') or f"User {row['user_id']}")
+                if member:
+                    name = member.display_name
+                else:
+                    # Stale row for someone who left — label it so the board
+                    # doesn't look wrong.
+                    name = (row.get('display_name') or f"User {row['user_id']}") + " (left)"
                 prestige = row.get('prestige', 0)
                 if prestige:
                     name = "⭐" * min(prestige, 5) + " " + name

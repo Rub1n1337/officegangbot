@@ -56,7 +56,7 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
         channel = guild.get_channel(channel_id)
         if not channel:
             logger.warning(f"Welcome channel ID {channel_id} not found in {guild.name}. Disabling system.")
-            await self.bot.db.set_feature_enabled(guild.id, "welcome-message", False)
+            await self._welcome_broke(guild, member)
             return
 
         message_format = await self.bot.db.get_guild_setting(guild.id, "welcome_message", DEFAULT_WELCOME_MESSAGE)
@@ -69,9 +69,30 @@ class WelcomeSystem(commands.Cog, name="👋 Welcome System"):
             logger.info(f"Sent welcome message for {member} in {guild.name}.")
         except discord.Forbidden:
             logger.error(f"Missing permissions for welcome message in #{channel.name} ({guild.name}). Disabling system.")
-            await self.bot.db.set_feature_enabled(guild.id, "welcome-message", False)
+            await self._welcome_broke(guild, member)
         except Exception as e:
             logger.error(f"Failed to send welcome message in {guild.name}: {e}", exc_info=True)
+
+
+    async def _welcome_broke(self, guild: discord.Guild, member: discord.Member):
+        """The welcome channel is gone or unwritable: greet the member in DM
+        (best-effort), tell the admins where it broke, and disable the feature
+        so it doesn't fail silently on every join."""
+        try:
+            await member.send(f"👋 Welcome to **{guild.name}**!")
+        except discord.HTTPException:
+            pass
+        sys_ch = guild.system_channel
+        if sys_ch and sys_ch.permissions_for(guild.me).send_messages:
+            try:
+                await sys_ch.send(
+                    "⚠️ The welcome channel is missing or I can't post there — "
+                    "the Welcome Message feature has been disabled. Re-enable it "
+                    "in the dashboard after fixing the channel."
+                )
+            except discord.HTTPException:
+                pass
+        await self.bot.db.set_feature_enabled(guild.id, "welcome-message", False)
 
     async def _assign_auto_role(self, member: discord.Member) -> None:
         guild = member.guild

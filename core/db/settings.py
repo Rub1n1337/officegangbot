@@ -18,6 +18,7 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'level_up_channel_id', 'automod_enabled', 'filter_enabled', 'filter_words',
     'ticket_support_role_id', 'ticket_category_id', 'ticket_auto_close_hours',
     'verification_role_id', 'ban_appeals_enabled', 'enabled_features',
+    'antiraid_min_account_age_days', 'antiraid_ping_role_id',
     'locale', 'automod_block_invites', 'automod_block_links',
     'automod_allowed_domains', 'automod_spam_count', 'automod_spam_window',
     'automod_mention_limit', 'automod_block_mass_mentions',

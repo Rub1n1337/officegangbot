@@ -38,6 +38,7 @@ class AntiRaidCog(commands.Cog, name="🚨 Anti-Raid"):
         cfg = await self.bot.db.get_antiraid_config(guild.id)
         window, count = cfg["join_window"], cfg["join_count"]
         action, duration = cfg["action"], cfg["duration"]
+        min_age_days = cfg.get("min_account_age_days", 0)
         now = time.time()
 
         dq = self._joins.setdefault(guild.id, deque())
@@ -53,11 +54,22 @@ class AntiRaidCog(commands.Cog, name="🚨 Anti-Raid"):
             await self._notify(guild, len(dq), window, action)
             for _, mid in list(dq):
                 m = guild.get_member(mid)
-                if m and not m.bot:
+                if m and not m.bot and not self._old_enough(m, min_age_days):
                     await self._act(m, action, duration)
         elif raid_active:
             # Still in raid mode — treat each new join as part of the wave.
-            await self._act(member, action, duration)
+            if not self._old_enough(member, min_age_days):
+                await self._act(member, action, duration)
+
+    @staticmethod
+    def _old_enough(member: discord.Member, min_age_days: int) -> bool:
+        """False-positive guard: with a configured minimum account age, mature
+        accounts caught in a join wave (e.g. after a YouTube shout-out) are
+        spared — raid bots are overwhelmingly fresh accounts."""
+        if min_age_days <= 0:
+            return False
+        age = datetime.datetime.now(datetime.timezone.utc) - member.created_at
+        return age.days >= min_age_days
 
     async def _act(self, member: discord.Member, action: str, duration: int):
         reason = "Anti-raid: join spike detected"
@@ -107,7 +119,9 @@ class AntiRaidCog(commands.Cog, name="🚨 Anti-Raid"):
                 color=discord.Color.red(),
                 timestamp=datetime.datetime.now(datetime.timezone.utc),
             )
-            await channel.send(embed=embed)
+            ping_role_id = (await self.bot.db.get_antiraid_config(guild.id)).get("ping_role_id")
+            content = f"<@&{ping_role_id}>" if ping_role_id else None
+            await channel.send(content=content, embed=embed)
         except discord.HTTPException as e:
             # A raid alert the admins never see is exactly when they need it —
             # at least leave a trace in the logs.

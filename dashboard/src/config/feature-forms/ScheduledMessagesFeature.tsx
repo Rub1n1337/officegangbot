@@ -45,6 +45,26 @@ const itemSchema = z.object({
   enabled: z.boolean(),
 });
 
+// When the message will actually fire next, mirroring the bot's
+// skip-missed-intervals recurrence: a past one-shot fires immediately on the
+// next tick; a past recurring time advances by whole periods into the future.
+function nextRunPreview(localValue: string, repeat: 'none' | 'daily' | 'weekly'): string | null {
+  if (!localValue) return null;
+  const at = new Date(localValue);
+  if (Number.isNaN(at.getTime())) return null;
+  const now = Date.now();
+  let ts = at.getTime();
+  if (ts <= now) {
+    if (repeat === 'none') return null; // will fire on the next minute tick
+    const period = repeat === 'daily' ? 86_400_000 : 7 * 86_400_000;
+    const missed = Math.floor((now - ts) / period) + 1;
+    ts += missed * period;
+  }
+  return new Date(ts).toLocaleString(undefined, {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 const schema = z.object({ items: z.array(itemSchema) });
 
 type Input = z.infer<typeof schema>;
@@ -152,6 +172,17 @@ export const useScheduledMessagesFeature: UseFormRender<ScheduledMessagesFeature
                   <option value="weekly">{ft('Weekly')}</option>
                 </Select>
               </FormControl>
+              {(() => {
+                const next = nextRunPreview(
+                  watch(`items.${index}.scheduledAt`),
+                  watch(`items.${index}.repeat`)
+                );
+                return next ? (
+                  <Text fontSize="xs" color="TextSecondary" mt={2}>
+                    {ft('Next run:')} {next}
+                  </Text>
+                ) : null;
+              })()}
             </Box>
           </Box>
         ))}
