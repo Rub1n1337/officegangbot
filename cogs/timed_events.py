@@ -204,7 +204,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
         
         mod_cog = self.bot.get_cog("🛡️ Moderation")
         if mod_cog:
-            await mod_cog._log_action(ctx, "🔇 Temp Mute", member, reason, duration=format_duration(seconds))
+            await mod_cog._log_action(ctx, "Temp Mute", member, reason, duration=format_duration(seconds))
             
         logger.info(f"Temp-muted {member} in {ctx.guild.name} for {format_duration(seconds)} by {ctx.author}")
 
@@ -270,7 +270,7 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
 
         mod_cog = self.bot.get_cog("🛡️ Moderation")
         if mod_cog:
-            await mod_cog._log_action(ctx, "🔨 Temp Ban", member, reason, duration=format_duration(seconds))
+            await mod_cog._log_action(ctx, "Temp Ban", member, reason, duration=format_duration(seconds))
 
         logger.info(f"Temp-banned {member} in {ctx.guild.name} for {format_duration(seconds)} by {ctx.author}")
 
