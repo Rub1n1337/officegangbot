@@ -3,7 +3,10 @@
 The key guarantees: the two locales never drift (same keys, same placeholders),
 unknown keys/locales degrade gracefully, and formatting works.
 """
+import ast
+import re
 import string
+from pathlib import Path
 
 from core.i18n import TRANSLATIONS, SUPPORTED_LOCALES, DEFAULT_LOCALE, t, normalize_locale
 
@@ -58,3 +61,48 @@ def test_missing_format_kwarg_does_not_raise():
 def test_normalize_locale():
     assert normalize_locale("ru") == "ru"
     assert normalize_locale("xx") == DEFAULT_LOCALE
+
+
+def _project_files():
+    root = Path(__file__).resolve().parent.parent
+    skip = {".git", "node_modules", "dashboard", ".next", "venv", "__pycache__", "tests"}
+    for path in root.rglob("*.py"):
+        if skip.isdisjoint(path.relative_to(root).parts) and path.name != "i18n.py":
+            yield path
+
+
+# "namespace.key" — the shape every key in TRANSLATIONS uses.
+_KEY_SHAPE = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
+
+
+def test_every_key_used_in_the_code_exists():
+    """A key the dictionary lacks is shown to the user verbatim.
+
+    t() falls back to English and then to the raw key, so a typo doesn't raise
+    — it puts "warn.action_mute" in a Discord embed. Parity between en and ru
+    (checked above) says nothing about this: both locales can be equally
+    missing a key the code asks for.
+
+    Scanning every key-shaped literal rather than only t(..., "literal") calls
+    is deliberate: half the call sites build the key at runtime — from
+    LOG_FIELDS, from a HierarchyError, from f"appeal.{status}_dm_title" — and
+    the literal is what those are built from.
+    """
+    known_namespaces = {key.split(".")[0] for key in TRANSLATIONS["en"]}
+    missing = []
+    for path in _project_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover - a broken file fails elsewhere
+            continue
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                continue
+            value = node.value
+            # Only strings inside a namespace the dictionary already uses:
+            # "utils.py" and "youtube.com" are the same shape as a key.
+            if not _KEY_SHAPE.match(value) or value.split(".")[0] not in known_namespaces:
+                continue
+            if value not in TRANSLATIONS["en"]:
+                missing.append(f"{path.name}:{node.lineno}: '{value}'")
+    assert missing == [], "keys used in the code but absent from TRANSLATIONS"

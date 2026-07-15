@@ -1,8 +1,13 @@
 import type { AuditEntry } from '@/config/types/custom-types';
 import type { Languages } from '@/config/translations/provider';
 
+// `lang` is required throughout this file, deliberately. It used to default to
+// 'ru', which meant a caller that forgot the argument shipped Russian to an
+// English admin and nothing said a word — the same silent-fallback trap that
+// put "Участники" in the English palette. Required, the compiler catches it.
+
 /** Relative "time ago" for a nullable ISO timestamp. Empty string when absent/invalid. */
-export function timeAgo(iso: string | null, lang: Languages = 'ru'): string {
+export function timeAgo(iso: string | null, lang: Languages): string {
   if (!iso) return '';
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
@@ -87,7 +92,7 @@ const ACTION_LABEL: Record<Languages, Record<string, string>> = {
   },
 };
 
-export function describeAudit(e: AuditEntry, lang: Languages = 'ru'): string {
+export function describeAudit(e: AuditEntry, lang: Languages): string {
   const f = AUDIT_LABEL[lang][e.action];
   return f ? f(e) : e.action.replace(/_/g, ' ');
 }
@@ -109,7 +114,7 @@ export function auditActionColor(action: string): string {
 }
 
 /** Short label for the action itself (for the filter dropdown). */
-export function actionLabel(action: string, lang: Languages = 'ru'): string {
+export function actionLabel(action: string, lang: Languages): string {
   if (ACTION_LABEL[lang][action]) return ACTION_LABEL[lang][action];
   const s = action.replace(/_/g, ' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -117,7 +122,7 @@ export function actionLabel(action: string, lang: Languages = 'ru'): string {
 
 /** Serialize audit entries to CSV (RFC-4180 quoting) for export. Prefixed with a
  * BOM so Excel reads the UTF-8 correctly. */
-export function auditToCsv(entries: AuditEntry[], lang: Languages = 'ru'): string {
+export function auditToCsv(entries: AuditEntry[], lang: Languages): string {
   const esc = (v: string | null | undefined): string => {
     const s = v == null ? '' : String(v);
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
