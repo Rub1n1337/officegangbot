@@ -32,7 +32,14 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
         )
         warnings = await self.bot.db.get_warnings(ctx.guild.id, member.id)
 
-        # Attempt to DM the user
+        # The DM is the member's only warning *before* an escalation hits, so it
+        # spells out the consequence: which threshold is next, what it does, and
+        # whether warnings decay. Without this, "Total Warnings: 3" tells them
+        # nothing about being one step from a kick.
+        cfg = await self.bot.db.get_warn_escalation(ctx.guild.id)
+        active = await self.bot.db.count_active_warnings(
+            ctx.guild.id, member.id, cfg["expiry_hours"]
+        )
         try:
             dm_embed = discord.Embed(
                 title=t(loc, "warn.dm_title", guild=ctx.guild.name),
@@ -40,7 +47,22 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
             )
             dm_embed.add_field(name=t(loc, "field.reason"), value=reason, inline=False)
             dm_embed.add_field(name=t(loc, "field.moderator"), value=str(ctx.author), inline=False)
-            dm_embed.add_field(name=t(loc, "field.total_warnings"), value=str(len(warnings)), inline=False)
+            dm_embed.add_field(name=t(loc, "field.total_warnings"), value=str(len(warnings)), inline=True)
+            if cfg["enabled"]:
+                dm_embed.add_field(name=t(loc, "warn.active_count"), value=str(active), inline=True)
+                lines = []
+                for threshold, action_key in (
+                    (cfg["mute_at"], "warn.action_mute"),
+                    (cfg["kick_at"], "warn.action_kick"),
+                    (cfg["ban_at"], "warn.action_ban"),
+                ):
+                    if threshold and threshold > active:
+                        lines.append(t(loc, "warn.dm_next_step", count=threshold,
+                                       action=t(loc, action_key)))
+                if cfg["expiry_hours"] > 0:
+                    lines.append(t(loc, "warn.dm_expiry", hours=cfg["expiry_hours"]))
+                if lines:
+                    dm_embed.add_field(name=t(loc, "field.what_now"), value="\n".join(lines), inline=False)
             await member.send(embed=dm_embed)
         except discord.Forbidden:
             pass
@@ -75,6 +97,22 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
             embed.set_thumbnail(url=member.display_avatar.url)
             return await reply(ctx, embed=embed, ephemeral=True)
 
+        # Expired warnings still show (they're history), but struck through:
+        # a moderator needs to see at a glance who actually has 3 *active* ones
+        # and who just has old ones that no longer escalate.
+        cfg = await self.bot.db.get_warn_escalation(ctx.guild.id)
+        expiry_hours = cfg["expiry_hours"] if cfg["enabled"] else 0
+        cutoff = (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=expiry_hours)
+            if expiry_hours > 0 else None
+        )
+
+        def _expired(w) -> bool:
+            ts = w["created_at"]
+            return bool(cutoff and isinstance(ts, datetime.datetime) and ts < cutoff)
+
+        any_expired = any(_expired(w) for w in warnings)
+
         per_page = 5
         total_pages = (len(warnings) + per_page - 1) // per_page
         pages = []
@@ -94,11 +132,14 @@ class WarningsCog(commands.Cog, name="⚠️ Warnings"):
                     timestamp_str = timestamp.strftime('%d.%m.%Y %H:%M')
                 else:
                     timestamp_str = str(timestamp)
-                embed.add_field(
-                    name=t(loc, "warnings.entry_name", number=number, time=timestamp_str),
-                    value=t(loc, "warnings.entry_value", reason=w['reason'], moderator=w['moderator_name']),
-                    inline=False,
-                )
+                name = t(loc, "warnings.entry_name", number=number, time=timestamp_str)
+                value = t(loc, "warnings.entry_value", reason=w['reason'], moderator=w['moderator_name'])
+                if _expired(w):
+                    name = f"~~{name}~~"
+                    value = f"~~{value}~~"
+                embed.add_field(name=name, value=value, inline=False)
+            if any_expired:
+                embed.add_field(name="\u200b", value=t(loc, "warnings.expired_note"), inline=False)
             embed.set_footer(text=t(loc, "page.indicator", current=page + 1, total=total_pages))
             pages.append(embed)
 

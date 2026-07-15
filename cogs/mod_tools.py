@@ -11,6 +11,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from core.logger import logger
+from core.i18n import t
 from core.permissions import has_permission, role_is_assignable
 from core.bulk_ops import parse_id_list
 from .utils import reply
@@ -163,6 +164,88 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
                 value=f"{who} · by {r['moderator_name'] or '—'} {when}\n{reason}",
                 inline=False,
             )
+        await reply(ctx, embed=embed, ephemeral=True)
+
+    @commands.hybrid_command(name="history", description="A member's full moderation history in one place.")
+    @app_commands.describe(member="Member to look up.")
+    @has_permission("warn")
+    async def history(self, ctx: commands.Context, member: discord.Member):
+        """One dossier instead of running /warnings, /cases and /notes in turn.
+
+        Same data the dashboard's member card already assembles — warnings
+        (active vs expired), notes, strikes and numbered cases — so a moderator
+        can see the whole picture before deciding on an action.
+        """
+        db = self.bot.db
+        if not db:
+            loc = "en"
+            return await reply(ctx, t(loc, "common.db_unavailable"), ephemeral=True)
+        loc = await db.get_locale(ctx.guild.id)
+
+        cfg = await db.get_warn_escalation(ctx.guild.id)
+        expiry_hours = cfg["expiry_hours"] if cfg["enabled"] else 0
+        warnings = await db.get_warnings(ctx.guild.id, member.id)
+        active_warnings = await db.count_active_warnings(ctx.guild.id, member.id, expiry_hours)
+        notes = await db.get_mod_notes(ctx.guild.id, member.id)
+        strikes = await db.count_active_strikes_for(ctx.guild.id, member.id)
+        cases = await db.get_mod_cases(ctx.guild.id, target_id=member.id, limit=5)
+
+        embed = discord.Embed(
+            title=t(loc, "history.title", member=member.display_name),
+            color=discord.Color.blurple(),
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(
+            name=t(loc, "history.summary"),
+            value=t(
+                loc, "history.summary_value",
+                warnings=len(warnings), active=active_warnings,
+                strikes=int(strikes), notes=len(notes), cases=len(cases),
+            ),
+            inline=False,
+        )
+        if member.joined_at:
+            embed.add_field(
+                name=t(loc, "history.joined"),
+                value=f"<t:{int(member.joined_at.timestamp())}:D> (<t:{int(member.joined_at.timestamp())}:R>)",
+                inline=True,
+            )
+        embed.add_field(
+            name=t(loc, "history.account_created"),
+            value=f"<t:{int(member.created_at.timestamp())}:D>",
+            inline=True,
+        )
+
+        if cases:
+            lines = []
+            for r in cases:
+                when = f"<t:{int(r['created_at'].timestamp())}:R>" if r["created_at"] else ""
+                reason = (r["reason"] or t(loc, "history.no_reason")).strip()
+                if len(reason) > 60:
+                    reason = reason[:57] + "…"
+                lines.append(f"`#{r['case_number']}` {_action_emoji(r['action'])} {r['action']} {when} — {reason}")
+            embed.add_field(name=t(loc, "history.recent_cases"), value="\n".join(lines)[:1024], inline=False)
+
+        if warnings:
+            cutoff = (
+                datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=expiry_hours)
+                if expiry_hours > 0 else None
+            )
+            lines = []
+            for w in warnings[-5:]:
+                ts = w["created_at"]
+                when = f"<t:{int(ts.timestamp())}:R>" if isinstance(ts, datetime.datetime) else ""
+                reason = (w["reason"] or "—")[:60]
+                expired = bool(cutoff and isinstance(ts, datetime.datetime) and ts < cutoff)
+                line = f"{when} — {reason} ({w['moderator_name'] or '—'})"
+                lines.append(f"~~{line}~~" if expired else line)
+            embed.add_field(name=t(loc, "history.recent_warnings"), value="\n".join(lines)[:1024], inline=False)
+
+        if notes:
+            lines = [f"`#{n['id']}` {(n['note'] or '')[:70]}" for n in notes[-3:]]
+            embed.add_field(name=t(loc, "history.notes"), value="\n".join(lines)[:1024], inline=False)
+
+        embed.set_footer(text=t(loc, "history.footer"))
         await reply(ctx, embed=embed, ephemeral=True)
 
     # -- Moderator notes ------------------------------------------------------
