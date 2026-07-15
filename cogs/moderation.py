@@ -10,6 +10,7 @@ from core.i18n import t
 from core.appeals import send_ban_appeal_dm
 from typing import Optional
 from .utils import reply
+from .mod_tools import _action_emoji, _action_label
 
 # Map the shared hierarchy reason codes to this cog's i18n message keys.
 _HIERARCHY_KEYS = {
@@ -180,7 +181,11 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
                 return
 
         timestamp = discord.utils.utcnow()
-        title = f"{action}" + (f" · Case #{case_number}" if case_number is not None else "")
+        # The emoji is added here rather than baked into the stored action name,
+        # so /case, /cases and /history can prefix their own without doubling it.
+        title = f"{_action_emoji(action)} {_action_label(action)}" + (
+            f" · Case #{case_number}" if case_number is not None else ""
+        )
         embed = discord.Embed(title=title, color=discord.Color.orange(), timestamp=timestamp)
         embed.add_field(name="Target", value=f"{target.mention} (`{target.id}`)", inline=False)
         embed.add_field(name="Moderator", value=f"{ctx.author.mention} (`{ctx.author.id}`)", inline=False)
@@ -215,7 +220,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         await self._notify_user(member, ctx.guild.name, "mod.dm_kicked_title", reason, loc,
                                 what_now_key="mod.dm_kicked_what_now")
         await member.kick(reason=f"{reason} (Moderator: {ctx.author.id})")
-        await self._log_action(ctx, "Member Kicked", member, reason)
+        await self._log_action(ctx, "Kick", member, reason)
         await reply(ctx, t(loc, "mod.kicked", member=member), ephemeral=True)
 
     @commands.hybrid_command(name="ban", description="Ban a member from the server.", extras={"manages_own_response": True})
@@ -253,7 +258,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
             dm_sent = await self._notify_user(member, ctx.guild.name, "mod.dm_banned_title", reason, loc,
                                               what_now_key="mod.dm_banned_what_now")
         await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
-        await self._log_action(ctx, "🔨 Ban", member, reason, dm_notified="✅" if dm_sent else "❌")
+        await self._log_action(ctx, "Ban", member, reason, dm_notified="✅" if dm_sent else "❌")
 
         result_content = t(loc, "mod.banned", member=member.mention, reason=reason)
         if ctx.interaction:
@@ -277,7 +282,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
             # A manual unban ends any pending temp-ban record, so the dashboard
             # stops listing it and the expiry loop won't re-unban.
             await self.bot.db.remove_timed_punishment(ctx.guild.id, user.id)
-            await self._log_action(ctx, "User Unbanned", user, reason)
+            await self._log_action(ctx, "Unban", user, reason)
             await reply(ctx, t(loc, "mod.unbanned", user=user), ephemeral=True)
         except discord.NotFound:
             await reply(ctx, t(loc, "mod.unban_not_banned", user=user), ephemeral=True)
@@ -293,7 +298,7 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
             return await reply(ctx, t(loc, "mod.unmute_not_muted", member=member.mention), ephemeral=True)
 
         await member.timeout(None, reason=f"{reason} (Moderator: {ctx.author.id})")
-        await self._log_action(ctx, "Member Unmuted", member, reason)
+        await self._log_action(ctx, "Unmute", member, reason)
         await reply(ctx, t(loc, "mod.unmuted", member=member), ephemeral=True)
 
 async def setup(bot: commands.Bot):

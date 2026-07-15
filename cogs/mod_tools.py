@@ -20,15 +20,39 @@ from .timed_events import parse_duration, format_duration
 MAX_BULK = 20
 
 # Emoji hints for the case log by action keyword.
-_ACTION_EMOJI = {"ban": "🔨", "kick": "👢", "mute": "🔇", "warn": "⚠️", "unban": "♻️", "unmute": "🔊"}
+# Order matters: "unban" contains "ban" and "unmute" contains "mute", so the
+# longer keys must be tested first — otherwise an unban renders with the ban
+# hammer.
+_ACTION_EMOJI = (
+    ("unban", "♻️"),
+    ("unmute", "🔊"),
+    ("ban", "🔨"),
+    ("kick", "👢"),
+    ("mute", "🔇"),
+    ("warn", "⚠️"),
+)
 
 
 def _action_emoji(action: str) -> str:
     a = (action or "").lower()
-    for key, emoji in _ACTION_EMOJI.items():
+    for key, emoji in _ACTION_EMOJI:
         if key in a:
             return emoji
     return "📄"
+
+
+def _action_label(action: str) -> str:
+    """The action name without a leading emoji.
+
+    Actions used to be stored with the emoji baked in ("🔨 Ban") while others
+    were plain ("Member Kicked"), so a display that prefixed its own emoji
+    printed "🔨 🔨 Ban" for some rows and not others. New rows store plain
+    names; this strips the emoji off the legacy ones so both render the same.
+    """
+    text = (action or "").strip()
+    while text and not (text[0].isalnum() or text[0] in "#/("):
+        text = text[1:].lstrip()
+    return text or (action or "").strip()
 
 
 class ConfirmView(discord.ui.View):
@@ -130,7 +154,7 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
             return await reply(ctx, f"❌ Case #{number} was not found.", ephemeral=True)
 
         embed = discord.Embed(
-            title=f"{_action_emoji(row['action'])} Case #{row['case_number']} · {row['action']}",
+            title=f"{_action_emoji(row['action'])} Case #{row['case_number']} · {_action_label(row['action'])}",
             color=discord.Color.orange(),
             timestamp=row["created_at"],
         )
@@ -160,7 +184,7 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
             if len(reason) > 80:
                 reason = reason[:77] + "…"
             embed.add_field(
-                name=f"#{r['case_number']} · {_action_emoji(r['action'])} {r['action']}",
+                name=f"#{r['case_number']} · {_action_emoji(r['action'])} {_action_label(r['action'])}",
                 value=f"{who} · by {r['moderator_name'] or '—'} {when}\n{reason}",
                 inline=False,
             )
@@ -223,7 +247,9 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
                 reason = (r["reason"] or t(loc, "history.no_reason")).strip()
                 if len(reason) > 60:
                     reason = reason[:57] + "…"
-                lines.append(f"`#{r['case_number']}` {_action_emoji(r['action'])} {r['action']} {when} — {reason}")
+                lines.append(
+                    f"`#{r['case_number']}` {_action_emoji(r['action'])} {_action_label(r['action'])} {when} — {reason}"
+                )
             embed.add_field(name=t(loc, "history.recent_cases"), value="\n".join(lines)[:1024], inline=False)
 
         if warnings:
@@ -387,7 +413,7 @@ class ModToolsCog(commands.Cog, name="🧰 Mod Tools"):
                 ok += 1
                 try:
                     await self.bot.db.add_mod_case(
-                        ctx.guild.id, "🔨 Mass Ban", uid, str(uid), ctx.author.id, str(ctx.author), reason
+                        ctx.guild.id, "Mass Ban", uid, str(uid), ctx.author.id, str(ctx.author), reason
                     )
                 except Exception as e:
                     # The ban went through; don't fail the batch if only the
