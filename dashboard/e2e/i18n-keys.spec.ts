@@ -35,24 +35,31 @@ function sourceFiles(dir: string): string[] {
 }
 
 /** Keys the dictionary defines: 'quoted': or bareWord: at the top level. */
+function collect(src: string, re: RegExp, into: (value: string) => void): void {
+  let m: RegExpExecArray | null;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = re.exec(src)) !== null) into(m[1]);
+}
+
 function dictionaryKeys(file: string): Set<string> {
   const src = readFileSync(file, 'utf8');
   const keys = new Set<string>();
-  for (const m of src.matchAll(/^\s*'([^']*)':/gm)) keys.add(m[1]);
-  for (const m of src.matchAll(/^\s*([A-Za-z][A-Za-z0-9_]*):/gm)) keys.add(m[1]);
+  collect(src, /^\s*'([^']*)':/gm, (k) => keys.add(k));
+  collect(src, /^\s*([A-Za-z][A-Za-z0-9_]*):/gm, (k) => keys.add(k));
   return keys;
 }
 
 /** Keys the code asks for: tt('…') / ft('…') with a plain string literal. */
 function calledKeys(fn: 'tt' | 'ft'): Map<string, string> {
-  const re = new RegExp(String.raw`\b${fn}\(\s*'([^']*)'\s*\)`, 'g');
   const found = new Map<string, string>();
-  for (const file of sourceFiles(SRC)) {
+  sourceFiles(SRC).forEach((file) => {
     const src = readFileSync(file, 'utf8');
-    for (const m of src.matchAll(re)) {
-      if (!found.has(m[1])) found.set(m[1], file.replace(SRC, 'src'));
-    }
-  }
+    // A fresh regex per file: exec() carries lastIndex between calls.
+    const re = new RegExp(String.raw`\b${fn}\(\s*'([^']*)'\s*\)`, 'g');
+    collect(src, re, (key) => {
+      if (!found.has(key)) found.set(key, file.replace(SRC, 'src'));
+    });
+  });
   return found;
 }
 
@@ -61,11 +68,11 @@ test('every tt() key has an English translation', () => {
   const called = calledKeys('tt');
   expect(called.size, 'no tt() calls found — the scan is broken, not the code').toBeGreaterThan(50);
 
-  const missing = [...called].filter(([key]) => !dictionary.has(key));
-  expect(
-    missing.map(([key, file]) => `${file}: tt('${key}')`),
-    'these keys fall back to the Russian source on the English locale'
-  ).toEqual([]);
+  const missing: string[] = [];
+  called.forEach((file, key) => {
+    if (!dictionary.has(key)) missing.push(`${file}: tt('${key}')`);
+  });
+  expect(missing, 'these keys fall back to the Russian source on the English locale').toEqual([]);
 });
 
 test('every ft() key has a Russian translation', () => {
@@ -73,11 +80,11 @@ test('every ft() key has a Russian translation', () => {
   const called = calledKeys('ft');
   expect(called.size, 'no ft() calls found — the scan is broken, not the code').toBeGreaterThan(50);
 
-  const missing = [...called].filter(([key]) => !dictionary.has(key));
-  expect(
-    missing.map(([key, file]) => `${file}: ft('${key}')`),
-    'these keys fall back to the English source on the Russian locale'
-  ).toEqual([]);
+  const missing: string[] = [];
+  called.forEach((file, key) => {
+    if (!dictionary.has(key)) missing.push(`${file}: ft('${key}')`);
+  });
+  expect(missing, 'these keys fall back to the English source on the Russian locale').toEqual([]);
 });
 
 test('the English dictionary has no entry that translates to itself', () => {
@@ -85,7 +92,10 @@ test('the English dictionary has no entry that translates to itself', () => {
   // Russian on /en while looking "translated" in the file.
   const src = readFileSync(UI_TEXT, 'utf8');
   const selfReferential: string[] = [];
-  for (const m of src.matchAll(/^\s*'([^']*)':\s*'([^']*)',/gm)) {
+  const re = /^\s*'([^']*)':\s*'([^']*)',/gm;
+  let m: RegExpExecArray | null;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = re.exec(src)) !== null) {
     if (m[1] === m[2] && /[А-Яа-яЁё]/.test(m[1])) selfReferential.push(m[1]);
   }
   expect(selfReferential, 'entries that map Russian to the same Russian').toEqual([]);
