@@ -1,4 +1,6 @@
 # cogs/moderation.py
+import datetime
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -119,12 +121,26 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         if code:
             raise HierarchyError(_HIERARCHY_KEYS[code])
 
-    async def _notify_user(self, target: discord.Member, guild_name: str, title_key: str, reason: str, loc: str, duration: Optional[str] = None):
-        """Sends a DM to the user about the moderation action, in the guild's locale."""
+    async def _notify_user(self, target: discord.Member, guild_name: str, title_key: str,
+                           reason: str, loc: str, duration: Optional[str] = None,
+                           expires_at: Optional[datetime.datetime] = None,
+                           what_now_key: Optional[str] = None):
+        """DMs the punished member about the action, in the guild's locale.
+
+        This is the one message a *non-moderator* reads, at a bad moment, so it
+        answers the two questions they actually have: when does this end, and
+        what can I do. `expires_at` renders as a Discord timestamp, so every
+        reader sees it in their own timezone and language.
+        """
         embed = discord.Embed(title=t(loc, title_key, guild=guild_name), color=discord.Color.red())
         embed.add_field(name=t(loc, "field.reason"), value=reason, inline=False)
         if duration:
-            embed.add_field(name=t(loc, "field.duration"), value=duration, inline=False)
+            embed.add_field(name=t(loc, "field.duration"), value=duration, inline=True)
+        if expires_at:
+            ts = int(expires_at.timestamp())
+            embed.add_field(name=t(loc, "field.expires"), value=f"<t:{ts}:F> (<t:{ts}:R>)", inline=True)
+        if what_now_key:
+            embed.add_field(name=t(loc, "field.what_now"), value=t(loc, what_now_key), inline=False)
         try:
             await target.send(embed=embed)
             return True
@@ -189,24 +205,25 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         await reply(ctx, t(loc, "mod.cleared", count=len(deleted)), ephemeral=True)
 
     @commands.hybrid_command(name="kick", description="Kick a member from the server.")
-    @app_commands.describe(member="The member to kick.", reason="The reason for the kick.")
+    @app_commands.describe(member="The member to kick.", reason="Why — recorded in the case log and DMed to the member.")
     @commands.bot_has_permissions(kick_members=True)
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("kick")
-    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str):
         loc = await self.bot.db.get_locale(ctx.guild.id)
         self._check_hierarchy(ctx, member)
-        await self._notify_user(member, ctx.guild.name, "mod.dm_kicked_title", reason, loc)
+        await self._notify_user(member, ctx.guild.name, "mod.dm_kicked_title", reason, loc,
+                                what_now_key="mod.dm_kicked_what_now")
         await member.kick(reason=f"{reason} (Moderator: {ctx.author.id})")
         await self._log_action(ctx, "Member Kicked", member, reason)
         await reply(ctx, t(loc, "mod.kicked", member=member), ephemeral=True)
 
     @commands.hybrid_command(name="ban", description="Ban a member from the server.", extras={"manages_own_response": True})
-    @app_commands.describe(member="Member to ban.", reason="Reason for the ban.")
+    @app_commands.describe(member="Member to ban.", reason="Why — recorded in the case log and DMed to the member.")
     @commands.bot_has_permissions(ban_members=True)
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("ban")
-    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str):
         loc = await self.bot.db.get_locale(ctx.guild.id)
         self._check_hierarchy(ctx, member)
 
@@ -233,7 +250,8 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
         if await self.bot.db.get_guild_setting(ctx.guild.id, "ban_appeals_enabled"):
             dm_sent = await send_ban_appeal_dm(ctx.guild, member, reason, loc)
         else:
-            dm_sent = await self._notify_user(member, ctx.guild.name, "mod.dm_banned_title", reason, loc)
+            dm_sent = await self._notify_user(member, ctx.guild.name, "mod.dm_banned_title", reason, loc,
+                                              what_now_key="mod.dm_banned_what_now")
         await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
         await self._log_action(ctx, "🔨 Ban", member, reason, dm_notified="✅" if dm_sent else "❌")
 

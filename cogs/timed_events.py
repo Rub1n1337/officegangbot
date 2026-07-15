@@ -178,22 +178,22 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
             )
 
         delta = datetime.timedelta(seconds=seconds)
+        expires_at = discord.utils.utcnow() + delta
 
-        # DM user before timeout
-        try:
-            dm_embed = discord.Embed(
-                title=f"🔇 You have been temporarily muted in {ctx.guild.name}",
-                color=discord.Color.orange()
+        # DM the member before the timeout lands. Routed through the Moderation
+        # cog's helper so the punished member gets the same localized shape
+        # (reason, duration, expiry timestamp, what-happens-now) for every
+        # action — this DM used to be hardcoded English with no expiry.
+        loc = await self.bot.db.get_locale(ctx.guild.id) if self.bot.db else "en"
+        mod_cog = self.bot.get_cog("🛡️ Moderation")
+        if mod_cog:
+            await mod_cog._notify_user(
+                member, ctx.guild.name, "mod.dm_muted_title", reason, loc,
+                duration=format_duration(seconds), expires_at=expires_at,
+                what_now_key="mod.dm_muted_what_now",
             )
-            dm_embed.add_field(name="Duration", value=format_duration(seconds), inline=True)
-            dm_embed.add_field(name="Reason", value=reason, inline=False)
-            await member.send(embed=dm_embed)
-        except discord.Forbidden:
-            pass
 
         await member.timeout(delta, reason=f"{reason} | Moderator: {ctx.author}")
-
-        expires_at = discord.utils.utcnow() + delta
         embed = discord.Embed(title="🔇 Temporary Mute", color=discord.Color.orange())
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
         embed.add_field(name="Duration", value=format_duration(seconds), inline=True)
@@ -212,13 +212,13 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
     @app_commands.describe(
         member="Member to ban.",
         duration="Duration (e.g. 30m, 2h, 1d).",
-        reason="Reason for the ban."
+        reason="Why — recorded in the case log and DMed to the member."
     )
     @commands.bot_has_permissions(ban_members=True)
     @commands.cooldown(3, 10, commands.BucketType.user)
     @has_permission("ban")
     async def tempban(self, ctx: commands.Context, member: discord.Member,
-                      duration: str, *, reason: str = "No reason provided"):
+                      duration: str, *, reason: str):
         # Enforce the role hierarchy like /ban and /mute do, otherwise a mod with
         # the ban permission could tempban members above their own role.
         self._check_hierarchy(ctx, member)
@@ -229,17 +229,17 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                 ephemeral=True
             )
 
-        # DM user before ban
-        try:
-            dm_embed = discord.Embed(
-                title=f"🔨 You have been temporarily banned from {ctx.guild.name}",
-                color=discord.Color.red()
+        # DM the member before the ban — afterwards there is no shared guild to
+        # DM through. Same localized shape as every other punishment DM.
+        tb_expires_at = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)
+        tb_loc = await self.bot.db.get_locale(ctx.guild.id) if self.bot.db else "en"
+        tb_mod_cog = self.bot.get_cog("🛡️ Moderation")
+        if tb_mod_cog:
+            await tb_mod_cog._notify_user(
+                member, ctx.guild.name, "mod.dm_tempbanned_title", reason, tb_loc,
+                duration=format_duration(seconds), expires_at=tb_expires_at,
+                what_now_key="mod.dm_tempbanned_what_now",
             )
-            dm_embed.add_field(name="Duration", value=format_duration(seconds), inline=True)
-            dm_embed.add_field(name="Reason", value=reason, inline=False)
-            await member.send(embed=dm_embed)
-        except discord.Forbidden:
-            pass
 
         try:
             await member.ban(reason=f"{reason} | Moderator: {ctx.author} | Duration: {format_duration(seconds)}")
