@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { provider } from '@/config/translations/provider';
 
 // Russian overrides for feature names/descriptions and category labels. These
@@ -28,14 +28,18 @@ const RU_CATEGORIES: Record<string, string> = {
 
 export function useFeatureMeta() {
   const lang = provider.useLang();
-  return {
-    feature(id: string, name: ReactNode, description: ReactNode): { name: ReactNode; description: ReactNode } {
-      if (lang === 'ru' && RU_FEATURES[id]) return RU_FEATURES[id];
-      return { name, description };
-    },
-    category(id: string, label: string): string {
-      if (lang === 'ru' && RU_CATEGORIES[id]) return RU_CATEGORIES[id];
-      return label;
-    },
-  };
+  // Stable per language, so callers can list it in hook deps.
+  return useMemo(
+    () => ({
+      feature(id: string, name: ReactNode, description: ReactNode): { name: ReactNode; description: ReactNode } {
+        if (lang === 'ru' && RU_FEATURES[id]) return RU_FEATURES[id];
+        return { name, description };
+      },
+      category(id: string, label: string): string {
+        if (lang === 'ru' && RU_CATEGORIES[id]) return RU_CATEGORIES[id];
+        return label;
+      },
+    }),
+    [lang]
+  );
 }

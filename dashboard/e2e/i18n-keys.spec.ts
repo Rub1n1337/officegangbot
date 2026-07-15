@@ -87,6 +87,44 @@ test('every ft() key has a Russian translation', () => {
   expect(missing, 'these keys fall back to the English source on the Russian locale').toEqual([]);
 });
 
+test('every settings-index label has an English translation', () => {
+  // These reach the palette as tt(s.label) — a variable, so the scan above
+  // cannot see them. They were English-only and rendered raw for a while,
+  // which put "Strike system" in front of a Russian admin typing "страйк".
+  const src = readFileSync(join(SRC, 'config', 'settings-index.ts'), 'utf8');
+  const labels: string[] = [];
+  collect(src, /^\s*\{ feature: '[^']*', label: '([^']*)'/gm, (l) => labels.push(l));
+  expect(labels.length, 'no labels found — the scan is broken, not the code').toBeGreaterThan(20);
+
+  const dictionary = dictionaryKeys(UI_TEXT);
+  const missing = labels.filter((l) => !dictionary.has(l));
+  expect(missing, 'settings labels that would render Russian on /en').toEqual([]);
+});
+
+test('every feature has a Russian name and description', () => {
+  // The mirror case: feature names live in features.tsx in English and are
+  // overridden per-id in feature-meta.ts. A missing id falls back to English,
+  // silently, on the Russian locale.
+  const featureSrc = readFileSync(join(SRC, 'config', 'features.tsx'), 'utf8');
+  const metaSrc = readFileSync(join(SRC, 'config', 'feature-meta.ts'), 'utf8');
+  const body = featureSrc.split('export const features: FeaturesConfig = {')[1] ?? '';
+
+  const ids: string[] = [];
+  collect(body, /^ {2}'([^']+)':\s*\{/gm, (id) => ids.push(id));
+  expect(ids.length, 'no feature ids found — the scan is broken, not the code').toBeGreaterThan(5);
+
+  const overrides = new Set<string>();
+  collect(metaSrc, /^\s*'?([A-Za-z-]+)'?:\s*\{ name:/gm, (id) => overrides.add(id));
+
+  const missing = ids.filter((id) => !overrides.has(id));
+  expect(missing, 'features that would render English on /ru').toEqual([]);
+  const stale: string[] = [];
+  overrides.forEach((id) => {
+    if (ids.indexOf(id) === -1) stale.push(id);
+  });
+  expect(stale, 'Russian overrides for features that no longer exist').toEqual([]);
+});
+
 test('the English dictionary has no entry that translates to itself', () => {
   // A copy-pasted entry whose value equals its Russian key would render as
   // Russian on /en while looking "translated" in the file.

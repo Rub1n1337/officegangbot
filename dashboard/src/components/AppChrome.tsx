@@ -16,6 +16,7 @@ import { useGuilds } from '@/api/hooks';
 import { getFeatures } from '@/utils/common';
 import { config } from '@/config/common';
 import { useText } from '@/config/translations/ui-text';
+import { useFeatureMeta } from '@/config/feature-meta';
 import { searchSettings } from '@/config/settings-index';
 
 /** Custom event other components can dispatch to open the command palette. */
@@ -82,6 +83,7 @@ function CommandPalette() {
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
   const tt = useText();
+  const meta = useFeatureMeta();
 
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [];
@@ -93,7 +95,10 @@ function CommandPalette() {
       for (const f of getFeatures()) {
         list.push({
           id: `f-${f.id}`,
-          label: String(f.name),
+          // Via meta, like the sidebar and the feature cards: the config's
+          // name is English, so reading it raw listed "Rules" next to the
+          // sidebar's "Правила" on the same screen.
+          label: String(meta.feature(f.id, f.name, '').name),
           hint: tt('Функция'),
           href: `/guilds/${guildId}/features/${f.id}`,
         });
@@ -106,7 +111,7 @@ function CommandPalette() {
       }
     }
     return list;
-  }, [guildId, guilds.data, tt]);
+  }, [guildId, guilds.data, tt, meta]);
 
   const needle = q.trim().toLowerCase();
   // Individual settings only surface when the admin is typing — they'd clutter
@@ -114,9 +119,9 @@ function CommandPalette() {
   // already matched by name.
   const settingHits = useMemo<Command[]>(() => {
     if (!guildId || !needle) return [];
-    return searchSettings(needle).map((s, i) => ({
+    return searchSettings(needle, tt).map((s, i) => ({
       id: `s-${s.feature}-${i}`,
-      label: s.label,
+      label: tt(s.label),
       hint: tt('Настройка'),
       href: `/guilds/${guildId}/features/${s.feature}`,
     }));
@@ -260,15 +265,15 @@ function CommandPalette() {
           <Flex gap={1} align="center">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd>
-            to navigate
+            {tt('навигация')}
           </Flex>
           <Flex gap={1} align="center">
             <Kbd>↵</Kbd>
-            to open
+            {tt('открыть')}
           </Flex>
           <Flex gap={1} align="center">
             <Kbd>esc</Kbd>
-            to close
+            {tt('закрыть')}
           </Flex>
         </Flex>
       </ModalContent>
