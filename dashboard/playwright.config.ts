@@ -2,9 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * E2E config. Tests live in ./e2e and run against a locally-served production
- * build (the same `next start` Vercel runs). They cover the public surface —
- * the sign-in page, i18n routing and auth redirects — which needs no backend,
- * so they catch routing/build/i18n regressions without a live bot or session.
+ * build (the same `next start` Vercel runs).
+ *
+ * smoke.spec.ts covers the public surface (sign-in, i18n routing, auth
+ * redirects). authed.spec.ts renders the product behind the login: it mints a
+ * session cookie and serves every backend call from e2e/fixtures.ts, so the
+ * real pages and feature forms render deterministically with no bot, no
+ * Postgres and no network.
  */
 export default defineConfig({
   testDir: './e2e',
