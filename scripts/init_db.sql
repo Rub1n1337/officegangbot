@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS users_xp (
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_xp_guild_xp ON users_xp(guild_id, xp DESC);
+-- Leaderboard sorts by (prestige DESC, xp DESC) — the index must match or
+-- Postgres falls back to an in-memory sort as the table grows.
+CREATE INDEX IF NOT EXISTS idx_users_xp_leaderboard ON users_xp(guild_id, prestige DESC, xp DESC);
 
 -- Warnings system
 CREATE TABLE IF NOT EXISTS warnings (
@@ -210,6 +212,8 @@ CREATE TABLE IF NOT EXISTS mod_cases (
 
 CREATE INDEX IF NOT EXISTS idx_mod_cases_guild ON mod_cases(guild_id, case_number DESC);
 CREATE INDEX IF NOT EXISTS idx_mod_cases_target ON mod_cases(guild_id, target_id);
+-- Analytics filters cases by created_at window.
+CREATE INDEX IF NOT EXISTS idx_mod_cases_created ON mod_cases(guild_id, created_at);
 
 -- Temporary roles: a role granted to a member until expires_at, then removed by
 -- the timed_events expiry loop.
@@ -239,6 +243,8 @@ CREATE TABLE IF NOT EXISTS automod_strikes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_automod_strikes ON automod_strikes(guild_id, user_id, created_at);
+-- get_active_strikes aggregates per guild over a created_at window (no user filter).
+CREATE INDEX IF NOT EXISTS idx_automod_strikes_created ON automod_strikes(guild_id, created_at);
 
 -- AutoMod custom rules: per-guild regex patterns that delete a message (and
 -- optionally add a strike) when they match.

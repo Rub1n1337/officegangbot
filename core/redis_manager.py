@@ -304,8 +304,13 @@ class RedisManager:
                     # Push the response onto a short-lived list that the caller is
                     # BLPOP-ing, so it's delivered immediately.
                     encoded = json.dumps(response, default=_json_default)
-                    await self.redis.rpush(response_key, encoded)
-                    await self.redis.expire(response_key, 15)
+                    # One pipeline: a crash between the push and the expire used
+                    # to leave the response list without a TTL, so a caller that
+                    # had already timed out leaked a key forever.
+                    pipe = self.redis.pipeline()
+                    pipe.rpush(response_key, encoded)
+                    pipe.expire(response_key, 15)
+                    await pipe.execute()
                 except Exception as e:
                     logger.error(f"RPC handler error: {e}", exc_info=True)
 
