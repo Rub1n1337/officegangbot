@@ -49,6 +49,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "history.notes": "Moderator notes",
         "history.no_reason": "no reason",
         "history.footer": "Struck-through entries have expired · full history on the dashboard",
+        "help.feature_off": "⬜ off",
+        "help.feature_off_note": "⬜ = the feature is switched off for this server, so its commands won't do anything until an admin enables it.",
         # --- /warnings ---
         "warnings.title": "⚠️ Warnings: {member}",
         "warnings.none": "✅ This member has no warnings.",
@@ -383,6 +385,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "history.notes": "Заметки модераторов",
         "history.no_reason": "без причины",
         "history.footer": "Зачёркнутое — истекло · полная история в дашборде",
+        "help.feature_off": "⬜ выкл",
+        "help.feature_off_note": "⬜ = функция выключена на этом сервере — её команды ничего не сделают, пока администратор её не включит.",
         # --- /warnings ---
         "warnings.title": "⚠️ Предупреждения: {member}",
         "warnings.none": "✅ У этого участника нет предупреждений.",
