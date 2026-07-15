@@ -558,18 +558,31 @@ class MyBot(commands.Bot):
         open_tickets = 0
         history = []
         if self.db:
-            enabled_features = await self.db.get_enabled_features(guild_id)
+            # The four reads are independent — run them concurrently (the stats
+            # endpoint is polled every 8s by the dashboard header).
+            enabled_res, tickets_res, history_res, rows_res = await asyncio.gather(
+                self.db.get_enabled_features(guild_id),
+                self.db.count_open_tickets(guild_id),
+                self.db.get_daily_metrics(guild_id, days=14),
+                self.db.get_leaderboard(guild_id, limit=5),
+                return_exceptions=True,
+            )
+            if isinstance(enabled_res, Exception):
+                logger.warning(f"get_guild_stats enabled features failed for {guild_id}: {enabled_res}")
+            else:
+                enabled_features = enabled_res
+            if isinstance(tickets_res, Exception):
+                logger.warning(f"get_guild_stats open-ticket count failed for {guild_id}: {tickets_res}")
+            else:
+                open_tickets = tickets_res
+            if isinstance(history_res, Exception):
+                logger.warning(f"get_guild_stats daily metrics failed for {guild_id}: {history_res}")
+            else:
+                history = history_res
             try:
-                open_tickets = await self.db.count_open_tickets(guild_id)
-            except Exception as e:
-                logger.warning(f"get_guild_stats open-ticket count failed for {guild_id}: {e}")
-            try:
-                # Daily metrics for the overview KPI sparklines (last 14 days).
-                history = await self.db.get_daily_metrics(guild_id, days=14)
-            except Exception as e:
-                logger.warning(f"get_guild_stats daily metrics failed for {guild_id}: {e}")
-            try:
-                rows = await self.db.get_leaderboard(guild_id, limit=5)
+                rows = [] if isinstance(rows_res, Exception) else rows_res
+                if isinstance(rows_res, Exception):
+                    raise rows_res
                 for row in rows:
                     member = guild.get_member(row["user_id"])
                     name = (
@@ -903,6 +916,8 @@ class MyBot(commands.Bot):
         if status == "approved" and guild:
             try:
                 await guild.unban(discord.Object(id=user_id), reason="Ban appeal approved")
+                # The approval ends any pending temp-ban record as well.
+                await self.db.remove_timed_punishment(guild_id, user_id)
             except discord.NotFound:
                 pass  # already unbanned
             except discord.HTTPException as e:
@@ -1230,7 +1245,7 @@ class MyBot(commands.Bot):
             block_invites = bool(options.get("blockInvites", False))
             block_links = bool(options.get("blockLinks", False))
             domains_raw = options.get("allowedDomains") or []
-            domains = sorted({normalize_domain(str(d)) for d in domains_raw if normalize_domain(str(d))})[:50]
+            domains = sorted({normalize_domain(str(d))[:253] for d in domains_raw if normalize_domain(str(d))})[:50]
             block_mass_mentions = bool(options.get("blockMassMentions", False))
             dry_run = bool(options.get("dryRun", False))
             spam_count = self._clamp_int(options.get("spamCount"), 5, 3, 20)

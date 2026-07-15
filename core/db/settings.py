@@ -126,13 +126,21 @@ class _SettingsMixin:
             features, stored_at = cached
             if time.time() - stored_at < self._ENABLED_FEATURES_TTL:
                 return features
-        await self.ensure_guild(guild_id)
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT enabled_features FROM guilds WHERE guild_id = $1",
-                guild_id
-            )
-            features = list(row['enabled_features']) if row and row['enabled_features'] else []
+        try:
+            await self.ensure_guild(guild_id)
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT enabled_features FROM guilds WHERE guild_id = $1",
+                    guild_id
+                )
+                features = list(row['enabled_features']) if row and row['enabled_features'] else []
+        except Exception:
+            # DB outage: serve the last-known value (even TTL-expired) rather
+            # than raising — otherwise AutoMod/levels/etc. silently switch off
+            # for every message until the DB is back.
+            if cached is not None:
+                return cached[0]
+            raise
         self._enabled_features_cache[guild_id] = (features, time.time())
         return features
 

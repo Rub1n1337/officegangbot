@@ -83,7 +83,12 @@ class TimedEventsCog(commands.Cog, name="⏱️ Timed Events"):
                 guild = self.bot.get_guild(guild_id)
 
                 if not guild:
-                    await self.bot.db.remove_timed_punishment(guild_id, user_id)
+                    # The guild may just be unavailable this cycle (shard
+                    # reconnect, bot briefly removed). Dropping the record here
+                    # would make the temp ban permanent — retry next cycle.
+                    logger.warning(
+                        f"Timed punishment for {user_id}: guild {guild_id} unavailable, retrying later"
+                    )
                     continue
 
                 try:

@@ -256,6 +256,9 @@ class Moderation(commands.Cog, name="🛡️ Moderation"):
 
         try:
             await ctx.guild.unban(user, reason=f"{reason} (Moderator: {ctx.author.id})")
+            # A manual unban ends any pending temp-ban record, so the dashboard
+            # stops listing it and the expiry loop won't re-unban.
+            await self.bot.db.remove_timed_punishment(ctx.guild.id, user.id)
             await self._log_action(ctx, "User Unbanned", user, reason)
             await reply(ctx, t(loc, "mod.unbanned", user=user), ephemeral=True)
         except discord.NotFound:
