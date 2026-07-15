@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { provider } from './provider';
+import { reportMissingKey } from './report-missing';
 
 // English translations for the Iris UI strings (pages, shell, popovers).
 // Keyed by the exact Russian source — the Iris screens were written in
@@ -300,5 +301,13 @@ const EN: Record<string, string> = {
 export function useText() {
   const lang = provider.useLang();
   // Stable per language, so components can safely list `tt` in hook deps.
-  return useCallback((ru: string): string => (lang === 'ru' ? ru : EN[ru] ?? ru), [lang]);
+  return useCallback(
+    (ru: string): string => {
+      if (lang === 'ru') return ru;
+      const en = EN[ru];
+      if (en === undefined) reportMissingKey('ui-text', ru);
+      return en ?? ru;
+    },
+    [lang]
+  );
 }
