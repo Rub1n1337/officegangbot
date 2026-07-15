@@ -6,6 +6,22 @@ from core.i18n import t
 from .utils import reply
 
 
+# Cog → the feature toggle that governs it. /help marks a category as off when
+# its feature is disabled for the guild: the commands still list (so an admin
+# can find them), but nobody wonders why /rank does nothing.
+COG_FEATURE = {
+    "🚨 Anti-Raid": "anti-raid",
+    "🛡️ AutoMod": "automod",
+    "🚫 Filter": "automod",  # the word filter lives inside AutoMod now
+    "⭐ Levels": "levels",
+    "Reaction Roles": "reaction-menus",
+    "📅 Scheduled Messages": "scheduled-messages",
+    "🎫 Tickets": "tickets",
+    "✅ Verification": "verification",
+    "👋 Welcome System": "welcome-message",
+}
+
+
 def _visible_cogs(bot: commands.Bot):
     """Cogs that expose at least one non-hidden command, sorted by name."""
     cogs = [
@@ -16,30 +32,44 @@ def _visible_cogs(bot: commands.Bot):
     return sorted(cogs, key=lambda c: c.qualified_name)
 
 
-def build_main_embed(bot: commands.Bot, loc: str) -> discord.Embed:
+def build_main_embed(bot: commands.Bot, loc: str, enabled_features=None) -> discord.Embed:
     """The overview page listing every command category."""
     embed = discord.Embed(
         title=t(loc, "help.title"),
         description=t(loc, "help.desc"),
         color=discord.Color.blue()
     )
+    disabled_any = False
     for cog in _visible_cogs(bot):
         commands_list = sorted(cmd.name for cmd in cog.get_commands() if not cmd.hidden)
-        if commands_list:
-            embed.add_field(
-                name=cog.qualified_name,
-                value=f"`{'`, `'.join(commands_list)}`",
-                inline=False
-            )
+        if not commands_list:
+            continue
+        name = cog.qualified_name
+        feature = COG_FEATURE.get(name)
+        if enabled_features is not None and feature and feature not in enabled_features:
+            name = f"{name} · {t(loc, 'help.feature_off')}"
+            disabled_any = True
+        embed.add_field(
+            name=name,
+            value=f"`{'`, `'.join(commands_list)}`",
+            inline=False
+        )
+    if disabled_any:
+        embed.set_footer(text=t(loc, "help.feature_off_note"))
     return embed
 
 
-def build_cog_embed(cog: commands.Cog, loc: str) -> discord.Embed:
+def build_cog_embed(cog: commands.Cog, loc: str, enabled_features=None) -> discord.Embed:
     """The detail page for a single category."""
+    description = cog.description or t(loc, "help.no_cat_desc")
+    feature = COG_FEATURE.get(cog.qualified_name)
+    off = enabled_features is not None and feature and feature not in enabled_features
+    if off:
+        description = f"{t(loc, 'help.feature_off_note')}\n\n{description}"
     embed = discord.Embed(
         title=t(loc, "help.cog_title", cog=cog.qualified_name),
-        description=cog.description or t(loc, "help.no_cat_desc"),
-        color=discord.Color.green()
+        description=description,
+        color=discord.Color.dark_grey() if off else discord.Color.green()
     )
     visible_commands = sorted(
         (cmd for cmd in cog.get_commands() if not cmd.hidden),
@@ -56,11 +86,13 @@ class HelpView(discord.ui.View):
     """A category dropdown that swaps the help embed in place. Only the member
     who invoked /help can drive it; it self-disables after a short timeout."""
 
-    def __init__(self, bot: commands.Bot, author_id: int, loc: str, *, timeout: float = 180):
+    def __init__(self, bot: commands.Bot, author_id: int, loc: str,
+                 enabled_features=None, *, timeout: float = 180):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.author_id = author_id
         self.loc = loc
+        self.enabled_features = enabled_features
         self._message: discord.Message | None = None
 
         select = discord.ui.Select(placeholder=t(loc, "help.select_placeholder"), min_values=1, max_values=1)
@@ -94,10 +126,13 @@ class HelpView(discord.ui.View):
     async def _on_select(self, interaction: discord.Interaction):
         value = interaction.data["values"][0]
         if value == "__overview__":
-            embed = build_main_embed(self.bot, self.loc)
+            embed = build_main_embed(self.bot, self.loc, self.enabled_features)
         else:
             cog = self.bot.get_cog(value)
-            embed = build_cog_embed(cog, self.loc) if cog else build_main_embed(self.bot, self.loc)
+            embed = (
+                build_cog_embed(cog, self.loc, self.enabled_features)
+                if cog else build_main_embed(self.bot, self.loc, self.enabled_features)
+            )
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def on_timeout(self):
@@ -118,6 +153,16 @@ class HelpCog(commands.Cog, name="❓ Help"):
 
     async def _locale(self, ctx: commands.Context) -> str:
         return await self.bot.db.get_locale(ctx.guild.id) if ctx.guild else "en"
+
+    async def _enabled(self, ctx: commands.Context):
+        """The guild's enabled features, or None in DMs / without a DB — None
+        means "don't mark anything as off"."""
+        if not ctx.guild or not self.bot.db:
+            return None
+        try:
+            return await self.bot.db.get_enabled_features(ctx.guild.id)
+        except Exception:
+            return None
 
     async def _help_autocomplete(
         self, interaction: discord.Interaction, current: str
@@ -150,8 +195,9 @@ class HelpCog(commands.Cog, name="❓ Help"):
     async def send_main_help(self, ctx: commands.Context):
         """Sends the interactive main help page with a category dropdown."""
         loc = await self._locale(ctx)
-        embed = build_main_embed(self.bot, loc)
-        view = HelpView(self.bot, ctx.author.id, loc)
+        enabled = await self._enabled(ctx)
+        embed = build_main_embed(self.bot, loc, enabled)
+        view = HelpView(self.bot, ctx.author.id, loc, enabled)
         await reply(ctx, embed=embed, ephemeral=True, view=view)
         # Capture the sent message so the view can disable itself on timeout.
         if ctx.interaction is not None:
@@ -182,7 +228,7 @@ class HelpCog(commands.Cog, name="❓ Help"):
     async def send_cog_help(self, ctx: commands.Context, cog: commands.Cog):
         """Sends help for a specific cog (category)."""
         loc = await self._locale(ctx)
-        embed = build_cog_embed(cog, loc)
+        embed = build_cog_embed(cog, loc, await self._enabled(ctx))
         await reply(ctx, embed=embed, ephemeral=True)
 
     async def send_command_help(self, ctx: commands.Context, command: commands.Command):

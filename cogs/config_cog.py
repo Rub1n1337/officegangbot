@@ -47,112 +47,135 @@ class Configuration(commands.Cog, name="⚙️ Configuration"):
         enabled_features = await self.bot.db.get_enabled_features(ctx.guild.id)
         mod_roles = await self.bot.db.get_mod_roles(ctx.guild.id)
         
-        embed = discord.Embed(title=f"⚙️ Settings for {ctx.guild.name}", color=discord.Color.blurple())
-        embed.set_footer(text="Use /config to manage these settings.")
+        # One consistent shape for every feature: name · on/off · the settings
+        # that matter. The old version checked two features that no longer
+        # exist ("reaction-role", "filter" — merged into reaction-menus and
+        # automod), so they always rendered "Disabled", and it silently omitted
+        # anti-raid, verification, scheduled messages and role menus entirely.
+        embed = discord.Embed(
+            title=f"⚙️ Settings — {ctx.guild.name}",
+            description="`/config` manages permissions and log channels · the dashboard covers the rest.",
+            color=discord.Color.blurple(),
+        )
+        if ctx.guild.icon:
+            embed.set_thumbnail(url=ctx.guild.icon.url)
 
-        # Permissions from Postgres mod_roles
+        def _mark(feature: str) -> str:
+            return "✅" if feature in enabled_features else "⬜"
+
+        def _channel(key: str) -> str:
+            cid = settings.get(key)
+            channel = ctx.guild.get_channel(int(cid)) if cid else None
+            return channel.mention if channel else "—"
+
+        def _role(key: str) -> str:
+            rid = settings.get(key)
+            role = ctx.guild.get_role(int(rid)) if rid else None
+            return role.mention if role else "—"
+
+        def _preview(key: str, limit: int = 60) -> str:
+            text = (settings.get(key) or "").strip().replace("\n", " ")
+            if not text:
+                return "—"
+            return f"`{text[:limit]}…`" if len(text) > limit else f"`{text}`"
+
+        # --- Moderation permissions ------------------------------------------
         perm_lines = []
         for perm_name in VALID_PERMISSIONS:
             role_ids = mod_roles.get(perm_name, [])
-            if role_ids:
-                roles = [ctx.guild.get_role(rid) for rid in role_ids if ctx.guild.get_role(rid)]
-                role_mentions = ", ".join([r.mention for r in roles]) if roles else "❌ Not Set"
-                perm_lines.append(f"`{perm_name.title()}`: {role_mentions}")
-            else:
-                perm_lines.append(f"`{perm_name.title()}`: ❌ Not Set")
-
-        embed.add_field(name="🛡️ Permission Roles", value="\n".join(perm_lines) or 'No permissions configured.', inline=False)
-
-        # Logging
-        is_logging_enabled = "logging" in enabled_features
-        log_channels = {name: self.bot.get_channel(int(settings.get(key))) if settings.get(key) else None for name, key in VALID_LOG_TYPES.items()}
-        
-        log_text = f"Feature Status: {'✅ **Enabled**' if is_logging_enabled else '❌ **Disabled**'}\n\n"
-        for name, channel in log_channels.items():
-            log_text += f"`{name.title()}`: {channel.mention if channel else '❌ Not Set'}\n"
-        
-        embed.add_field(name="📝 Logging Channels", value=log_text, inline=False)
-
-        # Rules
-        is_rules_enabled = "rules" in enabled_features
-        rules_channel = ctx.guild.get_channel(settings.get("rules_channel_id")) if settings.get("rules_channel_id") else None
-        rules_text = settings.get("rules_message") or "Not Set"
-        if len(rules_text) > 100:
-            rules_text = rules_text[:97] + "..."
+            roles = [ctx.guild.get_role(rid) for rid in role_ids] if role_ids else []
+            mentions = ", ".join(r.mention for r in roles if r) or "—"
+            perm_lines.append(f"`{perm_name:<6}` {mentions}")
         embed.add_field(
-            name="📜 Rules System",
-            value=f"**Status:** {'✅ Enabled' if is_rules_enabled else '❌ Disabled'}\n"
-                  f"**Channel:** {rules_channel.mention if rules_channel else '❌ Not Set'}\n"
-                  f"**Message:** `{rules_text}`",
-            inline=False
+            name="🛡️ Moderation permissions",
+            value="\n".join(perm_lines) + "\n-# Administrators always have full access.",
+            inline=False,
         )
 
-        # Welcome Message
-        is_welcome_enabled = "welcome-message" in enabled_features
-        welcome_channel = ctx.guild.get_channel(settings.get("welcome_channel_id")) if settings.get("welcome_channel_id") else None
-        welcome_text = settings.get("welcome_message") or "Not Set"
-        if len(welcome_text) > 100:
-            welcome_text = welcome_text[:97] + "..."
+        # --- Logging ----------------------------------------------------------
+        log_lines = [
+            f"`{name:<10}` {_channel(key)}"
+            for name, key in VALID_LOG_TYPES.items()
+        ]
         embed.add_field(
-            name="👋 Welcome System",
-            value=f"**Status:** {'✅ Enabled' if is_welcome_enabled else '❌ Enabled (via legacy)' if settings.get('welcome_enabled') else '❌ Disabled'}\n"
-                  f"**Channel:** {welcome_channel.mention if welcome_channel else '❌ Not Set'}\n"
-                  f"**Message:** `{welcome_text}`",
-            inline=False
+            name=f"{_mark('logging')} Logging",
+            value="\n".join(log_lines),
+            inline=False,
         )
 
-        # Reaction Role
-        is_rr_enabled = "reaction-role" in enabled_features
-        rr_channel = ctx.guild.get_channel(settings.get("rules_channel_id")) if settings.get("rules_channel_id") else None
-        rr_role = ctx.guild.get_role(settings.get("reaction_role_id")) if settings.get("reaction_role_id") else None
+        # --- Content features -------------------------------------------------
         embed.add_field(
-            name="🎭 Reaction Role",
-            value=f"**Status:** {'✅ Enabled' if is_rr_enabled else '❌ Disabled'}\n"
-                  f"**Channel:** {rr_channel.mention if rr_channel else '❌ Not Set'}\n"
-                  f"**Role:** {rr_role.mention if rr_role else '❌ Not Set'}\n"
-                  f"**Emoji:** {settings.get('reaction_emoji') or '❌ Not Set'}",
-            inline=True
+            name=f"{_mark('rules')} Rules",
+            value=f"Channel: {_channel('rules_channel_id')}\nText: {_preview('rules_message')}",
+            inline=False,
         )
-
-        # Automod
-        is_automod_enabled = "automod" in enabled_features
         embed.add_field(
-            name="🤖 Automod",
-            value=f"**Status:** {'✅ Enabled' if is_automod_enabled else '❌ Disabled'}",
-            inline=True
+            name=f"{_mark('welcome-message')} Welcome message",
+            value=f"Channel: {_channel('welcome_channel_id')}\nText: {_preview('welcome_message')}",
+            inline=False,
         )
-
-        # Tickets
-        is_tickets_enabled = "tickets" in enabled_features
         embed.add_field(
-            name="🎫 Tickets",
-            value=f"**Status:** {'✅ Enabled' if is_tickets_enabled else '❌ Disabled'}",
-            inline=True
+            name=f"{_mark('verification')} Verification",
+            value=f"Verified role: {_role('verification_role_id')}",
+            inline=False,
         )
 
-        # Levels
-        is_levels_enabled = "levels" in enabled_features
+        # --- Safety -----------------------------------------------------------
+        automod_bits = []
+        if settings.get("automod_block_invites"):
+            automod_bits.append("invites")
+        if settings.get("automod_block_links"):
+            automod_bits.append("links")
+        if settings.get("automod_block_mass_mentions"):
+            automod_bits.append("@everyone")
+        words = settings.get("filter_words") or []
+        if words:
+            automod_bits.append(f"{len(words)} banned words")
+        if settings.get("automod_dry_run"):
+            automod_bits.append("**dry-run**")
         embed.add_field(
-            name="📈 Levels",
-            value=f"**Status:** {'✅ Enabled' if is_levels_enabled else '❌ Disabled'}",
-            inline=True
+            name=f"{_mark('automod')} AutoMod",
+            value=("Blocks: " + ", ".join(automod_bits)) if automod_bits else "Anti-spam only",
+            inline=False,
         )
 
-        # Filter
-        is_filter_enabled = "filter" in enabled_features
+        raid_action = settings.get("antiraid_action") or "timeout"
         embed.add_field(
-            name="🚫 Message Filter",
-            value=f"**Status:** {'✅ Enabled' if is_filter_enabled else '❌ Disabled'}",
-            inline=True
+            name=f"{_mark('anti-raid')} Anti-raid",
+            value=(
+                f"{settings.get('antiraid_join_count') or 8} joins / "
+                f"{settings.get('antiraid_join_window') or 10}s → **{raid_action}**"
+            ),
+            inline=False,
         )
 
-        # Section divider
-        embed.add_field(name="\u200b", value="━━━━━━━━━━━━━━", inline=False)
-        embed.description = (
-            "**Legend:**\n"
-            "❌ Not Set — No role or channel configured.\n"
-            "Use `/config` to manage permissions and log channels."
+        # --- Engagement / support ---------------------------------------------
+        auto_close = int(settings.get("ticket_auto_close_hours") or 0)
+        embed.add_field(
+            name=f"{_mark('tickets')} Tickets",
+            value=(
+                f"Support role: {_role('ticket_support_role_id')} · "
+                + (f"auto-close after {auto_close}h" if auto_close else "no auto-close")
+            ),
+            inline=False,
         )
+        embed.add_field(
+            name=f"{_mark('levels')} Levels",
+            value=f"Level-up channel: {_channel('level_up_channel_id')}",
+            inline=False,
+        )
+        embed.add_field(
+            name=f"{_mark('reaction-menus')} Role menus",
+            value="Configured on the dashboard.",
+            inline=False,
+        )
+        embed.add_field(
+            name=f"{_mark('scheduled-messages')} Scheduled messages",
+            value="Configured on the dashboard.",
+            inline=False,
+        )
+
+        embed.set_footer(text="✅ enabled · ⬜ off · — not set")
         await reply(ctx, embed=embed, ephemeral=True)
 
 
