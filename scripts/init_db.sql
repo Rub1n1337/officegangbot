@@ -42,9 +42,7 @@ CREATE TABLE IF NOT EXISTS users_xp (
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
 
--- Leaderboard sorts by (prestige DESC, xp DESC) — the index must match or
--- Postgres falls back to an in-memory sort as the table grows.
-CREATE INDEX IF NOT EXISTS idx_users_xp_leaderboard ON users_xp(guild_id, prestige DESC, xp DESC);
+CREATE INDEX IF NOT EXISTS idx_users_xp_guild_xp ON users_xp(guild_id, xp DESC);
 
 -- Warnings system
 CREATE TABLE IF NOT EXISTS warnings (
@@ -388,6 +386,10 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_prestige_level INTEGER DEFAUL
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS levels_season INTEGER DEFAULT 1;
 -- Levels: lifetime prestige count per member (survives season/prestige resets).
 ALTER TABLE users_xp ADD COLUMN IF NOT EXISTS prestige INTEGER DEFAULT 0;
+-- Defined here (not next to the table) because it needs the prestige column
+-- above: the leaderboard sorts by (prestige DESC, xp DESC), so the index must
+-- match that order or Postgres falls back to an in-memory sort.
+CREATE INDEX IF NOT EXISTS idx_users_xp_leaderboard ON users_xp(guild_id, prestige DESC, xp DESC);
 -- Reaction menus: exclusive (single-select) mode — picking a role in the menu
 -- removes the member's other roles from the same menu.
 ALTER TABLE reaction_menus ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT FALSE;
