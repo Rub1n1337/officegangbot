@@ -105,6 +105,45 @@ test('Russian locale has no untranslated shell strings', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Модерация/ }).first()).toBeVisible();
 });
 
+test('overlays are localized too — palette, notifications, server picker', async ({ page }) => {
+  // Everything above reads the *page*. Overlays aren't in the DOM until they
+  // open, so a Russian string in the English ⌘K palette (which shipped) sailed
+  // past every check. Open them and read them.
+  await page.goto(`/en/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText(/Server health/).first()).toBeVisible({ timeout: 15_000 });
+
+  const cyrillic = /[А-Яа-яЁё]/;
+
+  // ⌘K command palette. Wait for a guild-scoped entry before reading it: the
+  // palette lists only "Switch server" until router.query.guild hydrates, and
+  // reading it too early passes vacuously — which is exactly how this test
+  // first "passed" against the bug it was written for.
+  await page.keyboard.press('Control+k');
+  const palette = page.getByPlaceholder(/Jump to a server or feature/);
+  await expect(palette).toBeVisible();
+  await expect(page.getByText('Stats')).toBeVisible();  // the Overview entry's hint
+  const paletteText = (await page.locator('.chakra-modal__content').first().innerText())
+    .replace(/Trials Gang/g, '');
+  expect(paletteText.length, 'palette read before its commands rendered').toBeGreaterThan(120);
+  expect(paletteText, 'Cyrillic in the English command palette').not.toMatch(cyrillic);
+  await page.keyboard.press('Escape');
+
+  // Notifications popover
+  await page.getByTitle('Notifications').click();
+  const notifications = page.getByText(/All quiet|Notifications/).first();
+  await expect(notifications).toBeVisible();
+  const notifText = await page.locator('.chakra-popover__content').first().innerText();
+  expect(notifText, 'Cyrillic in the English notifications popover').not.toMatch(cyrillic);
+  await page.keyboard.press('Escape');
+
+  // Server picker
+  await page.getByText('Switch server').click();
+  await expect(page.getByText('YOUR SERVERS')).toBeVisible();
+  const pickerText = (await page.locator('.chakra-popover__content').first().innerText())
+    .replace(/Trials Gang/g, '');
+  expect(pickerText, 'Cyrillic in the English server picker').not.toMatch(cyrillic);
+});
+
 test('Tickets list shows the subject, not just the opener', async ({ page }) => {
   await page.goto(`/ru/guilds/${GUILD_ID}/tickets`);
   await expect(page.getByText('Cannot access the voice channels')).toBeVisible({ timeout: 15_000 });

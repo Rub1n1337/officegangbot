@@ -160,8 +160,8 @@ const EN: Record<string, string> = {
   'открыт → закрыт': 'opened → closed',
   'нет закрытых тикетов': 'no closed tickets',
   'Хитмап активности': 'Activity heatmap',
-  'Сообщения по дням недели и часам (UTC). Только агрегатные счётчики — содержимое не хранится.':
-    'Messages by weekday and hour (UTC). Aggregate counters only — content is not stored.',
+  'Сообщения по дням недели и часам (ваше местное время). Только агрегатные счётчики — содержимое не хранится.':
+    'Messages by weekday and hour (your local time). Aggregate counters only — content is not stored.',
   'Активности пока нет. Счётчики начинают копиться с этого момента.':
     'No activity yet. Counters start accumulating from now on.',
   'сообщений': 'messages',
@@ -259,6 +259,7 @@ const EN: Record<string, string> = {
   'Модерация': 'Moderation',
   'Панель': 'Panel',
   'Тренды': 'Trends',
+  'Участники': 'Members',
   'Поиск': 'Lookup',
   'Функция': 'Feature',
   'Главная': 'Home',
