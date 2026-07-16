@@ -122,7 +122,7 @@ const FEATURE_PAYLOADS: Record<string, unknown> = {
     blockInvites: true, blockLinks: false, allowedDomains: ['youtube.com'],
     blockMassMentions: true, spamCount: 5, spamWindow: 3, mentionLimit: 5,
     strikesEnabled: true, strikeExpiryHours: 24, strikeMuteAt: 3, strikeKickAt: 5, strikeBanAt: 0,
-    dryRun: false, rules: [], bannedWords: ['badword'], ignoredChannels: [], ignoredRoles: [],
+    dryRun: false, rules: [], bannedWords: ['плохоеслово'], ignoredChannels: [], ignoredRoles: [],
   },
   'anti-raid': {
     joinCount: 8, joinWindow: 10, action: 'timeout', duration: 300,
@@ -133,8 +133,8 @@ const FEATURE_PAYLOADS: Record<string, unknown> = {
     channel: null, rewards: [], voiceXpEnabled: true, voiceXpPerMin: 5,
     xpMultiplier: 1, prestigeLevel: 100, season: 2, roleMultipliers: [],
   },
-  rules: { channel: null, message: 'Be nice.' },
-  'welcome-message': { channel: null, message: 'Welcome {user.mention}!', role: null },
+  rules: { channel: null, message: 'Будьте вежливы.' },
+  'welcome-message': { channel: null, message: 'Привет, {user.mention}!', role: null },
   moderation: {
     config: null, kick: null, ban: null, mute: null, warn: null, clear: null,
     warnEscalationEnabled: true, warnExpiryHours: 720, warnMuteAt: 3, warnKickAt: 5, warnBanAt: 7,

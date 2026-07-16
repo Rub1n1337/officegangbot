@@ -4,6 +4,15 @@ import { createI18n } from '@/utils/i18n';
 export const feature = createI18n(provider, {
   en: {
     unsaved: 'Save Changes',
+    status: {
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      off_title: 'This feature is off',
+      off_description: 'Enable it to configure and save its settings.',
+      switch_on: 'Enable',
+      switch_off: 'Disable',
+    },
+    preview: 'Preview',
     error: {
       'not enabled': 'Not Enabled',
       'not enabled description': 'Try enable this feature?',
@@ -19,6 +28,15 @@ export const feature = createI18n(provider, {
   },
   ru: {
     unsaved: 'Сохранить изменения',
+    status: {
+      enabled: 'Включено',
+      disabled: 'Выключено',
+      off_title: 'Функция выключена',
+      off_description: 'Включите её, чтобы настроить и сохранить параметры.',
+      switch_on: 'Включить',
+      switch_off: 'Выключить',
+    },
+    preview: 'Превью',
     error: {
       'not enabled': 'Не включено',
       'not enabled description': 'Включить эту функцию?',

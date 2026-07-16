@@ -1,5 +1,7 @@
 import { Badge, Box, Flex, Text } from '@chakra-ui/react';
 import { Fragment, ReactNode } from 'react';
+import { feature as view } from '@/config/translations/feature';
+import { useFormText } from '@/config/translations/form-text';
 
 /**
  * A Discord-style preview of the welcome message, with the placeholders filled
@@ -30,10 +32,12 @@ function render(message: string, serverName: string): ReactNode {
 }
 
 export function WelcomePreview({ message, serverName }: { message: string; serverName: string }) {
+  const t = view.useTranslations();
+  const ft = useFormText();
   return (
     <Box>
       <Text fontSize="sm" color="TextSecondary" mb={2}>
-        Preview
+        {t.preview}
       </Text>
       <Flex
         bg="CardBackground"
@@ -60,7 +64,7 @@ export function WelcomePreview({ message, serverName }: { message: string; serve
             </Text>
           ) : (
             <Text fontSize="sm" color="TextSecondary" fontStyle="italic">
-              Your welcome message will appear here…
+              {ft('Your welcome message will appear here…')}
             </Text>
           )}
         </Box>

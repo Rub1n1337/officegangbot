@@ -105,7 +105,7 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
           </Flex>
           <Progress value={62} size="sm" rounded="full" colorScheme="purple" />
           <Text fontSize="xs" color="TextSecondary" mt={1.5}>
-            620 / 1,000 XP · 380 to level 6
+            620 / 1,000 XP · 380 {ft('to level')} 6
           </Text>
         </Box>
 
