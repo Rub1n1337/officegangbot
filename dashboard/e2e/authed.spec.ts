@@ -86,6 +86,23 @@ test('the guild landing redirects to the Overview', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/guilds/${GUILD_ID}/settings`));
 });
 
+test('a feature card enables in place — the core onboarding loop', async ({ page }) => {
+  // "Включить" used to be a link to a disabled config form the user had to
+  // enable again — the Enable button didn't enable. It now enables from the
+  // grid, so the card flips to "Настроить" and the user stays on the overview
+  // (the setup banner counts from the same cache, so it ticks up too).
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('Здоровье сервера').first()).toBeVisible({ timeout: 15_000 });
+  const enable = page.getByRole('button', { name: 'Включить' });
+  // Wait for the feature grid to render before counting — it loads after the
+  // header, so reading the count too early sees zero.
+  await expect(enable.first()).toBeVisible({ timeout: 15_000 });
+  const before = await enable.count();
+  await enable.first().click();
+  await expect(enable).toHaveCount(before - 1, { timeout: 5_000 });
+  await expect(page).toHaveURL(new RegExp(`/guilds/${GUILD_ID}/settings`)); // stayed put
+});
+
 test('English locale has no Russian left in the shell', async ({ page }) => {
   // The Iris screens were authored in Russian and translated via ui-text.ts;
   // a missing entry falls back to the Russian source, which is invisible until
