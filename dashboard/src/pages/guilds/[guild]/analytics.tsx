@@ -8,6 +8,7 @@ import {
   SimpleGrid,
   Skeleton,
   Text,
+  useBreakpointValue,
 } from '@chakra-ui/react';
 import { MdInsights } from 'react-icons/md';
 import { useMemo, useState } from 'react';
@@ -113,7 +114,7 @@ function ChartCard({
 // in UTC; shift each cell by the browser's UTC offset so the chart reads in
 // the viewer's local time. ApexCharts draws the first series at the bottom,
 // so reverse to put Monday on top.
-function heatmapSeries(cells: AnalyticsData['heatmap'], tt: (ru: string) => string) {
+function heatmapSeries(cells: AnalyticsData['heatmap'], tt: (ru: string) => string, compact = false) {
   const offsetH = Math.round(-new Date().getTimezoneOffset() / 60);
   const byKey = new Map(
     cells.map((c) => {
@@ -122,9 +123,19 @@ function heatmapSeries(cells: AnalyticsData['heatmap'], tt: (ru: string) => stri
       return [key, c.count];
     })
   );
+  // On a phone, 24 hourly columns squash into unreadable slivers. Fold them into
+  // six 4-hour blocks (00–04 … 20–24) so cells stay legible without scrolling.
+  const cols = compact ? 6 : 24;
+  const span = compact ? 4 : 1;
   return WEEKDAYS.map((name, wd) => ({
     name: tt(name),
-    data: Array.from({ length: 24 }, (_, h) => ({ x: `${h}`, y: byKey.get(wd * 24 + h) ?? 0 })),
+    data: Array.from({ length: cols }, (_, i) => {
+      const start = i * span;
+      let y = 0;
+      for (let h = start; h < start + span; h++) y += byKey.get(wd * 24 + h) ?? 0;
+      const x = compact ? `${String(start).padStart(2, '0')}–${start + span}` : `${start}`;
+      return { x, y };
+    }),
   })).reverse();
 }
 
@@ -199,7 +210,13 @@ function downloadCsv(filename: string, csv: string) {
 
 function AnalyticsBody({ data }: { data: AnalyticsData }) {
   const tt = useText();
-  const heatmap = useMemo(() => heatmapSeries(data.heatmap, tt), [data.heatmap, tt]);
+  // Fold 24 hourly columns into six 4-hour blocks below md, where they'd
+  // otherwise be unreadable slivers. useBreakpointValue re-runs on resize.
+  const compactHeatmap = useBreakpointValue({ base: true, md: false }) ?? false;
+  const heatmap = useMemo(
+    () => heatmapSeries(data.heatmap, tt, compactHeatmap),
+    [data.heatmap, tt, compactHeatmap]
+  );
   const actions = useMemo(() => pivotActions(data.modActionsByDay), [data.modActionsByDay]);
   const tickets = useMemo(
     () => ticketSeries(data.ticketsOpenedByDay, data.ticketsClosedByDay, tt),
@@ -243,7 +260,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
             plotOptions: { heatmap: { radius: 2, enableShades: true, shadeIntensity: 0.55 } },
             xaxis: {
               type: 'category',
-              tickAmount: 12,
+              tickAmount: compactHeatmap ? 6 : 12,
               labels: { rotate: 0 },
             },
             tooltip: { y: { formatter: (v: number) => `${v} ${tt('сообщений')}` } },
