@@ -235,6 +235,21 @@ for (const [name, path] of MOBILE_PAGES) {
   });
 }
 
+test('audit rows do not crush their text to a sliver on a phone', async ({ page }) => {
+  // The sideways-scroll check above is blind to this: a fixed date column and a
+  // wide action badge squeezed the actor+description text to ~40px, so it wrapped
+  // one character per line — tall, not wide, no overflow. Assert the text block
+  // that carries "<actor> <action>" is a readable width at phone size.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(`/ru/guilds/${GUILD_ID}/audit`);
+  const line = page.getByText(/изменил настройки/).first();
+  await expect(line).toBeVisible({ timeout: 15_000 });
+  const box = await line.boundingBox();
+  expect(box, 'audit description has no box').not.toBeNull();
+  // Crushed-to-a-column is ~40px; a healthy line on a 375px screen is 200px+.
+  expect(box!.width, 'audit text is crushed into a narrow column on mobile').toBeGreaterThan(150);
+});
+
 test('Tickets list shows the subject, not just the opener', async ({ page }) => {
   await page.goto(`/ru/guilds/${GUILD_ID}/tickets`);
   await expect(page.getByText('Cannot access the voice channels')).toBeVisible({ timeout: 15_000 });

@@ -73,7 +73,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   return (
     <Flex
       align="center"
-      gap="16px"
+      gap={{ base: '10px', md: '16px' }}
       px={{ base: '16px', md: '28px' }}
       py="15px"
       borderBottom="1px solid"
@@ -114,7 +114,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           {(guild?.name ?? 'OG').slice(0, 2).toUpperCase()}
         </Flex>
       )}
-      <Box lineHeight="1.25" minW={0}>
+      <Box lineHeight="1.25" minW={0} flex="1">
         <Text fontSize="15px" fontWeight="700" noOfLines={1}>
           {guild?.name ?? '—'}
         </Text>
@@ -123,16 +123,21 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
             w="7px"
             h="7px"
             rounded="full"
+            flexShrink={0}
             bg={online ? 'green.400' : 'secondaryGray.500'}
             animation={online ? `${pulse} 2.4s infinite` : undefined}
           />
-          {online
-            ? `${(stats?.member_count ?? 0).toLocaleString('ru-RU')} ${tt('участников')}`
-            : tt('Бот офлайн')}
+          {/* noOfLines keeps "7 участников" on one line — it was stacking one
+              word per line when the action cluster squeezed this block. */}
+          <Text as="span" noOfLines={1}>
+            {online
+              ? `${(stats?.member_count ?? 0).toLocaleString('ru-RU')} ${tt('участников')}`
+              : tt('Бот офлайн')}
+          </Text>
         </Flex>
       </Box>
 
-      <Flex ml="auto" align="center" gap="10px">
+      <Flex ml="auto" align="center" gap={{ base: '6px', md: '10px' }} flexShrink={0}>
         <Flex
           as="button"
           display={{ base: 'none', md: 'flex' }}
