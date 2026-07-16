@@ -204,6 +204,37 @@ for (const feature of RU_FEATURE_FORMS) {
   });
 }
 
+// 320px is the narrowest phone still in use (iPhone SE 1st gen, small Android).
+// A page wider than its viewport scrolls sideways — the classic mobile break —
+// and it's invisible at the 375px the design targets: a fixed 344px popover, or
+// two buttons that won't wrap, only spill once the screen is under their width.
+const MOBILE_PAGES: Array<[string, string]> = [
+  ['Overview', `/guilds/${GUILD_ID}/settings`],
+  ['Moderation', `/guilds/${GUILD_ID}/moderation`],
+  ['Members', `/guilds/${GUILD_ID}/members`],
+  ['Tickets', `/guilds/${GUILD_ID}/tickets`],
+  ['Analytics', `/guilds/${GUILD_ID}/analytics`],
+  ['Audit', `/guilds/${GUILD_ID}/audit`],
+  ['Profile', '/user/profile'],
+  ['Form: automod', `/guilds/${GUILD_ID}/features/automod`],
+  ['Form: levels', `/guilds/${GUILD_ID}/features/levels`],
+];
+
+for (const [name, path] of MOBILE_PAGES) {
+  test(`no sideways scroll at 320px — ${name}`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 780 });
+    await page.goto(`/ru${path}`);
+    await page.waitForTimeout(1500);
+    const { scrollW, clientW } = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth,
+    }));
+    expect(scrollW, `${name} scrolls sideways at 320px (something is wider than the screen)`).toBeLessThanOrEqual(
+      clientW + 1
+    );
+  });
+}
+
 test('Tickets list shows the subject, not just the opener', async ({ page }) => {
   await page.goto(`/ru/guilds/${GUILD_ID}/tickets`);
   await expect(page.getByText('Cannot access the voice channels')).toBeVisible({ timeout: 15_000 });

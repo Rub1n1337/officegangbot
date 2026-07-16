@@ -421,7 +421,26 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
                     {timeAgo(a.createdAt, lang)}
                   </Text>
                   {a.status === 'pending' && (
-                    <Flex ml="auto" gap="8px" flexShrink={0}>
+                    // Full-width on its own line on a phone (the two buttons
+                    // don't fit beside the name under ~360px); inline and
+                    // right-aligned from sm up.
+                    <Flex
+                      gap="8px"
+                      ml="auto"
+                      flexShrink={0}
+                      // Side by side the two Russian labels are ~270px, wider
+                      // than this row on a small phone, and flex items don't
+                      // shrink below their content — so stack them full-width
+                      // below ~380px. (A raw media query: responsive prop
+                      // objects weren't resolving on this deeply-nested node.)
+                      sx={{
+                        '@media (max-width: 380px)': {
+                          flexDirection: 'column',
+                          width: '100%',
+                          marginLeft: 0,
+                        },
+                      }}
+                    >
                       <Button
                         size="sm"
                         rounded="9px"

@@ -34,7 +34,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
   const initials = (name?: string) => (name ?? 'OG').slice(0, 2).toUpperCase();
 
   return (
-    <Popover isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-start" gutter={6}>
+    <Popover isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-start" gutter={6} isLazy>
       <PopoverTrigger>
         <Flex
           as="button"
@@ -67,6 +67,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
       <Portal>
         <PopoverContent
           w="258px"
+          maxW="calc(100vw - 24px)"
           bg="CardBackground"
           border="1px solid"
           borderColor="CardBorder"

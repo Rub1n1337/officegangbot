@@ -197,6 +197,9 @@ export function NotificationsBell({ guild }: { guild: string }) {
       onClose={onClose}
       placement="bottom-end"
       gutter={8}
+      // Without this the 344px-wide content is mounted and positioned even
+      // while closed, pushing every server page sideways below ~344px wide.
+      isLazy
     >
       <PopoverTrigger>
         <Flex
@@ -241,6 +244,7 @@ export function NotificationsBell({ guild }: { guild: string }) {
       <Portal>
         <PopoverContent
           w="344px"
+          maxW="calc(100vw - 24px)"
           bg="CardBackground"
           border="1px solid"
           borderColor="CardBorder"
