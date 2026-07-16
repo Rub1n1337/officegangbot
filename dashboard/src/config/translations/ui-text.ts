@@ -296,6 +296,38 @@ const EN: Record<string, string> = {
   'Активности пока нет. Хитмап считает сообщения по дням недели и часам — первые точки появятся, как только на сервере начнут общаться (обычно в течение часа).':
     'No activity yet. The heatmap counts messages by weekday and hour — the first cells appear once people start chatting (usually within the hour).',
   'история копится с этого момента': 'history starts accumulating now',
+
+  // --- Command palette: footer hints ------------------------------------------
+  'навигация': 'to navigate',
+  'открыть': 'to open',
+  'закрыть': 'to close',
+
+  // --- Command palette: SETTINGS_INDEX labels ---------------------------------
+  'Блокировка инвайтов': 'Block invite links',
+  'Блокировка внешних ссылок': 'Block external links',
+  'Пороги анти-спама': 'Anti-spam thresholds',
+  'Лимит упоминаний': 'Mention limit',
+  'Система страйков': 'Strike system',
+  'Свои regex-фильтры': 'Custom regex filters',
+  'Пробный режим AutoMod': 'AutoMod dry-run',
+  'Исключения AutoMod': 'AutoMod exemptions',
+  'Роли модераторов': 'Moderator roles',
+  'Авто-эскалация предупреждений': 'Warning auto-escalation',
+  'Пороги анти-рейда': 'Anti-raid thresholds',
+  'Роль верифицированного': 'Verified role',
+  'Приветственное сообщение': 'Welcome message',
+  'Авто-роль': 'Autorole',
+  'Канал и награды за уровни': 'Level-up channel & rewards',
+  'Голосовой опыт и множители': 'Voice XP & multipliers',
+  'Престиж и сезоны': 'Prestige & seasons',
+  'Роль поддержки и категория тикетов': 'Ticket support role & category',
+  'Автозакрытие тикетов': 'Ticket auto-close',
+  'Каналы логов': 'Log channels',
+  'Запрещённые слова': 'Banned words',
+  'Меню ролей (стиль, роли)': 'Role menus (style, roles)',
+  'Реакция на существующем сообщении': 'Reaction on an existing message',
+  'Канал и текст правил': 'Rules channel & message',
+  'Отложенные сообщения': 'Scheduled messages',
 };
 
 export function useText() {

@@ -144,6 +144,31 @@ test('overlays are localized too — palette, notifications, server picker', asy
   expect(pickerText, 'Cyrillic in the English server picker').not.toMatch(cyrillic);
 });
 
+test('the Russian palette is Russian — names, settings and footer', async ({ page }) => {
+  // The mirror of the test above, and the one that matters more: the palette
+  // read feature names straight from the English config, its setting labels
+  // were English-only, and the footer hints were never translated at all. The
+  // "no Cyrillic on /en" checks are blind to all three by construction.
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText(/Здоровье сервера/).first()).toBeVisible({ timeout: 15_000 });
+
+  await page.keyboard.press('Control+k');
+  await expect(page.getByText('Статистика')).toBeVisible();  // wait out router hydration
+
+  // Read the default list — feature names and the footer — before typing:
+  // typing filters the list down and would leave almost nothing to check.
+  const text = (await page.locator('.chakra-modal__content').first().innerText())
+    // The server's own name and the literal key cap stay as they are.
+    .replace(/Trials Gang/g, '')
+    .replace(/\besc\b/g, '');
+  expect(text.length, 'palette read before its commands rendered').toBeGreaterThan(120);
+  expect(text, 'Latin text in the Russian command palette').not.toMatch(/[A-Za-z]/);
+
+  // And a settings hit, which only appears once the admin types.
+  await page.keyboard.type('страйк');
+  await expect(page.getByText('Система страйков')).toBeVisible();
+});
+
 test('Tickets list shows the subject, not just the opener', async ({ page }) => {
   await page.goto(`/ru/guilds/${GUILD_ID}/tickets`);
   await expect(page.getByText('Cannot access the voice channels')).toBeVisible({ timeout: 15_000 });
