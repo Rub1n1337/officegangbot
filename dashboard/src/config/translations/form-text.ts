@@ -1,4 +1,5 @@
 import { provider } from './provider';
+import { reportMissingKey } from './report-missing';
 
 // Russian translations for the feature-form UI strings (labels, descriptions,
 // placeholders, section headers, buttons). Keyed by the exact English source so
@@ -321,5 +322,10 @@ const RU: Record<string, string> = {
 
 export function useFormText() {
   const lang = provider.useLang();
-  return (en: string): string => (lang === 'ru' ? RU[en] ?? en : en);
+  return (en: string): string => {
+    if (lang !== 'ru') return en;
+    const ru = RU[en];
+    if (ru === undefined) reportMissingKey('form-text', en);
+    return ru ?? en;
+  };
 }
