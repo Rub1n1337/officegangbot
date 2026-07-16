@@ -144,12 +144,12 @@ export function UpdateFeaturePanel({
               color: enabled ? 'green.400' : 'TextSecondary',
             }}
           >
-            {enabled ? 'Enabled' : 'Disabled'}
+            {enabled ? t.status.enabled : t.status.disabled}
           </Box>
           <Switch
             variant="main"
             size="lg"
-            aria-label={`${enabled ? 'Disable' : 'Enable'} ${name}`}
+            aria-label={`${enabled ? t.status.switch_off : t.status.switch_on} ${name}`}
             isChecked={enabled}
             isDisabled={enableMutation.isLoading || guildQuery.isLoading}
             onChange={(e) => onSwitch(e.target.checked)}
@@ -198,10 +198,10 @@ export function UpdateFeaturePanel({
             >
               <Icon as={IoLockClosed} boxSize={7} color="TextSecondary" />
               <Text fontWeight="600" fontSize="lg">
-                This feature is off
+                {t.status.off_title}
               </Text>
               <Text color="TextSecondary" fontSize="sm">
-                Enable it to configure and save its settings.
+                {t.status.off_description}
               </Text>
               <Button
                 variant="action"

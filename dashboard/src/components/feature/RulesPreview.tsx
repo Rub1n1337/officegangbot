@@ -1,5 +1,7 @@
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { Fragment, ReactNode } from 'react';
+import { feature as view } from '@/config/translations/feature';
+import { useFormText } from '@/config/translations/form-text';
 
 /**
  * A lightweight, dependency-free approximation of how the rules message will
@@ -65,22 +67,24 @@ export function RulesPreview({
   reactionEnabled?: boolean;
   reactionEmoji?: string;
 }) {
+  const t = view.useTranslations();
+  const ft = useFormText();
   const empty = !message.trim();
   return (
     <Box>
       <Text fontSize="sm" color="TextSecondary" mb={2}>
-        Preview
+        {t.preview}
       </Text>
       {/* Discord-embed-style card: colored accent bar + body. */}
       <Flex bg="CardBackground" rounded="md" overflow="hidden" border="1px solid" borderColor="CardBorder">
         <Box w="4px" bg="Brand" flexShrink={0} />
         <Box p={4} flex="1" minW={0}>
           <Text fontWeight="700" mb={2}>
-            📜 Server Rules
+            📜 {ft('Server Rules')}
           </Text>
           {empty ? (
             <Text fontSize="sm" color="TextSecondary" fontStyle="italic">
-              Your rules message will appear here as you type…
+              {ft('Your rules message will appear here as you type…')}
             </Text>
           ) : (
             <Flex direction="column" gap={1}>

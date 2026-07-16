@@ -169,6 +169,41 @@ test('the Russian palette is Russian — names, settings and footer', async ({ p
   await expect(page.getByText('Система страйков')).toBeVisible();
 });
 
+/**
+ * Text that is Latin on purpose and must not fail the check below: slash
+ * commands, @-mentions, brand names, template tokens, and the fixture's own
+ * data (a server name, a banned word, a rules message).
+ */
+function stripLegitimateLatin(text: string): string {
+  return text
+    .replace(/\/[a-z_]+/g, ' ')             // /rank, /season_reset
+    .replace(/@[a-zA-Z]+/g, ' ')            // @everyone, @here, @NewMember
+    .replace(/\{[^}]*\}/g, ' ')             // {user.mention}, {server.name}
+    .replace(/https?:\S+|[a-z0-9-]+\.(gg|com|org)/g, ' ')
+    .replace(/OfficeGangBot|Trials Gang|e2e-admin|AutoMod|Discord|BOT|XP|ID|regex/g, ' ')
+    .replace(/Loading\.\.\./g, ' ');        // Chakra's Spinner sr-only label
+}
+
+const RU_FEATURE_FORMS = [
+  'automod', 'anti-raid', 'tickets', 'levels', 'rules', 'welcome-message',
+  'moderation', 'logging', 'verification', 'reaction-menus', 'scheduled-messages',
+];
+
+for (const feature of RU_FEATURE_FORMS) {
+  test(`the ${feature} form is Russian on /ru`, async ({ page }) => {
+    // The form tests above only assert a marker renders and nothing throws.
+    // Nobody checked what language the forms speak, and the answer was: partly
+    // English. Every page said "Enabled"/"Disabled", the seven disabled ones
+    // said "This feature is off — Enable it to configure and save its
+    // settings.", and the counters said "1 banned word".
+    await page.goto(`/ru/guilds/${GUILD_ID}/features/${feature}`);
+    await expect(page.getByText(/Включено|Выключено/).first()).toBeVisible({ timeout: 15_000 });
+
+    const text = stripLegitimateLatin(await page.locator('main, body').first().innerText());
+    expect(text, `English text on the Russian ${feature} form`).not.toMatch(/[A-Za-z]{3}/);
+  });
+}
+
 test('Tickets list shows the subject, not just the opener', async ({ page }) => {
   await page.goto(`/ru/guilds/${GUILD_ID}/tickets`);
   await expect(page.getByText('Cannot access the voice channels')).toBeVisible({ timeout: 15_000 });

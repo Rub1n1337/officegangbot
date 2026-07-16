@@ -8,6 +8,9 @@ import { reportMissingKey } from './report-missing';
 // translation keys through every form component.
 const RU: Record<string, string> = {
   // --- Shared ---------------------------------------------------------------
+  // react-select's built-in messages, which are English by default.
+  'Loading...': 'Загрузка…',
+  'No options': 'Ничего не найдено',
   Channel: 'Канал',
   'Select a category': 'Выберите категорию',
   'Select a Date': 'Выберите дату',
@@ -310,6 +313,11 @@ const RU: Record<string, string> = {
     'Новые каналы тикетов создаются в этой категории',
 
   // --- Welcome --------------------------------------------------------------
+  'Server Rules': 'Правила сервера',
+  'Your welcome message will appear here…': 'Текст приветствия появится здесь…',
+  'Your rules message will appear here as you type…':
+    'Текст правил появится здесь по мере ввода…',
+  'to level': 'до уровня',
   'Where to send the welcome message': 'Куда отправлять приветствие',
   'The welcome message. Use {user.mention} to mention the new member and {server.name} for the server name.':
     'Текст приветствия. {user.mention} — упоминание нового участника, {server.name} — название сервера.',

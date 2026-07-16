@@ -35,6 +35,7 @@ import { NumberStepper } from '@/components/forms/NumberStepper';
 import { ChannelMultiSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleMultiSelectForm } from '@/components/forms/RoleSelect';
 import { useFormText } from '@/config/translations/form-text';
+import { provider, type Languages } from '@/config/translations/provider';
 import type { AutomodFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
 
@@ -92,6 +93,7 @@ function normalizeDomains(raw: string): string[] {
 
 function DomainsInput({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
   const ft = useFormText();
+  const lang = provider.useLang();
   const [input, setInput] = useState('');
   const add = (raw: string) => {
     onChange(Array.from(new Set([...value, ...normalizeDomains(raw)])).sort());
@@ -127,15 +129,46 @@ function DomainsInput({ value, onChange }: { value: string[]; onChange: (next: s
         onBlur={() => input.trim() && add(input)}
       />
       <Text fontSize="xs" color="TextSecondary" mt={1}>
-        {value.length} allowed domain{value.length === 1 ? '' : 's'}
+        {value.length} {pluralAllowedDomains(value.length, lang)}
       </Text>
     </Box>
   );
 }
 
+// Russian needs three plural forms where English needs two, so these counters
+// can't be built by tacking an "s" onto a translated noun.
+function plural(
+  n: number,
+  lang: Languages,
+  en: [one: string, many: string],
+  ru: [one: string, few: string, many: string]
+): string {
+  if (lang !== 'ru') return n === 1 ? en[0] : en[1];
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return ru[0];
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return ru[1];
+  return ru[2];
+}
+
+const pluralBannedWords = (n: number, lang: Languages) =>
+  plural(n, lang, ['banned word', 'banned words'], [
+    'запрещённое слово',
+    'запрещённых слова',
+    'запрещённых слов',
+  ]);
+
+const pluralAllowedDomains = (n: number, lang: Languages) =>
+  plural(n, lang, ['allowed domain', 'allowed domains'], [
+    'разрешённый домен',
+    'разрешённых домена',
+    'разрешённых доменов',
+  ]);
+
 // Banned words: lowercase tags, split on space/comma/newline (pasting a list works).
 function WordsInput({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
   const ft = useFormText();
+  const lang = provider.useLang();
   const [input, setInput] = useState('');
   const add = (raw: string) => {
     const words = raw
@@ -175,7 +208,7 @@ function WordsInput({ value, onChange }: { value: string[]; onChange: (next: str
         onBlur={() => input.trim() && add(input)}
       />
       <Text fontSize="xs" color="TextSecondary" mt={1}>
-        {value.length} banned word{value.length === 1 ? '' : 's'}
+        {value.length} {pluralBannedWords(value.length, lang)}
       </Text>
     </Box>
   );

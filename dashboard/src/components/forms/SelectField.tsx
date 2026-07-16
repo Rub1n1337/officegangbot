@@ -10,6 +10,7 @@ import {
 } from 'chakra-react-select';
 import { forwardRef, ReactNode } from 'react';
 import { dark, light } from '@/theme/colors';
+import { useFormText } from '@/config/translations/form-text';
 import { useColorModeValue } from '@chakra-ui/react';
 
 const customComponents = {
@@ -114,11 +115,17 @@ export type Option = OptionBase & {
 };
 
 export const SelectFieldBase = forwardRef<SelectInstance, Props>((props, ref) => {
+  const ft = useFormText();
   return (
     <Select<any, any, any>
       focusBorderColor={useColorModeValue(light.brand, dark.brand)}
       components={customComponents}
       chakraStyles={styles}
+      // react-select's own defaults for these are English, so on /ru the menu
+      // said "Loading..." and "No options" no matter what we translated.
+      // Before the spread, so a caller can still override them.
+      loadingMessage={() => ft('Loading...')}
+      noOptionsMessage={() => ft('No options')}
       ref={ref}
       {...props}
     />
