@@ -18,6 +18,7 @@ import { config } from '@/config/common';
 import { useText } from '@/config/translations/ui-text';
 import { useFeatureMeta } from '@/config/feature-meta';
 import { searchSettings } from '@/config/settings-index';
+import { useChunkErrorRecovery } from '@/utils/useChunkErrorRecovery';
 
 /** Custom event other components can dispatch to open the command palette. */
 export const OPEN_COMMAND_PALETTE = 'open-command-palette';
@@ -283,6 +284,9 @@ function CommandPalette() {
 
 /** Global UI chrome mounted once in _app: route progress bar + command palette. */
 export function AppChrome() {
+  // Recover from stale chunks after a deploy instead of sitting broken until a
+  // manual Ctrl+Shift+R.
+  useChunkErrorRecovery();
   return (
     <>
       <RouteProgress />
