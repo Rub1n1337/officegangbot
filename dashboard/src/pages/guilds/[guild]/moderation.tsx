@@ -250,9 +250,9 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
               <IconButton
                 aria-label={tt('Удалить предупреждение')}
                 icon={<MdDelete />}
-                w="34px"
-                h="34px"
-                minW="34px"
+                w="40px"
+                h="40px"
+                minW="40px"
                 rounded="9px"
                 variant="outline"
                 borderColor="CardBorder"
