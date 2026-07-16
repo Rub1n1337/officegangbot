@@ -86,8 +86,34 @@ function downloadCsv(filename: string, csv: string) {
 
 function AuditRow({ e, lang }: { e: AuditEntry; lang: Languages }) {
   return (
-    <Flex align="flex-start" justify="space-between" gap={3} rounded="11px" p="12px 14px" bg="secondaryGray.100" _dark={{ bg: 'navy.600' }}>
-      <Flex gap={3} minW={0} align="flex-start">
+    // Row on desktop; stacks on a phone. Side by side, a long action badge and
+    // the fixed date column left the middle text almost no width, so the actor
+    // + description wrapped one character per line.
+    // Row on desktop; stacks on a phone. Side by side, a long action badge and
+    // the fixed date column left the middle text almost no width, so the actor
+    // + description wrapped one character per line. NB: this theme sets sm=320px
+    // (breakpoints.ts), so the mobile/desktop switch is `md` — `sm` would apply
+    // from 320px up and miss every phone.
+    <Flex
+      direction={{ base: 'column', md: 'row' }}
+      align={{ base: 'stretch', md: 'flex-start' }}
+      justify="space-between"
+      gap={{ base: 1.5, md: 3 }}
+      rounded="11px"
+      p="12px 14px"
+      bg="secondaryGray.100"
+      _dark={{ bg: 'navy.600' }}
+    >
+      <Flex
+        // Badge above the text on a phone, beside it on desktop. A wide badge
+        // ("ИЗМЕНЕНИЕ ФУНКЦИИ") next to the text left the text column so narrow
+        // it broke mid-word even after the row itself stacked.
+        direction={{ base: 'column', md: 'row' }}
+        align={{ base: 'flex-start', md: 'flex-start' }}
+        gap={{ base: 1, md: 3 }}
+        minW={0}
+        flex="1"
+      >
         <Badge colorScheme={auditActionColor(e.action)} rounded="20px" px="9px" mt="1px" flexShrink={0}>
           {actionLabel(e.action, lang)}
         </Badge>
@@ -105,14 +131,20 @@ function AuditRow({ e, lang }: { e: AuditEntry; lang: Languages }) {
           )}
         </Box>
       </Flex>
-      <Box textAlign="right" flexShrink={0}>
+      <Flex
+        direction={{ base: 'row', md: 'column' }}
+        gap={{ base: 2, md: 0 }}
+        textAlign={{ base: 'left', md: 'right' }}
+        align={{ base: 'baseline', md: 'flex-end' }}
+        flexShrink={0}
+      >
         <Text fontSize="xs" color="TextSecondary">
           {timeAgo(e.createdAt, lang)}
         </Text>
         <Text fontSize="xs" color="TextSecondary" opacity={0.7}>
           {formatDateTime(e.createdAt)}
         </Text>
-      </Box>
+      </Flex>
     </Flex>
   );
 }
