@@ -245,3 +245,40 @@ test('Moderation surfaces a pending appeal with its decision buttons', async ({ 
   await expect(page.getByText('appealer')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: /Одобрить/ })).toBeVisible();
 });
+
+test('a stale chunk after a deploy self-recovers instead of needing a hard reload', async ({ page }) => {
+  // The dashboard is a client-rendered SPA; a deploy renames every chunk and
+  // deletes the old ones, so a tab open across the deploy asks for a chunk that
+  // 404s and sits broken until Ctrl+Shift+R. useChunkErrorRecovery reloads once.
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText(/Здоровье сервера/).first()).toBeVisible({ timeout: 15_000 });
+
+  await page.evaluate(() => ((window as unknown as { __alive: boolean }).__alive = true));
+  await page.evaluate(() => {
+    const err = Object.assign(new Error('Loading chunk 42 failed'), { name: 'ChunkLoadError' });
+    window.dispatchEvent(
+      new PromiseRejectionEvent('unhandledrejection', { promise: Promise.reject(err), reason: err })
+    );
+  });
+  await page.waitForTimeout(1200);
+  // A reload wipes the window tag; an unrelated error would have left it set.
+  expect(
+    await page.evaluate(() => (window as unknown as { __alive?: boolean }).__alive),
+    'the page did not reload itself on a chunk-load error'
+  ).toBeUndefined();
+
+  // And an unrelated rejection must NOT reload, or the app would thrash.
+  await expect(page.getByText(/Здоровье сервера/).first()).toBeVisible({ timeout: 15_000 });
+  await page.evaluate(() => ((window as unknown as { __alive: boolean }).__alive = true));
+  await page.evaluate(() => {
+    const err = new Error('an unrelated runtime error');
+    window.dispatchEvent(
+      new PromiseRejectionEvent('unhandledrejection', { promise: Promise.reject(err), reason: err })
+    );
+  });
+  await page.waitForTimeout(800);
+  expect(
+    await page.evaluate(() => (window as unknown as { __alive?: boolean }).__alive),
+    'an unrelated error should not trigger a reload'
+  ).toBe(true);
+});
