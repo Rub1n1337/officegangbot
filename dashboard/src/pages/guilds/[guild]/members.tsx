@@ -488,7 +488,21 @@ const MembersPage: NextPageWithLayout = () => {
           <Text color="TextSecondary">{tt('Не удалось загрузить участника.')}</Text>
         )
       ) : !hasQuery ? (
-        <Text color="TextSecondary">{tt('Введите минимум 2 символа для поиска.')}</Text>
+        // Before a search this page was a bare grey line in a sea of empty
+        // space. A centered prompt fills it and says what the page is for.
+        <Flex direction="column" align="center" textAlign="center" py="56px" gap="14px">
+          <Flex w="58px" h="58px" rounded="18px" bg="brandAlpha.100" align="center" justify="center">
+            <Icon as={IoSearch} boxSize="27px" color="brand.200" />
+          </Flex>
+          <Box>
+            <Text fontWeight="700" fontSize="16px">
+              {tt('Найдите участника')}
+            </Text>
+            <Text color="TextSecondary" fontSize="14px" mt="5px" maxW="380px" lineHeight="1.5">
+              {tt('Введите имя или @ник, чтобы открыть историю, предупреждения и заметки — и применить меры.')}
+            </Text>
+          </Box>
+        </Flex>
       ) : search.isLoading ? (
         <Flex direction="column" gap={2}>
           <Skeleton h="56px" rounded="xl" />

@@ -120,6 +120,9 @@ const EN: Record<string, string> = {
   'Поиск по имени или @нику…': 'Search by name or @handle…',
   'Не удалось загрузить участника.': 'Failed to load the member.',
   'Введите минимум 2 символа для поиска.': 'Type at least 2 characters to search.',
+  'Найдите участника': 'Find a member',
+  'Введите имя или @ник, чтобы открыть историю, предупреждения и заметки — и применить меры.':
+    'Type a name or @handle to open their history, warnings and notes — and take action.',
   'Никого не найдено по': 'Nobody found for',
   'Действия': 'Actions',
   'Предупредить': 'Warn',
