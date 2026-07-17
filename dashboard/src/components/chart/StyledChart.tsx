@@ -13,7 +13,12 @@ export function StyledChart(props: ChartProps) {
   ]);
 
   const options: ApexCharts.ApexOptions = {
+    // Without a theme mode + transparent background the chart keeps a white
+    // canvas in dark mode — most visible on the heatmap, whose zero-value cells
+    // shade toward white and lit up as a bright block on the dark card.
+    theme: { mode: theme },
     chart: {
+      background: 'transparent',
       toolbar: {
         show: false,
       },
