@@ -179,10 +179,17 @@ class RedisManager:
     # XP Cooldowns
     # -------------------------
 
-    async def check_xp_cooldown(self, guild_id: int, user_id: int) -> bool:
+    async def check_xp_cooldown(self, guild_id: int, user_id: int) -> Optional[bool]:
         """
-        Returns True if user is on XP cooldown (sent message < 60s ago).
-        Uses Redis SET NX with TTL for atomic cooldown check.
+        Returns True if the user is on XP cooldown (sent a message < 60s ago),
+        False if not (and the cooldown was just set), or **None if Redis
+        couldn't answer**. Uses Redis SET NX with TTL for an atomic
+        check-and-set.
+
+        The None case matters: returning False on error used to mean "not on
+        cooldown", so every message during a Redis blip granted XP with no
+        cooldown at all — unbounded XP farming. None lets the caller fall back
+        to the in-memory cooldown instead.
         """
         try:
             key = f"xp_cooldown:{guild_id}:{user_id}"
@@ -190,7 +197,7 @@ class RedisManager:
             return result is None  # None = key existed = on cooldown
         except Exception as e:
             logger.error(f"Redis XP cooldown error: {e}")
-            return False
+            return None
 
     # -------------------------
     # AutoMod message log
