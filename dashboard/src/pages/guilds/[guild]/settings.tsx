@@ -30,7 +30,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useEnableFeatureMutation } from '@/api/hooks';
 import { getFeature, updateFeature } from '@/api/bot';
 import { useSession } from '@/utils/auth/hooks';
 import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
@@ -364,6 +364,7 @@ function FeatureCard({
 }) {
   const m = meta.feature(feature.id, feature.name, feature.description);
   const tt = useText();
+  const enableMut = useEnableFeatureMutation();
   return (
     <Flex
       direction="column"
@@ -416,9 +417,11 @@ function FeatureCard({
             {tt('Настроить')}
           </Button>
         ) : (
+          // Enable in place — the button says "Enable", so it should enable,
+          // not just open a disabled form the user has to enable again. The
+          // card flips to "on" and the setup banner ticks up from the same
+          // cache update, so the whole checklist can be done from here.
           <Button
-            as={Link}
-            href={`/guilds/${guild}/features/${feature.id}`}
             size="sm"
             rounded="10px"
             color="white"
@@ -426,6 +429,8 @@ function FeatureCard({
             boxShadow="0 6px 16px -7px rgba(110,86,245,.7)"
             _hover={{ filter: 'brightness(1.08)' }}
             leftIcon={<Icon as={MdAdd} boxSize="16px" />}
+            isLoading={enableMut.isLoading}
+            onClick={() => enableMut.mutate({ guild, feature: feature.id, enabled: true })}
           >
             {tt('Включить')}
           </Button>
