@@ -203,11 +203,15 @@ class RedisManager:
     # AutoMod message log
     # -------------------------
 
-    async def log_message(self, guild_id: int, user_id: int, window: int = 3) -> int:
+    async def log_message(self, guild_id: int, user_id: int, window: int = 3) -> Optional[int]:
         """
-        Records a message timestamp for spam detection.
-        Returns count of messages in the last `window` seconds.
-        Uses Redis sorted set with timestamp as score.
+        Records a message timestamp for spam detection and returns the count of
+        messages in the last `window` seconds, or **None if Redis couldn't
+        answer**. Uses a Redis sorted set with the timestamp as score.
+
+        None (not 0) on error is deliberate: returning 0 read as "no spam", so a
+        Redis blip silently switched spam detection off. None lets the caller
+        fall back to its in-memory counter — the same fix as check_xp_cooldown.
         """
         try:
             window = max(1, int(window))
@@ -222,7 +226,7 @@ class RedisManager:
             return results[2]  # zcard result
         except Exception as e:
             logger.error(f"Redis log_message error: {e}")
-            return 0
+            return None
 
     async def clear_message_log(self, guild_id: int, user_id: int) -> None:
         """Clears message log for a user after mute."""
