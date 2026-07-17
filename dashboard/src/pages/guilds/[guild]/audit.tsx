@@ -208,7 +208,7 @@ const AuditPage: NextPageWithLayout = () => {
         </Text>
       </Box>
 
-      <QueryStatus query={query} loading={<AuditSkeleton />} error="Failed to load the audit log.">
+      <QueryStatus query={query} loading={<AuditSkeleton />} error={tt('Не удалось загрузить журнал.')}>
         <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" gap={3} mb={4} wrap="wrap">
             <InputGroup maxW="260px">

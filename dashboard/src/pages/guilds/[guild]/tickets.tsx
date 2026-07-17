@@ -342,7 +342,7 @@ const TicketsPage: NextPageWithLayout = () => {
         </Text>
       </Box>
 
-      <QueryStatus query={query} loading={<TicketsSkeleton />} error="Failed to load tickets.">
+      <QueryStatus query={query} loading={<TicketsSkeleton />} error={tt('Не удалось загрузить тикеты.')}>
         <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" justify="space-between" gap={3} mb={4} wrap="wrap">
             <Flex gap={3} wrap="wrap" flex={1} w={{ base: 'full', sm: 'auto' }}>

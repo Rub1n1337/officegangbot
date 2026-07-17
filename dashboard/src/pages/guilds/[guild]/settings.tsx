@@ -743,7 +743,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
         </Flex>
       </Flex>
 
-      <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error="Failed to load guild stats.">
+      <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error={tt('Не удалось загрузить статистику сервера.')}>
         {statsQuery.data && <OverviewMetrics stats={statsQuery.data} />}
       </QueryStatus>
 

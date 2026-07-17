@@ -9,6 +9,17 @@ import { reportMissingKey } from './report-missing';
 // renders an empty string. Interpolated values (counts, names) stay outside
 // the keys: components pass only the static fragments through t().
 const EN: Record<string, string> = {
+  // --- Error states (ErrorPanel + per-page query failures) -------------------
+  'Бот запускается или временно недоступен.':
+    'The bot may be starting up or temporarily unreachable.',
+  'Повторить': 'Try again',
+  'Не удалось загрузить данные модерации.': 'Failed to load moderation data.',
+  'Не удалось загрузить тикеты.': 'Failed to load tickets.',
+  'Не удалось загрузить аналитику.': 'Failed to load analytics.',
+  'Не удалось загрузить журнал.': 'Failed to load the audit log.',
+  'Не удалось загрузить статистику сервера.': 'Failed to load guild stats.',
+  'Не удалось загрузить данные пользователя.': 'Failed to load user info.',
+
   // --- Shell (sidebar / header / popovers) -----------------------------------
   'Панель управления': 'Control panel',
   'Поиск…': 'Search…',
