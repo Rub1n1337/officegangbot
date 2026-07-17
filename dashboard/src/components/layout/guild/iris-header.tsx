@@ -89,6 +89,9 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
         </IconBtn>
       </Flex>
 
+      {/* The guild avatar is the least useful thing in a cramped header — the
+          sidebar and server picker both show it. Hide it under 380px so the
+          server name isn't crushed to "T…" on the narrowest phones. */}
       {guild?.icon ? (
         <Box
           as="img"
@@ -98,6 +101,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           h="34px"
           rounded="11px"
           objectFit="cover"
+          display={{ base: 'none', '2sm': 'block' }}
         />
       ) : (
         <Flex
@@ -110,6 +114,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           color="white"
           fontWeight="700"
           fontSize="13px"
+          display={{ base: 'none', '2sm': 'flex' }}
         >
           {(guild?.name ?? 'OG').slice(0, 2).toUpperCase()}
         </Flex>
