@@ -130,18 +130,23 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         user_id = message.author.id
         now = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
-        # Cooldown check via Redis (atomic, cross-process safe)
-        if self.bot.redis:
-            on_cooldown = await self.bot.redis.check_xp_cooldown(guild_id, user_id)
-            if on_cooldown:
-                return
-        else:
-            # Fallback to in-memory cooldown
+        # Cooldown check via Redis (atomic, cross-process safe). Returns
+        # True/False, or None when Redis couldn't answer.
+        on_cooldown = (
+            await self.bot.redis.check_xp_cooldown(guild_id, user_id)
+            if self.bot.redis
+            else None
+        )
+        if on_cooldown is None:
+            # No Redis, or a Redis error — enforce the cooldown in memory so a
+            # blip can't drop it entirely and let a user farm XP every message.
             guild_cooldowns = self._xp_cooldowns.setdefault(guild_id, {})
             last_xp = guild_cooldowns.get(user_id, 0)
             if now - last_xp < 60:
                 return
             guild_cooldowns[user_id] = now
+        elif on_cooldown:
+            return
 
         # Award XP (base per-message roll, then multipliers applied in _grant_xp).
         await self._grant_xp(message.guild, message.author, random.randint(15, 25),
