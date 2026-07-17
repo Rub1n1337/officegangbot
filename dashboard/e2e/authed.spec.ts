@@ -250,6 +250,26 @@ test('audit rows do not crush their text to a sliver on a phone', async ({ page 
   expect(box!.width, 'audit text is crushed into a narrow column on mobile').toBeGreaterThan(150);
 });
 
+test('keyboard focus is visible (WCAG 2.4.7)', async ({ page }) => {
+  // The button theme cleared Chakra's focus shadow and Chakra set a transparent
+  // outline, so keyboard users saw no focus anywhere. Tab to a control and
+  // assert the focus ring has a real (non-transparent) colour.
+  await page.goto(`/ru/guilds/${GUILD_ID}/analytics`);
+  await expect(page.getByText('Тренды и модерация').first()).toBeVisible({ timeout: 15_000 });
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Tab');
+  const ring = await page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || el === document.body) return null;
+    const s = getComputedStyle(el);
+    // Alpha 0 == invisible. Parse the outline colour's alpha.
+    const m = s.outlineColor.match(/rgba?\([^)]*?(?:,\s*([0-9.]+))?\)$/);
+    const alpha = m && m[1] !== undefined ? parseFloat(m[1]) : 1;
+    return { color: s.outlineColor, width: s.outlineWidth, alpha };
+  });
+  expect(ring, 'nothing is focused after tabbing').not.toBeNull();
+  expect(ring!.alpha, `focus ring is invisible (${ring!.color})`).toBeGreaterThan(0);
+});
+
 test('Tickets list shows the subject, not just the opener', async ({ page }) => {
   await page.goto(`/ru/guilds/${GUILD_ID}/tickets`);
   await expect(page.getByText('Cannot access the voice channels')).toBeVisible({ timeout: 15_000 });
