@@ -566,7 +566,7 @@ const ModerationPage: NextPageWithLayout = () => {
       <QueryStatus
         query={query}
         loading={<ModerationSkeleton />}
-        error="Failed to load moderation data."
+        error={tt('Не удалось загрузить данные модерации.')}
       >
         {query.data && (
           <Flex direction="column" gap={5}>

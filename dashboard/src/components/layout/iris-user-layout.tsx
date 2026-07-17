@@ -104,7 +104,7 @@ export default function IrisUserLayout({ children }: { children: ReactNode }) {
           {/* Pages under this layout use useSelfUser() (non-null user), so —
               like the old AppLayout — don't render them until the session
               user has loaded. */}
-          <QueryStatus query={query} loading={<LoadingPanel />} error="Failed to load user info">
+          <QueryStatus query={query} loading={<LoadingPanel />} error={tt('Не удалось загрузить данные пользователя.')}>
             {children}
           </QueryStatus>
         </Box>

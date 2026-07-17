@@ -394,7 +394,7 @@ const AnalyticsPage: NextPageWithLayout = () => {
         </Button>
       </Flex>
 
-      <QueryStatus query={query} loading={<AnalyticsSkeleton />} error="Failed to load analytics.">
+      <QueryStatus query={query} loading={<AnalyticsSkeleton />} error={tt('Не удалось загрузить аналитику.')}>
         {query.data && <AnalyticsBody data={query.data} />}
       </QueryStatus>
     </Flex>
