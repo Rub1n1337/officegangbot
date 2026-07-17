@@ -288,73 +288,59 @@ class AutoModCog(commands.Cog, name="🛡️ AutoMod"):
         # --- Anti-spam (configurable: N messages within a time window) ---
         spam_count = config["spam_count"]
         spam_window = config["spam_window"]
-        if self.bot.redis:
-            msg_count = await self.bot.redis.log_message(guild_id, user_id, spam_window)
-            if msg_count >= spam_count:
-                await self.bot.redis.clear_message_log(guild_id, user_id)
-                if dry_run:
-                    await self._log_automod(
-                        message.guild,
-                        f"🧪 **[Dry-run]** No action — **spam** by {message.author.mention} "
-                        f"(`{user_id}`): {spam_count}+ messages in {spam_window}s "
-                        f"(would time out 10m)."
-                    )
-                else:
-                    try:
-                        await message.channel.send(
-                            t(loc, "automod.spam_timeout", mention=message.author.mention),
-                            delete_after=10
-                        )
-                    except discord.Forbidden:
-                        pass
-                    await self._log_automod(
-                        message.guild,
-                        f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                        f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
-                    )
-                    await self._apply_timeout(message.author, "AutoMod: spam detection")
-                await self._register_strike(message, "spam")
-        else:
-            # Fallback to in-memory if Redis unavailable
+
+        # Count recent messages via Redis (atomic, cross-process). None means
+        # Redis couldn't answer — fall back to the in-memory counter so a Redis
+        # blip can't silently switch spam detection off (the mirror of the XP
+        # cooldown fix).
+        msg_count = (
+            await self.bot.redis.log_message(guild_id, user_id, spam_window)
+            if self.bot.redis
+            else None
+        )
+        used_redis = msg_count is not None
+        user_log = None
+        if not used_redis:
             guild_log = self._message_log.setdefault(guild_id, {})
             user_log = guild_log.setdefault(user_id, [])
-
-            # Keep only messages from within the configured window
-            user_log[:] = [t for t in user_log if now - t < spam_window]
+            # Keep only messages from within the configured window.
+            user_log[:] = [ts for ts in user_log if now - ts < spam_window]
             user_log.append(now)
-
-            # Drop empty per-user/per-guild entries so the fallback dict doesn't
-            # grow unbounded over time (only matters when Redis is unavailable).
+            # Drop empty entries so the fallback dict doesn't grow unbounded.
             for uid in [uid for uid, log in guild_log.items() if not log and uid != user_id]:
                 del guild_log[uid]
             if not guild_log:
                 self._message_log.pop(guild_id, None)
+            msg_count = len(user_log)
 
-            if len(user_log) >= spam_count:
+        if msg_count >= spam_count:
+            # Reset the window so the next burst starts from zero.
+            if used_redis:
+                await self.bot.redis.clear_message_log(guild_id, user_id)
+            elif user_log is not None:
                 user_log.clear()
-                if dry_run:
-                    await self._log_automod(
-                        message.guild,
-                        f"🧪 **[Dry-run]** No action — **spam** by {message.author.mention} "
-                        f"(`{user_id}`): {spam_count}+ messages in {spam_window}s "
-                        f"(would time out 10m)."
+            if dry_run:
+                await self._log_automod(
+                    message.guild,
+                    f"🧪 **[Dry-run]** No action — **spam** by {message.author.mention} "
+                    f"(`{user_id}`): {spam_count}+ messages in {spam_window}s "
+                    f"(would time out 10m)."
+                )
+            else:
+                try:
+                    await message.channel.send(
+                        t(loc, "automod.spam_timeout", mention=message.author.mention),
+                        delete_after=10
                     )
-                else:
-                    try:
-                        await message.channel.send(
-                            t(loc, "automod.spam_timeout", mention=message.author.mention),
-                            delete_after=10
-                        )
-                    except discord.Forbidden:
-                        pass
-
-                    await self._log_automod(
-                        message.guild,
-                        f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
-                        f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
-                    )
-                    await self._apply_timeout(message.author, "AutoMod: spam detection")
-                await self._register_strike(message, "spam")
+                except discord.Forbidden:
+                    pass
+                await self._log_automod(
+                    message.guild,
+                    f"**Spam Detection** — {message.author.mention} (`{user_id}`)\n"
+                    f"Sent {spam_count}+ messages in {spam_window} seconds. Auto-timeout for **10 minutes**."
+                )
+                await self._apply_timeout(message.author, "AutoMod: spam detection")
+            await self._register_strike(message, "spam")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoModCog(bot))
