@@ -142,7 +142,7 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
               {t.status === 'open' ? tt('открыт') : tt('закрыт')}
             </Badge>
           </Flex>
-          <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, sm: 1 }} mt="2px">
+          <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, md: 1 }} mt="2px">
             {t.subject && `${t.openerName ?? t.openerId} · `}
             {tt('Открыт')} {timeAgo(t.openedAt, lang)}
             {t.closedAt && ` · ${tt('закрыт')} ${timeAgo(t.closedAt, lang)}`}
@@ -167,7 +167,7 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
           _hover={{ borderColor: 'brand.400' }}
         >
           <Icon as={MdDescription} />
-          <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
+          <Box as="span" display={{ base: 'none', md: 'inline' }} ml={1.5}>
             {tt('Транскрипт')}
           </Box>
         </Button>
@@ -257,7 +257,7 @@ function TranscriptHits({
                   _hover={{ borderColor: 'brand.400' }}
                 >
                   <Icon as={MdDescription} />
-                  <Box as="span" display={{ base: 'none', sm: 'inline' }} ml={1.5}>
+                  <Box as="span" display={{ base: 'none', md: 'inline' }} ml={1.5}>
                     {tt('Транскрипт')}
                   </Box>
                 </Button>
