@@ -20,6 +20,11 @@ import { useFeatureMeta } from '@/config/feature-meta';
 import { searchSettings } from '@/config/settings-index';
 import { useChunkErrorRecovery } from '@/utils/useChunkErrorRecovery';
 
+// Only real guild paths qualify as palette "recents": a /guilds/undefined/...
+// URL (minted while router.query was hydrating) used to get persisted and
+// re-offered forever, funneling the user back to a dead page.
+const isGuildPath = (p: string) => /^\/guilds\/\d+(\/|$)/.test(p);
+
 /** Custom event other components can dispatch to open the command palette. */
 export const OPEN_COMMAND_PALETTE = 'open-command-palette';
 
@@ -132,14 +137,15 @@ function CommandPalette() {
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => {
     try {
-      setRecent(JSON.parse(localStorage.getItem('palette-recent') ?? '[]'));
+      const stored: string[] = JSON.parse(localStorage.getItem('palette-recent') ?? '[]');
+      setRecent(stored.filter(isGuildPath)); // self-heals poisoned entries
     } catch {
       setRecent([]);
     }
   }, [isOpen]);
   useEffect(() => {
     const path = router.asPath;
-    if (!path.startsWith('/guilds/')) return;
+    if (!isGuildPath(path)) return;
     try {
       const prev: string[] = JSON.parse(localStorage.getItem('palette-recent') ?? '[]');
       const next = [path, ...prev.filter((p) => p !== path)].slice(0, 3);

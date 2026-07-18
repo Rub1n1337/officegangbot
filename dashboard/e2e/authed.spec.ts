@@ -317,6 +317,23 @@ test('the server picker survives a Discord 429 on a hard reload', async ({ page 
   await expect(page.getByText(/Не удалось загрузить ваши серверы/)).toHaveCount(0);
 });
 
+test('a /guilds/undefined URL redirects home without hammering the API', async ({ page }) => {
+  // During hydration the sidebar briefly renders hrefs from an empty
+  // router.query, so an early click landed on /guilds/undefined/... — a dead
+  // page whose every query 403'd on /api/bot/.../undefined (seen live in the
+  // user's console), and the palette persisted it under "recents". Three
+  // layers now stop it: query gates validate the id, the layout redirects, and
+  // recents only keep real guild paths.
+  const bad: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/bot/') && r.url().includes('/undefined')) bad.push(r.url());
+  });
+  await page.goto('/ru/guilds/undefined/moderation');
+  await page.waitForURL(/\/user\/home/, { timeout: 15_000 });
+  await page.waitForTimeout(1000);
+  expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
+});
+
 test('a stale chunk after a deploy self-recovers instead of needing a hard reload', async ({ page }) => {
   // The dashboard is a client-rendered SPA; a deploy renames every chunk and
   // deletes the old ones, so a tab open across the deploy asks for a chunk that
