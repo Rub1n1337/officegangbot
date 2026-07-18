@@ -96,6 +96,14 @@ if (typeof window !== 'undefined') {
   });
 }
 
+
+// A guild id must be a Discord snowflake. Guarding on `guild != null` let the
+// literal string "undefined" through (from a /guilds/undefined URL minted while
+// router.query was still hydrating), firing every query at /api/bot/...​/undefined.
+export function isValidGuildId(guild: string | undefined | null): boolean {
+  return typeof guild === 'string' && /^\d+$/.test(guild);
+}
+
 export const Keys = {
   login: ['login'],
   guild_info: (guild: string) => ['guild_info', guild],
@@ -208,7 +216,7 @@ export function useGuildInfoQuery(guild: string) {
     Keys.guild_info(guild),
     () => fetchGuildInfo(session!!, guild),
     {
-      enabled: status === 'authenticated' && guild != null,
+      enabled: status === 'authenticated' && isValidGuildId(guild),
       refetchOnWindowFocus: true,
       // Retry transient failures (e.g. a slow RPC / the bot restarting) with
       // backoff so the overview recovers without a manual "Try again".
@@ -223,7 +231,7 @@ export function useFeatureQuery<K extends keyof CustomFeatures>(guild: string, f
   const { status, session } = useSession();
 
   return useQuery(Keys.features(guild, feature), () => getFeature(session!!, guild, feature), {
-    enabled: status === 'authenticated' && guild != null,
+    enabled: status === 'authenticated' && isValidGuildId(guild),
     // Recover from a transient failure (bot restarting) without a manual retry.
     retry: 2,
     retryDelay,
@@ -336,7 +344,7 @@ export function useGuildStatsQuery(guild: string) {
   const { status, session } = useSession();
 
   return useQuery(Keys.guildStats(guild), () => fetchGuildStats(session!!, guild), {
-    enabled: status === 'authenticated' && guild != null,
+    enabled: status === 'authenticated' && isValidGuildId(guild),
     refetchOnWindowFocus: true,
     // Live dashboard: re-fetch on an interval so the Overview updates on its own
     // (only while the tab is focused, to stay gentle on the rate limit).
@@ -356,7 +364,7 @@ export function useMemberSearchQuery(guild: string, query: string) {
     ['member_search', guild, query],
     async () => (await searchMembers(session!!, guild, query)).members,
     {
-      enabled: status === 'authenticated' && guild != null && query.trim().length >= 2,
+      enabled: status === 'authenticated' && isValidGuildId(guild) && query.trim().length >= 2,
       keepPreviousData: true,
       staleTime: 30_000,
       retry: false,
@@ -371,7 +379,7 @@ export function useMemberDetailQuery(guild: string, userId: string | null) {
     ['member_detail', guild, userId],
     () => fetchMemberDetail(session!!, guild, userId!!),
     {
-      enabled: status === 'authenticated' && guild != null && userId != null,
+      enabled: status === 'authenticated' && isValidGuildId(guild) && userId != null,
       staleTime: 15_000,
       retry: 2,
       retryDelay,
@@ -454,7 +462,7 @@ export function useAuditQuery(guild: string) {
     ['audit', guild],
     async () => (await fetchAudit(session!!, guild)).entries,
     {
-      enabled: status === 'authenticated' && guild != null,
+      enabled: status === 'authenticated' && isValidGuildId(guild),
       staleTime: 20_000,
       retry: 2,
       retryDelay,
@@ -469,7 +477,7 @@ export function useTicketsQuery(guild: string) {
     ['tickets', guild],
     async () => (await fetchTickets(session!!, guild)).tickets,
     {
-      enabled: status === 'authenticated' && guild != null,
+      enabled: status === 'authenticated' && isValidGuildId(guild),
       staleTime: 20_000,
       retry: 2,
       retryDelay,
@@ -487,7 +495,7 @@ export function useTicketSearchQuery(guild: string, query: string) {
     ['ticket_search', guild, q],
     async () => (await searchTickets(session!!, guild, q)).tickets,
     {
-      enabled: status === 'authenticated' && guild != null && q.length >= 2,
+      enabled: status === 'authenticated' && isValidGuildId(guild) && q.length >= 2,
       keepPreviousData: true,
       staleTime: 20_000,
       retry: 2,
@@ -503,7 +511,7 @@ export function useTicketTranscriptQuery(guild: string, ticketId: number | null)
     ['ticket', guild, ticketId],
     async () => fetchTicketTranscript(session!!, guild, ticketId as number),
     {
-      enabled: status === 'authenticated' && guild != null && ticketId !== null,
+      enabled: status === 'authenticated' && isValidGuildId(guild) && ticketId !== null,
       staleTime: 60_000,
       retry: 2,
       retryDelay,
@@ -515,7 +523,7 @@ export function useModerationQuery(guild: string) {
   const { status, session } = useSession();
 
   return useQuery<ModerationData>(['moderation', guild], () => fetchModeration(session!!, guild), {
-    enabled: status === 'authenticated' && guild != null,
+    enabled: status === 'authenticated' && isValidGuildId(guild),
     staleTime: 30_000,
     retry: 2,
     retryDelay,
@@ -586,7 +594,7 @@ export function useAnalyticsQuery(guild: string, days: number) {
     ['analytics', guild, days],
     () => fetchAnalytics(session!!, guild, days),
     {
-      enabled: status === 'authenticated' && guild != null,
+      enabled: status === 'authenticated' && isValidGuildId(guild),
       keepPreviousData: true,
       staleTime: 60_000,
       retry: 2,
@@ -630,7 +638,7 @@ export function useGuildEmojisQuery(guild: string) {
   const { status, session } = useSession();
 
   return useQuery(Keys.guildEmojis(guild), () => fetchGuildEmojis(session!!, guild), {
-    enabled: status === 'authenticated' && guild != null,
+    enabled: status === 'authenticated' && isValidGuildId(guild),
     staleTime: 5 * 60 * 1000,
     retry: false,
   });

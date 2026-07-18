@@ -16,8 +16,20 @@ const screenIn = keyframes`from{opacity:0;transform:translateY(6px)}to{opacity:1
 
 export default function IrisGuildLayout({ children }: { children: ReactNode }) {
   const [isOpen, setOpen] = usePageStore((s) => [s.sidebarIsOpen, s.setSidebarIsOpen]);
-  const route = useRouter().asPath;
+  const router = useRouter();
+  const route = router.asPath;
   const reduceMotion = usePrefersReducedMotion();
+
+  // Escape hatch for a broken guild URL. During hydration the sidebar briefly
+  // renders hrefs from an empty router.query, so an early click can land on
+  // /guilds/undefined/... — a dead page whose every query would 403 (the
+  // palette then even persisted it under "recent"). Send it home instead.
+  const guildParam = router.query.guild;
+  const invalidGuild =
+    router.isReady && typeof guildParam === 'string' && !/^\d+$/.test(guildParam);
+  useEffect(() => {
+    if (invalidGuild) void router.replace('/user/home');
+  }, [invalidGuild, router]);
 
   // Mobile: swipe right from the left edge opens the sidebar drawer (the
   // Drawer's own swipe-to-close already works via its overlay).
