@@ -31,6 +31,7 @@ import { useFeatureMeta } from '@/config/feature-meta';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges';
+import { useGuildId } from '@/utils/useGuildId';
 
 export function UpdateFeaturePanel({
   feature,
@@ -40,7 +41,10 @@ export function UpdateFeaturePanel({
   config: FeatureConfig<keyof CustomFeatures>;
 }) {
   const t = view.useTranslations();
-  const { guild, feature: featureId } = useRouter().query as Params;
+  const { feature: featureId } = useRouter().query as Params;
+  // From the URL path — during hydration router.query is empty, and the
+  // breadcrumb briefly linked to /guilds/undefined.
+  const guild = useGuildId() ?? '';
   const { name, description } = useFeatureMeta().feature(featureId, config.name, config.description);
   const mutation = useUpdateFeatureMutation();
   const enableMutation = useEnableFeatureMutation();
@@ -93,7 +97,7 @@ export function UpdateFeaturePanel({
         separator={<Icon as={IoChevronForward} fontSize="0.7em" />}
       >
         <BreadcrumbItem>
-          <BreadcrumbLink as={Link} href={`/guilds/${guild}`}>
+          <BreadcrumbLink as={Link} href={guild ? `/guilds/${guild}` : '/user/home'}>
             {guildPreview?.name ?? 'Server'}
           </BreadcrumbLink>
         </BreadcrumbItem>

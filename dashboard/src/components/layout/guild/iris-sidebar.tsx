@@ -22,7 +22,7 @@ import { useFeatureMeta } from '@/config/feature-meta';
 import { guild as view } from '@/config/translations/guild';
 import { useText } from '@/config/translations/ui-text';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
-import { Params } from '@/pages/guilds/[guild]/features/[feature]';
+import { useGuildId } from '@/utils/useGuildId';
 
 // Iris sidebar surfaces (from the Claude Design mockup): a slightly-darker
 // panel than the cards on dark, plain white on light.
@@ -35,7 +35,7 @@ function NavItem({
   active,
   badge,
 }: {
-  href: string;
+  href?: string;
   icon: IconType;
   label: ReactNode;
   active: boolean;
@@ -43,8 +43,8 @@ function NavItem({
 }) {
   return (
     <Flex
-      as={Link}
-      href={href}
+      {...(href ? ({ as: Link, href } as object) : {})}
+      cursor={href ? 'pointer' : 'default'}
       align="center"
       gap={3}
       px="11px"
@@ -89,8 +89,11 @@ function NavItem({
 
 export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
-  const { guild: guildId } = router.query as Params;
-  const info = useGuildInfoQuery(guildId);
+  // From the URL path, so it's correct on the very first render — building
+  // these from router.query minted /guilds/undefined/... links during
+  // hydration, and an early click navigated there for real.
+  const guildId = useGuildId();
+  const info = useGuildInfoQuery(guildId ?? '');
   const user = useSelfUserQuery().data;
   const t = view.useTranslations();
   const tt = useText();
@@ -102,14 +105,18 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   // Mockup order: Overview, Moderation, Members, Tickets, Audit Log, Analytics.
   // The Tickets badge shows open tickets from the stats query the header
   // already polls — same react-query key, so no extra RPC from here.
-  const openTickets = useGuildStatsQuery(guildId).data?.open_tickets ?? 0;
+  const openTickets = useGuildStatsQuery(guildId ?? '').data?.open_tickets ?? 0;
+  // While the id is unknown (build-time render) the items carry no href and
+  // render non-clickable, so an early click does nothing instead of navigating
+  // to a bogus URL.
+  const base = guildId ? `/guilds/${guildId}` : undefined;
   const nav = [
-    { href: `/guilds/${guildId}/settings`, icon: MdSpaceDashboard, label: t.bn.settings, route: '/guilds/[guild]/settings' },
-    { href: `/guilds/${guildId}/moderation`, icon: MdGavel, label: t.bn.moderation, route: '/guilds/[guild]/moderation' },
-    { href: `/guilds/${guildId}/members`, icon: MdPeople, label: t.bn.members, route: '/guilds/[guild]/members' },
-    { href: `/guilds/${guildId}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets', badge: openTickets },
-    { href: `/guilds/${guildId}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
-    { href: `/guilds/${guildId}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
+    { href: base && `${base}/settings`, icon: MdSpaceDashboard, label: t.bn.settings, route: '/guilds/[guild]/settings' },
+    { href: base && `${base}/moderation`, icon: MdGavel, label: t.bn.moderation, route: '/guilds/[guild]/moderation' },
+    { href: base && `${base}/members`, icon: MdPeople, label: t.bn.members, route: '/guilds/[guild]/members' },
+    { href: base && `${base}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets', badge: openTickets },
+    { href: base && `${base}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
+    { href: base && `${base}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
   ];
 
   return (
@@ -150,7 +157,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
       </Flex>
 
       {/* Server switcher → opens the server picker popover */}
-      <ServerPicker guildId={guildId} />
+      <ServerPicker guildId={guildId ?? ''} />
 
       {/* Search */}
       <Flex

@@ -6,11 +6,11 @@ import type { MouseEvent } from 'react';
 import { MdSearch, MdDarkMode, MdLightMode, MdPerson, MdMenu } from 'react-icons/md';
 import { NotificationsBell } from './NotificationsPanel';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { iconUrl, avatarUrl } from '@/api/discord';
 import { useGuildPreview, useGuildStatsQuery, useSelfUserQuery } from '@/api/hooks';
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 import { useText } from '@/config/translations/ui-text';
+import { useGuildId } from '@/utils/useGuildId';
 
 const pulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}`;
 
@@ -48,7 +48,8 @@ function IconBtn({
 }
 
 export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
-  const { guild: guildId } = useRouter().query as { guild: string };
+  // From the URL path — router.query is empty during hydration (see useGuildId).
+  const guildId = useGuildId() ?? '';
   const { guild } = useGuildPreview(guildId);
   const stats = useGuildStatsQuery(guildId).data;
   const user = useSelfUserQuery().data;

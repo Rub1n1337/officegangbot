@@ -317,6 +317,27 @@ test('the server picker survives a Discord 429 on a hard reload', async ({ page 
   await expect(page.getByText(/Не удалось загрузить ваши серверы/)).toHaveCount(0);
 });
 
+test('nav links are never minted with a bogus guild id', async ({ page }) => {
+  // Root cause of the /guilds/undefined storm: during hydration the sidebar
+  // rendered hrefs from an empty router.query, and an early click navigated to
+  // /guilds/undefined for real (the redirect then dumped the user on
+  // /user/home, losing their place). Nav ids now come from the URL path
+  // (useGuildId), and while unknown the items carry no href at all.
+
+  // 1) The raw served HTML — exactly what exists before hydration — must have
+  // no anchor pointing at a bogus guild. (__NEXT_DATA__ metadata legitimately
+  // contains the route pattern as JSON; only href attributes count.)
+  const resp = await page.request.get(`/ru/guilds/${GUILD_ID}/settings`);
+  const bogus = (await resp.text()).match(/href="[^"]*guilds\/(undefined|\[guild\])[^"]*"/g) ?? [];
+  expect(bogus, 'static HTML contains links with a bogus guild id').toEqual([]);
+
+  // 2) Clicking a sidebar link as early as it exists lands on the right page.
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('link', { name: /Модерация/ }).first().click({ timeout: 10_000 });
+  await expect(page).toHaveURL(new RegExp(`/guilds/${GUILD_ID}/moderation`), { timeout: 10_000 });
+});
+
 test('a /guilds/undefined URL redirects home without hammering the API', async ({ page }) => {
   // During hydration the sidebar briefly renders hrefs from an empty
   // router.query, so an early click landed on /guilds/undefined/... — a dead

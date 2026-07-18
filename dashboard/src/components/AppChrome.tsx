@@ -19,6 +19,7 @@ import { useText } from '@/config/translations/ui-text';
 import { useFeatureMeta } from '@/config/feature-meta';
 import { searchSettings } from '@/config/settings-index';
 import { useChunkErrorRecovery } from '@/utils/useChunkErrorRecovery';
+import { useGuildId } from '@/utils/useGuildId';
 
 // Only real guild paths qualify as palette "recents": a /guilds/undefined/...
 // URL (minted while router.query was hydrating) used to get persisted and
@@ -85,7 +86,7 @@ function CommandPalette() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const guilds = useGuilds();
   const inputRef = useRef<HTMLInputElement>(null);
-  const guildId = (router.query.guild as string) || undefined;
+  const guildId = useGuildId();
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
   const tt = useText();
