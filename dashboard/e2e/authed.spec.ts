@@ -298,6 +298,25 @@ test('Moderation surfaces a pending appeal with its decision buttons', async ({ 
   await expect(page.getByRole('button', { name: /Одобрить/ })).toBeVisible();
 });
 
+test('the server picker survives a Discord 429 on a hard reload', async ({ page }) => {
+  // /users/@me/guilds is strictly rate-limited and a hard reload wipes the
+  // in-memory query cache — so frequent reloaders got 429 and a dead picker,
+  // which they "fixed" with another reload (feeding the same rate limit).
+  // useGuilds persists the last-known list and serves it as placeholder data.
+  await page.goto('/ru/user/home');
+  await expect(page.getByText('Trials Gang').first()).toBeVisible({ timeout: 15_000 });
+  expect(await page.evaluate(() => localStorage.getItem('cached-user-guilds'))).toContain('Trials Gang');
+
+  await page.route('https://discord.com/api/**', (route) => {
+    if (route.request().url().includes('/users/@me/guilds'))
+      return route.fulfill({ status: 429, contentType: 'application/json', body: '{"retry_after": 10}' });
+    return route.fallback();
+  });
+  await page.reload();
+  await expect(page.getByText('Trials Gang').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Не удалось загрузить ваши серверы/)).toHaveCount(0);
+});
+
 test('a stale chunk after a deploy self-recovers instead of needing a hard reload', async ({ page }) => {
   // The dashboard is a client-rendered SPA; a deploy renames every chunk and
   // deletes the old ones, so a tab open across the deploy asks for a chunk that

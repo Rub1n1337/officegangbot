@@ -60,7 +60,9 @@ async function handleError(res: Response, options: Options) {
     } catch {
       /* non-JSON body — keep the status message */
     }
-    throw new Error(message);
+    // Carry the HTTP status so callers can react per-status (e.g. back off
+    // longer on a Discord 429 instead of retrying into the same rate limit).
+    throw Object.assign(new Error(message), { status: res.status });
   }
 }
 
