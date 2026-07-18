@@ -1,6 +1,6 @@
 import { CustomFeatures, CustomGuildInfo } from '../config/types';
 import { QueryClient, onlineManager, useMutation, useQuery } from '@tanstack/react-query';
-import { UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
+import { Guild, UserInfo, getGuild, getGuilds, fetchUserInfo } from '@/api/discord';
 import {
   deleteWarning,
   setBanAppeals,
@@ -118,11 +118,45 @@ export function useGuild(id: string) {
   });
 }
 
+// Last-known guild list, persisted so a hard reload doesn't depend on Discord
+// answering. /users/@me/guilds is strictly rate-limited, and every hard reload
+// wipes the in-memory query cache — so users who reload often hit 429 and saw
+// a broken picker/palette until yet another reload. Cleared on logout.
+export const GUILDS_CACHE_KEY = 'cached-user-guilds';
+
+function readCachedGuilds(): Guild[] | undefined {
+  try {
+    if (typeof window === 'undefined') return undefined;
+    const raw = localStorage.getItem(GUILDS_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : undefined;
+    return Array.isArray(parsed) ? (parsed as Guild[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function useGuilds() {
   const accessToken = useAccessToken();
 
   return useQuery(['user_guilds'], () => getGuilds(accessToken as string), {
     enabled: accessToken != null,
+    // Serve the cached list instantly while the real fetch runs (or fails).
+    placeholderData: readCachedGuilds,
+    onSuccess: (data) => {
+      try {
+        localStorage.setItem(GUILDS_CACHE_KEY, JSON.stringify(data));
+      } catch {
+        /* quota/private mode — cache just won't persist */
+      }
+    },
+    // On 429, quick retries burn more of the same rate-limit window. Back off
+    // at 5s/10s instead of the default 1s/2s (bounded, so a cold-cache failure
+    // still surfaces the error panel in ~15s rather than hanging).
+    retry: 2,
+    retryDelay: (attempt, error) =>
+      (error as { status?: number })?.status === 429
+        ? 5000 * (attempt + 1)
+        : retryDelay(attempt),
   });
 }
 

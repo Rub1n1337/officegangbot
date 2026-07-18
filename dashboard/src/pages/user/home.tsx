@@ -52,7 +52,10 @@ export function GuildSelect() {
   const botGuilds = useMyBotGuilds();
   const [search, setSearch] = useState('');
 
-  if (guilds.status === 'error')
+  // Only the no-data failure is a dead end. With the persisted last-known list
+  // (useGuilds placeholderData) a Discord 429 on reload still renders the
+  // picker from cache instead of stranding the user on an error screen.
+  if (guilds.status === 'error' && !guilds.data)
     return (
       <ErrorPanel
         retry={() => guilds.refetch()}

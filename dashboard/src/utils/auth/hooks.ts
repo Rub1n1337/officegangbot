@@ -22,6 +22,14 @@ export async function logout() {
     },
   });
 
+  // Drop the persisted guild list so the next account on this browser doesn't
+  // see the previous user's servers as placeholder data.
+  try {
+    localStorage.removeItem('cached-user-guilds');
+  } catch {
+    /* ignore */
+  }
+
   await client.invalidateQueries(Keys.login);
   await Router.push('/auth/signin');
 }
