@@ -3,10 +3,9 @@ import {
   PopoverBody, Portal, useDisclosure,
 } from '@chakra-ui/react';
 import { MdUnfoldMore, MdCheck, MdAddCircleOutline } from 'react-icons/md';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useMemo } from 'react';
-import { useGuilds } from '@/api/hooks';
+import { useGuilds, useMyBotGuilds } from '@/api/hooks';
 import { iconUrl } from '@/api/discord';
 import { config } from '@/config/common';
 import { useText } from '@/config/translations/ui-text';
@@ -17,8 +16,20 @@ import { useText } from '@/config/translations/ui-text';
 export function ServerPicker({ guildId }: { guildId: string }) {
   const router = useRouter();
   const guilds = useGuilds();
+  const botGuilds = useMyBotGuilds();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const tt = useText();
+
+  // Which of these servers the bot is actually in — the list deliberately
+  // shows ALL the user's admin servers (that's how you invite the bot to a new
+  // one), but without a marker they all looked identical and picking a botless
+  // one felt like a bug. Indicators only render when the bot answered, so an
+  // unreachable bot doesn't mislabel every server as botless.
+  const knowPresence = botGuilds.data?.botReachable === true;
+  const present = useMemo(
+    () => new Set((botGuilds.data?.guilds ?? []).map((g) => g.id)),
+    [botGuilds.data]
+  );
 
   const list = useMemo(
     () => (guilds.data ?? []).filter((g) => config.guild.filter(g)),
@@ -112,15 +123,28 @@ export function ServerPicker({ guildId }: { guildId: string }) {
                     <Text flex="1" minW={0} fontSize="13px" fontWeight={active ? '600' : '500'} noOfLines={1}>
                       {g.name}
                     </Text>
+                    {knowPresence && !present.has(g.id) && (
+                      <Text fontSize="10.5px" color="TextSecondary" flexShrink={0}>
+                        {tt('нет бота')}
+                      </Text>
+                    )}
+                    {knowPresence && present.has(g.id) && !active && (
+                      <Box w="7px" h="7px" rounded="full" bg="green.400" flexShrink={0} />
+                    )}
                     {active && <Icon as={MdCheck} boxSize="17px" color="brand.200" flexShrink={0} />}
                   </Flex>
                 );
               })}
             </Box>
             <Box borderTop="1px solid" borderColor="CardBorder" mt="4px" pt="4px">
+              {/* The real Discord invite (server picker inside Discord) — this
+                  used to link to /user/home, which just dumped the user on the
+                  start page instead of adding the bot anywhere. */}
               <Flex
-                as={Link}
-                href="/user/home"
+                as="a"
+                href={config.inviteUrl}
+                target="_blank"
+                rel="noreferrer"
                 align="center"
                 gap="10px"
                 p="8px 10px"

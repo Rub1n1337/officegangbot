@@ -355,6 +355,45 @@ test('a /guilds/undefined URL redirects home without hammering the API', async (
   expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
 });
 
+test('a botless guild answers once and offers a real Discord invite', async ({ page }) => {
+  // A 404 is a definitive "bot not in this guild": it used to be retried 3x AND
+  // polled every 8s by the stats query, filling the console forever on the
+  // NotJoined page. And the picker's "Add to another server" linked to
+  // /user/home — the Enable-invite path simply didn't exist there.
+  const J404 = { status: 404, contentType: 'application/json', body: '{"detail":"Guild not found"}' };
+  await page.route('**/api/bot/**', async (route) => {
+    const p = new URL(route.request().url()).pathname;
+    if (p.endsWith(`/guilds/${GUILD_ID}`) || p.endsWith('/stats')) return route.fulfill(J404);
+    return route.fallback();
+  });
+  let statsHits = 0;
+  page.on('request', (r) => { if (r.url().includes('/stats')) statsHits++; });
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  // Old behaviour produced 4+ hits within this window from retries alone.
+  await page.waitForTimeout(6_000);
+  expect(statsHits, 'a definitive 404 was retried/polled').toBeLessThanOrEqual(2);
+
+  const invite = page.locator('a', { hasText: /Invite|Пригласить/i }).first();
+  await expect(invite).toBeVisible({ timeout: 5_000 });
+  const href = (await invite.getAttribute('href')) ?? '';
+  expect(href).toContain('discord.com/api/oauth2/authorize');
+  expect(href).toContain(`guild_id=${GUILD_ID}`);
+});
+
+test('the server picker labels botless servers and its add-link opens Discord', async ({ page }) => {
+  await page.route('**/api/me/guilds', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ botReachable: true, guilds: [] }) })
+  );
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText(/Здоровье сервера/).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByText('Сменить сервер').click();
+  await expect(page.getByText('ВАШИ СЕРВЕРЫ')).toBeVisible();
+  await expect(page.getByText('нет бота').first()).toBeVisible();
+  const href = (await page.locator('a', { hasText: 'Добавить на другой сервер' }).first().getAttribute('href')) ?? '';
+  expect(href, 'add-server must invite the bot, not link to /user/home').toContain('discord.com/api/oauth2/authorize');
+});
+
 test('a stale chunk after a deploy self-recovers instead of needing a hard reload', async ({ page }) => {
   // The dashboard is a client-rendered SPA; a deploy renames every chunk and
   // deletes the old ones, so a tab open across the deploy asks for a chunk that
