@@ -34,6 +34,7 @@ const EN: Record<string, string> = {
   'Сменить сервер': 'Switch server',
   'ВАШИ СЕРВЕРЫ': 'YOUR SERVERS',
   'Добавить на другой сервер': 'Add to another server',
+  'нет бота': 'no bot',
   'Уведомления': 'Notifications',
   'Прочитать всё': 'Mark all read',
   'Пока тихо — открытых тикетов и апелляций нет.':

@@ -44,6 +44,14 @@ import { useToast } from '@chakra-ui/react';
 // stranding the user on an error screen until they hit "Try again".
 const retryDelay = (attempt: number) => Math.min(1000 * 2 ** attempt, 8000);
 
+// 4xx is a definitive answer (bot not in the guild, no permission, bad input) —
+// retrying can't change it, it just sprays the console and the API. Retry only
+// network/5xx failures.
+const isClientError = (error: unknown): boolean => {
+  const s = (error as { status?: number } | null)?.status;
+  return s != null && s >= 400 && s < 500;
+};
+
 export const client = new QueryClient({
   defaultOptions: {
     mutations: {
@@ -57,7 +65,7 @@ export const client = new QueryClient({
       // Reconnecting to the network (or the bot coming back) refetches stale data.
       refetchOnReconnect: true,
       staleTime: Infinity,
-      retry: 2,
+      retry: (failures, error) => !isClientError(error) && failures < 2,
       retryDelay,
       // Default 'online' mode pauses a query's retry (fetchStatus 'paused') when
       // the onlineManager reports offline. On this always-online app that flag can
@@ -219,8 +227,9 @@ export function useGuildInfoQuery(guild: string) {
       enabled: status === 'authenticated' && isValidGuildId(guild),
       refetchOnWindowFocus: true,
       // Retry transient failures (e.g. a slow RPC / the bot restarting) with
-      // backoff so the overview recovers without a manual "Try again".
-      retry: 3,
+      // backoff — but not 4xx: a 404 means the bot isn't in this guild, which
+      // no retry will fix (it used to burst 4 requests per cycle).
+      retry: (failures, error) => !isClientError(error) && failures < 3,
       retryDelay,
       staleTime: 0,
     }
@@ -349,10 +358,14 @@ export function useGuildStatsQuery(guild: string) {
     // Live dashboard: re-fetch on an interval so the Overview updates on its own
     // (only while the tab is focused, to stay gentle on the rate limit).
     staleTime: 0,
-    refetchInterval: 8_000,
+    // On a 404 (bot not in this guild) stop polling — it answered, and the
+    // refetch-on-focus below already picks the bot up the moment the user
+    // returns from the invite tab. Polling a 404 every 8s just filled the
+    // console on the NotJoined page.
+    refetchInterval: (_data, query) => (isClientError(query.state.error) ? false : 8_000),
     refetchIntervalInBackground: false,
     // Recover from a transient failure (slow RPC / bot restart) on its own.
-    retry: 3,
+    retry: (failures, error) => !isClientError(error) && failures < 3,
     retryDelay,
   });
 }
