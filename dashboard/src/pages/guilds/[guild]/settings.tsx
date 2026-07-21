@@ -704,6 +704,85 @@ function ConfigTransfer({ guild }: { guild: string }) {
   );
 }
 
+// The dashboard's one signature metric: a single 0–100 "pulse" that answers
+// "how's my server doing?" at a glance (the Oura-readiness / Apple-rings idea —
+// reduce several signals to one number). Deliberately transparent, not a black
+// box: the three inputs are shown as dots next to the ring, each a plain,
+// checkable fact, so the score never feels arbitrary. v1 weighting — tune later.
+function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFeatures: string[] }) {
+  const tt = useText();
+  const enabled = new Set(enabledFeatures);
+  const core = getFeatures().filter((f) => CORE_SETUP_FEATURES.includes(f.id));
+  const configured = core.filter((f) => enabled.has(f.id)).length;
+  const setupPts = core.length ? Math.round((configured / core.length) * 40) : 40;
+  const last7 = (stats.history ?? []).slice(-7).reduce((a, d) => a + d.messages, 0);
+
+  const parts = [
+    { label: tt('Онлайн'), ok: stats.online, detail: '' },
+    { label: tt('Настроен'), ok: configured === core.length, detail: ` ${configured}/${core.length}` },
+    { label: tt('Активность'), ok: last7 > 0, detail: '' },
+  ];
+  const score = Math.min(100, (stats.online ? 30 : 0) + setupPts + (last7 > 0 ? 30 : 0));
+  const color = score >= 80 ? '#22C55E' : score >= 50 ? '#EAB308' : '#F16A6A';
+  const label = score >= 80 ? tt('Отлично') : score >= 50 ? tt('Хорошо') : tt('Нужно внимание');
+
+  const R = 30;
+  const CIRC = 2 * Math.PI * R;
+
+  return (
+    <Flex
+      bg="CardBackground"
+      rounded="16px"
+      p="18px 20px"
+      border="1px solid"
+      borderColor="CardBorder"
+      boxShadow="normal"
+      align="center"
+      gap="20px"
+      color="TextSecondary"
+    >
+      <Box position="relative" flexShrink={0} lineHeight={0}>
+        <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden>
+          <circle cx="38" cy="38" r={R} fill="none" strokeWidth="7" stroke="currentColor" opacity={0.14} />
+          <circle
+            cx="38"
+            cy="38"
+            r={R}
+            fill="none"
+            strokeWidth="7"
+            stroke={color}
+            strokeLinecap="round"
+            strokeDasharray={`${(score / 100) * CIRC} ${CIRC}`}
+            transform="rotate(-90 38 38)"
+          />
+        </svg>
+        <Flex position="absolute" inset={0} align="center" justify="center">
+          <Text fontSize="23px" fontWeight="800" color="TextPrimary" sx={tabularNums}>
+            {score}
+          </Text>
+        </Flex>
+      </Box>
+      <Box minW={0} flex="1">
+        <Text fontSize="11px" fontWeight="700" letterSpacing="0.1em">
+          {tt('ПУЛЬС СЕРВЕРА')}
+        </Text>
+        <Text fontSize="17px" fontWeight="800" color={color} mt="1px">
+          {label}
+        </Text>
+        <Flex gap="14px" mt="8px" wrap="wrap">
+          {parts.map((p) => (
+            <Flex key={p.label} align="center" gap="6px" fontSize="12.5px" sx={tabularNums}>
+              <Box w="8px" h="8px" rounded="full" flexShrink={0} bg={p.ok ? 'green.400' : 'secondaryGray.500'} />
+              {p.label}
+              {p.detail}
+            </Flex>
+          ))}
+        </Flex>
+      </Box>
+    </Flex>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -743,6 +822,10 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           {infoQuery.data && <BotLanguage guild={guild} locale={infoQuery.data.locale ?? 'en'} />}
         </Flex>
       </Flex>
+
+      {statsQuery.data && infoQuery.data && (
+        <ServerPulse stats={statsQuery.data} enabledFeatures={enabledFeatures} />
+      )}
 
       <QueryStatus query={statsQuery} loading={<OverviewSkeleton />} error={tt('Не удалось загрузить статистику сервера.')}>
         {statsQuery.data && <OverviewMetrics stats={statsQuery.data} />}

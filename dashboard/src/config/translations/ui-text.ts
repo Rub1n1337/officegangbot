@@ -21,6 +21,13 @@ const EN: Record<string, string> = {
   'Не удалось загрузить данные пользователя.': 'Failed to load user info.',
 
   // --- Shell (sidebar / header / popovers) -----------------------------------
+  'ПУЛЬС СЕРВЕРА': 'SERVER PULSE',
+  'Онлайн': 'Online',
+  'Настроен': 'Configured',
+  'Активность': 'Activity',
+  'Отлично': 'Great',
+  'Хорошо': 'Good',
+  'Нужно внимание': 'Needs attention',
   'Панель управления': 'Control panel',
   'Поиск…': 'Search…',
   'ВКЛЮЧЁННЫЕ ФУНКЦИИ': 'ENABLED FEATURES',

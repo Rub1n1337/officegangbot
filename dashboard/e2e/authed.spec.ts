@@ -355,6 +355,22 @@ test('a /guilds/undefined URL redirects home without hammering the API', async (
   expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
 });
 
+test('overview shows the Server Pulse signature metric, transparently', async ({ page }) => {
+  // One number that answers "how's my server?" (the rings/readiness idea), but
+  // not a black box: the three inputs show as labelled dots so the score is
+  // always explainable.
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('ПУЛЬС СЕРВЕРА')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Онлайн')).toBeVisible();
+  await expect(page.getByText(/Настроен/)).toBeVisible();
+  await expect(page.getByText('Активность')).toBeVisible();
+  // The ring's centre score is a plain 0..100.
+  const score = await page.locator('svg[width="76"]').first()
+    .evaluate((svg) => Number((svg.parentElement?.textContent || '').trim()));
+  expect(score).toBeGreaterThanOrEqual(0);
+  expect(score).toBeLessThanOrEqual(100);
+});
+
 test('sidebar: nav and enabled-feature icons share one optical column', async ({ page }) => {
   // The nav icons are 20px; the enabled-feature icons below were 18px with a
   // different gap, so the icon and text columns drifted ~3px apart mid-sidebar.
