@@ -355,6 +355,19 @@ test('a /guilds/undefined URL redirects home without hammering the API', async (
   expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
 });
 
+test('sidebar: nav and enabled-feature icons share one optical column', async ({ page }) => {
+  // The nav icons are 20px; the enabled-feature icons below were 18px with a
+  // different gap, so the icon and text columns drifted ~3px apart mid-sidebar.
+  // They now share the 20px box and 12px gap.
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('Здоровье сервера').first()).toBeVisible({ timeout: 15_000 });
+  const navIcon = await page.getByRole('link', { name: /Модерация/ }).first()
+    .evaluate((el) => (el.firstElementChild as HTMLElement).getBoundingClientRect().width);
+  const featIcon = await page.getByRole('link', { name: /Уровни/ }).first()
+    .evaluate((el) => (el.firstElementChild as HTMLElement).getBoundingClientRect().width);
+  expect(Math.abs(navIcon - featIcon), 'sidebar icon boxes are different sizes').toBeLessThanOrEqual(2);
+});
+
 test('the number stepper is a comfortable tap target', async ({ page }) => {
   // The +/- buttons were 28px — hard to hit on a phone. An invisible ::after
   // hit-zone can't help here (the feature-form cards clip overflow:hidden and
