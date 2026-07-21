@@ -226,7 +226,10 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 as={Link}
                 href={`/guilds/${guildId}/features/${f.id}`}
                 align="center"
-                gap="11px"
+                // Same icon box (20px) and gap (12px) as the nav items above, so
+                // the icon and the text columns line up down the whole sidebar
+                // instead of the feature rows sitting ~3px to the left.
+                gap={3}
                 p="8px 11px"
                 rounded="11px"
                 color="TextSecondary"
@@ -235,7 +238,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 transition="background .15s ease, color .15s ease"
                 _hover={{ bg: 'blackAlpha.50', color: 'TextPrimary', _dark: { bg: 'whiteAlpha.50' } }}
               >
-                <Box color="brand.200" display="flex" fontSize="18px">
+                <Box color="brand.200" display="flex" fontSize="20px">
                   {f.icon}
                 </Box>
                 {meta.feature(f.id, f.name, '').name}

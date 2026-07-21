@@ -268,7 +268,11 @@ function CommandPalette() {
                 mx={2}
                 px={3}
                 py={2}
-                rounded="lg"
+                // The selected row rounds up as the highlight lands on it —
+                // border-radius reacting to state, so the active item reads as a
+                // distinct chip nesting in the list rather than a flat band.
+                rounded={i === idx ? 'xl' : 'lg'}
+                transition="background .12s ease, border-radius .12s ease"
                 cursor="pointer"
                 align="center"
                 justify="space-between"
