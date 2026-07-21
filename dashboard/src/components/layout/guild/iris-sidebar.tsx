@@ -26,6 +26,11 @@ import { useGuildId } from '@/utils/useGuildId';
 
 // Iris sidebar surfaces (from the Claude Design mockup): a slightly-darker
 // panel than the cards on dark, plain white on light.
+//
+// Grid-refactor pilot: spacing uses the 4px scale tokens (2.5 = 10px is a
+// legitimate half-step), and text uses the theme textStyles instead of raw px.
+// Element sizes, radii and the accent-bar insets are left as px — they're not
+// gutters.
 const SIDEBAR_BG = { base: 'white', _dark: '#0D0D18' };
 
 function NavItem({
@@ -47,11 +52,11 @@ function NavItem({
       cursor={href ? 'pointer' : 'default'}
       align="center"
       gap={3}
-      px="11px"
-      py="10px"
+      px={3}
+      py={2.5}
       rounded="12px"
       position="relative"
-      fontSize="14px"
+      textStyle="body"
       fontWeight={active ? '600' : '500'}
       color={active ? 'TextPrimary' : 'TextSecondary'}
       bg={active ? 'brandAlpha.100' : 'transparent'}
@@ -72,10 +77,10 @@ function NavItem({
         <Box
           as="span"
           ml="auto"
-          fontSize="11px"
+          textStyle="micro"
           fontWeight="700"
           rounded="20px"
-          px="8px"
+          px={2}
           py="1px"
           color="brand.200"
           bg="brandAlpha.100"
@@ -122,9 +127,10 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Flex
       direction="column"
-      gap="5px"
+      gap={1}
       h="100%"
-      p="20px 16px"
+      px={4}
+      py={5}
       overflowY="auto"
       bg={SIDEBAR_BG.base}
       _dark={{ bg: SIDEBAR_BG._dark }}
@@ -133,7 +139,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
       onClick={onNavigate}
     >
       {/* Brand */}
-      <Flex align="center" gap="11px" px="8px" pt="6px" pb="16px">
+      <Flex align="center" gap={3} px={2} pt={2} pb={4}>
         <Flex
           w="36px"
           h="36px"
@@ -147,10 +153,10 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Icon as={MdSmartToy} boxSize="21px" color="white" />
         </Flex>
         <Box lineHeight="1.15">
-          <Text fontWeight="700" fontSize="15px" letterSpacing="-0.01em">
+          <Text textStyle="h3" letterSpacing="-0.01em">
             OfficeGangBot
           </Text>
-          <Text fontSize="11px" color="TextSecondary">
+          <Text textStyle="micro" color="TextSecondary">
             {tt('Панель управления')}
           </Text>
         </Box>
@@ -163,14 +169,15 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <Flex
         as="button"
         align="center"
-        gap="9px"
-        p="9px 11px"
+        gap={2}
+        px={3}
+        py={2}
         rounded="12px"
         border="1px solid"
         borderColor="CardBorder"
         color="TextSecondary"
-        fontSize="13px"
-        mt="2px"
+        textStyle="body"
+        mt={0.5}
         transition="background .15s ease"
         _hover={{ bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
         onClick={(e) => {
@@ -183,18 +190,18 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <Box
           as="span"
           ml="auto"
-          fontSize="11px"
+          textStyle="micro"
           border="1px solid"
           borderColor="CardBorder"
           rounded="6px"
-          px="6px"
+          px={2}
         >
           ⌘K
         </Box>
       </Flex>
 
       {/* Nav */}
-      <Flex direction="column" gap="3px" mt="12px">
+      <Flex direction="column" gap={1} mt={3}>
         {nav.map((n) => (
           <NavItem
             key={n.href}
@@ -210,13 +217,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Enabled features */}
       {enabledFeatures.length > 0 && (
         <>
-          <Text
-            fontSize="10.5px"
-            fontWeight="700"
-            letterSpacing="0.1em"
-            color="TextSecondary"
-            m="16px 4px 6px"
-          >
+          <Text textStyle="overline" color="TextSecondary" mt={4} mx={1} mb={2}>
             {tt('ВКЛЮЧЁННЫЕ ФУНКЦИИ')}
           </Text>
           <Flex direction="column" gap="1px">
@@ -228,13 +229,14 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 align="center"
                 // Same icon box (20px) and gap (12px) as the nav items above, so
                 // the icon and the text columns line up down the whole sidebar
-                // instead of the feature rows sitting ~3px to the left.
+                // instead of the feature rows sitting to the left.
                 gap={3}
-                p="8px 11px"
+                px={3}
+                py={2}
                 rounded="11px"
                 color="TextSecondary"
+                textStyle="body"
                 fontWeight="500"
-                fontSize="13.5px"
                 transition="background .15s ease, color .15s ease"
                 _hover={{ bg: 'blackAlpha.50', color: 'TextPrimary', _dark: { bg: 'whiteAlpha.50' } }}
               >
@@ -254,13 +256,13 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
       {user && (
         <Flex
           align="center"
-          gap="10px"
-          p="10px"
+          gap={2.5}
+          p={2.5}
           rounded="12px"
           bg="CardBackground"
           border="1px solid"
           borderColor="CardBorder"
-          mt="10px"
+          mt={2.5}
         >
           <Box
             as="img"
@@ -273,10 +275,10 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
             flexShrink={0}
           />
           <Box flex="1" minW={0} lineHeight="1.2">
-            <Text fontSize="13px" fontWeight="600" noOfLines={1}>
+            <Text textStyle="body" fontWeight="600" noOfLines={1}>
               {user.username}
             </Text>
-            <Text fontSize="11px" color="TextSecondary">
+            <Text textStyle="micro" color="TextSecondary">
               {tt('Администратор')}
             </Text>
           </Box>
