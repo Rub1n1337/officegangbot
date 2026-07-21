@@ -28,6 +28,7 @@ import { QueryStatus } from '@/components/panel/QueryPanel';
 import { timeAgo, describeAudit, isModerationAction } from '@/utils/audit';
 import { provider, type Languages } from '@/config/translations/provider';
 import { useText } from '@/config/translations/ui-text';
+import { tabularNums } from '@/theme/numeric';
 import type {
   AuditEntry,
   ModerationAppeals,
@@ -122,6 +123,7 @@ function Pill({ tone, children }: { tone: keyof typeof PILL_TONE; children: Reac
       color={t.color}
       bg={t.bg}
       _dark={t.darkBg ? { bg: t.darkBg } : undefined}
+      sx={tabularNums}
     >
       {children}
     </Box>

@@ -19,6 +19,7 @@ import { IoSearch, IoAddCircleOutline } from 'react-icons/io5';
 import { useState } from 'react';
 import { config } from '@/config/common';
 import { useText } from '@/config/translations/ui-text';
+import { tabularNums } from '@/theme/numeric';
 import { useGuilds, useMyBotGuilds } from '@/api/hooks';
 import { NextPageWithLayout } from '@/pages/_app';
 import IrisUserLayout from '@/components/layout/iris-user-layout';
@@ -150,7 +151,7 @@ export function GuildSelect() {
                       {guild.name}
                     </Text>
                     {botReachable && isPresent && (
-                      <Text fontSize="xs" color="TextSecondary">
+                      <Text fontSize="xs" color="TextSecondary" sx={tabularNums}>
                         {memberCounts.get(guild.id)?.toLocaleString()} {tt('участников')}
                       </Text>
                     )}

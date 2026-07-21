@@ -41,6 +41,7 @@ import { featureCategories } from '@/config/features';
 import { useFeatureMeta } from '@/config/feature-meta';
 import type { CustomFeatures, GuildStats, GuildStatsTopXp } from '@/config/types/custom-types';
 import { useText } from '@/config/translations/ui-text';
+import { tabularNums } from '@/theme/numeric';
 
 // Thin accent sparkline for the KPI tiles (mockup: 2px polyline). Renders
 // nothing until there are at least two points, so fresh guilds simply show
@@ -118,12 +119,12 @@ function IrisStat({
         </Text>
         {delta != null && <DeltaChip delta={delta} suffix={deltaSuffix} />}
       </Flex>
-      <Text fontSize="27px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="9px">
+      <Text fontSize="27px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="9px" sx={tabularNums}>
         {value}
       </Text>
       {spark && <Sparkline points={spark} />}
       {hint && (
-        <Text fontSize="11px" color="TextSecondary" mt="6px">
+        <Text fontSize="11px" color="TextSecondary" mt="6px" sx={tabularNums}>
           {hint}
         </Text>
       )}
@@ -318,7 +319,7 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
         <Icon as={MdBolt} boxSize="22px" color="brand.200" />
       </Flex>
       <Box flex="1" minW={0}>
-        <Text fontSize="14.5px" fontWeight="700">
+        <Text fontSize="14.5px" fontWeight="700" sx={tabularNums}>
           {allDone
             ? tt('Базовые функции настроены')
             : `${tt('Базовая настройка:')} ${core.length - missing.length} ${tt('из')} ${core.length}`}
