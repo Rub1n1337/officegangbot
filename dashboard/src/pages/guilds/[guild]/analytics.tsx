@@ -18,6 +18,7 @@ import { NextPageWithLayout } from '@/pages/_app';
 import { useAnalyticsQuery } from '@/api/hooks';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { StyledChart } from '@/components/chart/StyledChart';
+import { tabularNums } from '@/theme/numeric';
 import type { AnalyticsData, DayCount, ModActionDay } from '@/config/types/custom-types';
 import { useText } from '@/config/translations/ui-text';
 import { MdDownload } from 'react-icons/md';
@@ -62,7 +63,7 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
       <Text fontSize="12px" color="TextSecondary" fontWeight="500">
         {label}
       </Text>
-      <Text fontSize="28px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="7px">
+      <Text fontSize="28px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="7px" sx={tabularNums}>
         {value}
       </Text>
       {hint && (
@@ -329,7 +330,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
                 <Box flex={1} bg="secondaryGray.100" _dark={{ bg: 'navy.600' }} rounded="5px" h="8px" overflow="hidden">
                   <Box bgGradient="linear(135deg, #8B7CFF, #6E56F5)" rounded="5px" h="8px" w={`${(m.count / maxMods) * 100}%`} />
                 </Box>
-                <Text fontSize="12px" fontWeight="700" color="brand.200" minW="20px" textAlign="right" flexShrink={0}>
+                <Text fontSize="12px" fontWeight="700" color="brand.200" minW="20px" textAlign="right" flexShrink={0} sx={tabularNums}>
                   {m.count}
                 </Text>
               </Flex>

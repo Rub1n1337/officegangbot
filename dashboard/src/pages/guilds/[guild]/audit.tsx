@@ -29,6 +29,7 @@ import {
 } from '@/utils/audit';
 import { provider } from '@/config/translations/provider';
 import { useText } from '@/config/translations/ui-text';
+import { tabularNums } from '@/theme/numeric';
 import type { Languages } from '@/config/translations/provider';
 import type { AuditEntry } from '@/config/types/custom-types';
 
@@ -250,7 +251,7 @@ const AuditPage: NextPageWithLayout = () => {
               ))}
             </Select>
 
-            <Text fontSize="sm" color="TextSecondary">
+            <Text fontSize="sm" color="TextSecondary" sx={tabularNums}>
               {filtered.length} {tt('из')} {rows.length}
             </Text>
 

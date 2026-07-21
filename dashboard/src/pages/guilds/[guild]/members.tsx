@@ -46,6 +46,7 @@ import type { ModerateAction } from '@/api/bot';
 import type { MemberDetail } from '@/config/types/custom-types';
 import { provider, type Languages } from '@/config/translations/provider';
 import { useText } from '@/config/translations/ui-text';
+import { tabularNums } from '@/theme/numeric';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -78,7 +79,7 @@ const ACTION_RU: Record<ModerateAction, string> = {
 // A rounded status pill in one of the Iris tones.
 function Pill({ children, color, bg, dark }: { children: ReactNode; color: string; bg: string; dark?: object }) {
   return (
-    <Box as="span" fontSize="12px" fontWeight="600" rounded="20px" px="12px" py="5px" color={color} bg={bg} _dark={dark}>
+    <Box as="span" fontSize="12px" fontWeight="600" rounded="20px" px="12px" py="5px" color={color} bg={bg} _dark={dark} sx={tabularNums}>
       {children}
     </Box>
   );

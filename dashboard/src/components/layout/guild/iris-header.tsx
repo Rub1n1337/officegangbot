@@ -11,6 +11,7 @@ import { useGuildPreview, useGuildStatsQuery, useSelfUserQuery } from '@/api/hoo
 import { OPEN_COMMAND_PALETTE } from '@/components/AppChrome';
 import { useText } from '@/config/translations/ui-text';
 import { useGuildId } from '@/utils/useGuildId';
+import { tabularNums } from '@/theme/numeric';
 
 const pulse = keyframes`0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}`;
 
@@ -135,7 +136,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           />
           {/* noOfLines keeps "7 участников" on one line — it was stacking one
               word per line when the action cluster squeezed this block. */}
-          <Text as="span" noOfLines={1}>
+          <Text as="span" noOfLines={1} sx={tabularNums}>
             {online
               ? `${(stats?.member_count ?? 0).toLocaleString('ru-RU')} ${tt('участников')}`
               : tt('Бот офлайн')}
