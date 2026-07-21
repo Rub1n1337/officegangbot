@@ -202,12 +202,28 @@ function CommandPalette() {
     router.push(href);
   };
 
+  // Keep the highlighted row in view as the arrows move past the visible fold.
+  // The scroll container carries scroll-padding so the active row never sticks
+  // to the very top or bottom edge — Notion's "autoscroll with padding".
+  const activeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [idx]);
+
+  // A row highlights on hover — but only from a real pointer move. When the
+  // keyboard scrolls the list, a fresh row slides under the *stationary*
+  // cursor and fires mouseEnter, which would otherwise yank the selection away
+  // from where the arrows just put it. This latch ignores that synthetic enter.
+  const pointerActive = useRef(false);
+
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      pointerActive.current = false;
       setIdx((i) => Math.min(i + 1, filtered.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      pointerActive.current = false;
       setIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -231,7 +247,15 @@ function CommandPalette() {
             onKeyDown={onInputKey}
           />
         </Box>
-        <Box maxH="340px" overflowY="auto" py={2}>
+        <Box
+          maxH="340px"
+          overflowY="auto"
+          py={2}
+          sx={{ scrollPaddingBlock: '12px' }}
+          onMouseMove={() => {
+            pointerActive.current = true;
+          }}
+        >
           {filtered.length === 0 ? (
             <Text px={5} py={3} color="TextSecondary" fontSize="sm">
               {tt('Ничего не найдено.')}
@@ -240,6 +264,7 @@ function CommandPalette() {
             filtered.map((c, i) => (
               <Flex
                 key={c.id}
+                ref={i === idx ? activeRef : undefined}
                 mx={2}
                 px={3}
                 py={2}
@@ -250,7 +275,9 @@ function CommandPalette() {
                 gap={3}
                 bg={i === idx ? 'blackAlpha.200' : 'transparent'}
                 _dark={{ bg: i === idx ? 'whiteAlpha.100' : 'transparent' }}
-                onMouseEnter={() => setIdx(i)}
+                onMouseEnter={() => {
+                  if (pointerActive.current) setIdx(i);
+                }}
                 onClick={() => go(c.href)}
               >
                 <Text isTruncated>{c.label}</Text>

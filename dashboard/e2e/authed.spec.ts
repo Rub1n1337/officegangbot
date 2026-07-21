@@ -355,6 +355,56 @@ test('a /guilds/undefined URL redirects home without hammering the API', async (
   expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
 });
 
+test('palette: arrow keys autoscroll the active row into view', async ({ page }) => {
+  // The palette list is a 340px overflow box with ~16 default commands. Arrow
+  // keys moved the highlight but never scrolled, so past the fold you navigated
+  // blind. The active row now scrollIntoViews (with scroll-padding so it never
+  // sticks to the edge).
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('Здоровье сервера').first()).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.press('Control+k');
+  const input = page.getByPlaceholder(/Перейти к серверу/);
+  await expect(input).toBeVisible();
+  await input.click();
+  await page.mouse.move(20, 20); // cursor well away from the list
+  for (let i = 0; i < 14; i++) await input.press('ArrowDown');
+  await page.waitForTimeout(250);
+  const res = await page.evaluate(() => {
+    const modal = document.querySelector('.chakra-modal__content')!;
+    const scroller = Array.from(modal.querySelectorAll('*')).find((e) => getComputedStyle(e).overflowY === 'auto') as HTMLElement;
+    const rows = Array.from(scroller.children) as HTMLElement[];
+    const active = rows.find((r) => getComputedStyle(r).backgroundColor !== 'rgba(0, 0, 0, 0)');
+    if (!active) return { visible: false, scrollTop: 0 };
+    const sr = scroller.getBoundingClientRect(), ar = active.getBoundingClientRect();
+    return { visible: ar.top >= sr.top - 1 && ar.bottom <= sr.bottom + 1, scrollTop: Math.round(scroller.scrollTop) };
+  });
+  expect(res.visible, 'active row scrolled out of view').toBeTruthy();
+  expect(res.scrollTop, 'list did not autoscroll to follow the arrows').toBeGreaterThan(0);
+});
+
+test('palette: a stationary cursor does not steal keyboard selection', async ({ page }) => {
+  // Keyboard scroll slides a fresh row under the still cursor, firing mouseEnter.
+  // That used to yank the selection back; hover now only counts after a real
+  // pointer move.
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('Здоровье сервера').first()).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.press('Control+k');
+  const input = page.getByPlaceholder(/Перейти к серверу/);
+  await expect(input).toBeVisible();
+  await input.click();
+  const box = await page.locator('.chakra-modal__content').boundingBox();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + 200);
+  for (let i = 0; i < 10; i++) await input.press('ArrowDown');
+  await page.waitForTimeout(150);
+  const activeText = await page.evaluate(() => {
+    const modal = document.querySelector('.chakra-modal__content')!;
+    const scroller = Array.from(modal.querySelectorAll('*')).find((e) => getComputedStyle(e).overflowY === 'auto') as HTMLElement;
+    const active = (Array.from(scroller.children) as HTMLElement[]).find((r) => getComputedStyle(r).backgroundColor !== 'rgba(0, 0, 0, 0)');
+    return (active?.textContent ?? 'none').replace(/\s+/g, ' ').slice(0, 30);
+  });
+  expect(activeText, 'hover under a still cursor stole the keyboard selection').not.toMatch(/Обзор|Модерация/);
+});
+
 test('analytics charts render through the mount-gate with no NaN geometry', async ({ page }) => {
   // ApexCharts measures its parent on mount; a 0-width container (first client
   // paint, an un-laid-out SimpleGrid column, a device-emulation viewport) made
