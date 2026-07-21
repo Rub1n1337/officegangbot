@@ -355,6 +355,28 @@ test('a /guilds/undefined URL redirects home without hammering the API', async (
   expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
 });
 
+test('analytics charts render through the mount-gate with no NaN geometry', async ({ page }) => {
+  // ApexCharts measures its parent on mount; a 0-width container (first client
+  // paint, an un-laid-out SimpleGrid column, a device-emulation viewport) made
+  // every length compute to NaN, spamming the console with "<svg> width NaN"
+  // and "translate(NaN, 0)" on animation frames. StyledChart now gates the
+  // mount on a real width and disables the animation. This asserts the charts
+  // still mount (the gate can't hide them forever) and that a small→large
+  // resize produces no NaN.
+  const nan: string[] = [];
+  page.on('console', (m) => { if (/NaN/i.test(m.text())) nan.push(m.text().slice(0, 80)); });
+  page.on('pageerror', (e) => { if (/NaN/i.test(e.message)) nan.push(e.message.slice(0, 80)); });
+  await page.goto(`/ru/guilds/${GUILD_ID}/analytics`);
+  await expect(page.getByText(/Тренды и модерация/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.apexcharts-canvas').first()).toBeVisible({ timeout: 15_000 });
+  expect(await page.locator('.apexcharts-canvas svg').count()).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 380, height: 900 });
+  await page.waitForTimeout(400);
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await page.waitForTimeout(800);
+  expect(nan, 'a chart emitted NaN geometry').toEqual([]);
+});
+
 test('a botless guild answers once and offers a real Discord invite', async ({ page }) => {
   // A 404 is a definitive "bot not in this guild": it used to be retried 3x AND
   // polled every 8s by the stats query, filling the console forever on the
