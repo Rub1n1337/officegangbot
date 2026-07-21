@@ -26,6 +26,21 @@ export const theme = extendTheme({
     heading: `'Onest',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif`,
     body: `'Onest',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif`,
   },
+  // The single type scale. Every size + line-height is a multiple of the 4px
+  // baseline grid, so text in adjacent cards/columns lands on one rhythm. Used
+  // via `textStyle="body"` etc., replacing the ~20 raw px font sizes (13.5,
+  // 11.5, 10.5 …) that had accumulated. Weightless styles (body/caption/micro)
+  // leave fontWeight to the component; the heading styles own their weight.
+  textStyles: {
+    overline: { fontSize: '11px', lineHeight: '16px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' },
+    micro: { fontSize: '11px', lineHeight: '16px' },
+    caption: { fontSize: '12px', lineHeight: '16px' },
+    body: { fontSize: '14px', lineHeight: '20px' },
+    h3: { fontSize: '15px', lineHeight: '20px', fontWeight: 700 },
+    h2: { fontSize: '20px', lineHeight: '28px', fontWeight: 800, letterSpacing: '-0.01em' },
+    h1: { fontSize: '26px', lineHeight: '32px', fontWeight: 800, letterSpacing: '-0.02em' },
+    stat: { fontSize: '28px', lineHeight: '32px', fontWeight: 800, letterSpacing: '-0.02em' },
+  },
   components: {
     Button: buttonStyles,
     Switch: switchStyles,
