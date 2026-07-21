@@ -355,6 +355,18 @@ test('a /guilds/undefined URL redirects home without hammering the API', async (
   expect(bad, 'API requests fired with an undefined guild id').toEqual([]);
 });
 
+test('the number stepper is a comfortable tap target', async ({ page }) => {
+  // The +/- buttons were 28px — hard to hit on a phone. An invisible ::after
+  // hit-zone can't help here (the feature-form cards clip overflow:hidden and
+  // the value label paints over any inward extension), so the buttons are now a
+  // real 36px. Compensation for imperfect aim, done reliably.
+  await page.goto(`/guilds/${GUILD_ID}/features/anti-raid`);
+  await expect(page.getByText(/Join threshold|Порог заходов/).first()).toBeVisible({ timeout: 15_000 });
+  const box = (await page.locator('button[aria-label="decrease"]').first().boundingBox())!;
+  expect(Math.round(box.width), 'stepper button too small to tap').toBeGreaterThanOrEqual(36);
+  expect(Math.round(box.height), 'stepper button too small to tap').toBeGreaterThanOrEqual(36);
+});
+
 test('palette: arrow keys autoscroll the active row into view', async ({ page }) => {
   // The palette list is a 340px overflow box with ~16 default commands. Arrow
   // keys moved the highlight but never scrolled, so past the fold you navigated
