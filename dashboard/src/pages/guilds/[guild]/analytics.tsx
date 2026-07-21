@@ -78,12 +78,16 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
 function ChartCard({
   title,
   subtitle,
+  insight,
   isEmpty,
   emptyText,
   children,
 }: {
   title: string;
   subtitle?: string;
+  // A one-line takeaway read from the data — interpretation next to the chart,
+  // not just the chart. Hidden when there's nothing to show.
+  insight?: React.ReactNode;
   isEmpty: boolean;
   emptyText: string;
   children: React.ReactNode;
@@ -95,6 +99,12 @@ function ChartCard({
         <Text fontSize="xs" color="TextSecondary" mt={1}>
           {subtitle}
         </Text>
+      )}
+      {insight && !isEmpty && (
+        <Flex align="center" gap="6px" mt="10px" fontSize="12.5px" fontWeight="600" color="brand.200" sx={tabularNums}>
+          <Icon as={MdInsights} boxSize="15px" flexShrink={0} />
+          <Text>{insight}</Text>
+        </Flex>
       )}
       <Box mt={4}>
         {isEmpty ? (
@@ -230,6 +240,33 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
   const heatmapEmpty = data.heatmap.every((c) => c.count === 0) || data.heatmap.length === 0;
   const maxMods = Math.max(1, ...data.topModerators.map((m) => m.count));
 
+  // Interpretation, not just visualization: read the single takeaway out of the
+  // data and put it next to the chart. Peak activity window from the heatmap,
+  // shifted to local time the same way the cells are.
+  const peakInsight = useMemo(() => {
+    let best = { count: 0, wd: -1, hour: 0 };
+    const offsetH = Math.round(-new Date().getTimezoneOffset() / 60);
+    for (const c of data.heatmap) {
+      if (c.count > best.count) {
+        const shifted = (((c.weekday * 24 + c.hour + offsetH) % 168) + 168) % 168;
+        best = { count: c.count, wd: Math.floor(shifted / 24), hour: shifted % 24 };
+      }
+    }
+    if (best.wd < 0) return null;
+    return `${tt('Пик активности')}: ${tt(WEEKDAYS[best.wd])}, ${String(best.hour).padStart(2, '0')}:00`;
+  }, [data.heatmap, tt]);
+
+  // Busiest moderation day over the period.
+  const modInsight = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const r of data.modActionsByDay) byDay.set(r.day, (byDay.get(r.day) ?? 0) + r.count);
+    let best: { day: string; count: number } | null = null;
+    for (const [day, count] of Array.from(byDay.entries())) {
+      if (!best || count > best.count) best = { day, count };
+    }
+    return best && best.count > 0 ? `${tt('Активнее всего')}: ${shortDay(best.day)} (${best.count})` : null;
+  }, [data.modActionsByDay, tt]);
+
   return (
     <Flex direction="column" gap={5}>
       <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
@@ -246,6 +283,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
       <ChartCard
         title={tt('Хитмап активности')}
         subtitle={tt('Сообщения по дням недели и часам (ваше местное время). Только агрегатные счётчики — содержимое не хранится.')}
+        insight={peakInsight}
         isEmpty={heatmapEmpty}
         emptyText={tt('Активности пока нет. Хитмап считает сообщения по дням недели и часам — первые точки появятся, как только на сервере начнут общаться (обычно в течение часа).')}
       >
@@ -273,6 +311,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
         <ChartCard
           title={tt('Действия модерации по времени')}
           subtitle={tt('Из нумерованных кейсов модерации, стопкой по типу действия.')}
+          insight={modInsight}
           isEmpty={actions.series.length === 0}
           emptyText={tt('Кейсов модерации за период нет.')}
         >

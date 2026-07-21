@@ -430,6 +430,17 @@ test('palette: a stationary cursor does not steal keyboard selection', async ({ 
   expect(activeText, 'hover under a still cursor stole the keyboard selection').not.toMatch(/Обзор|Модерация/);
 });
 
+test('analytics reads a takeaway out of the data, not just a chart', async ({ page }) => {
+  // Interpretation over visualization: the heatmap carries a computed "peak
+  // activity" line (weekday + local hour) next to the chart, so the screen
+  // answers "when are we busy" instead of leaving the user to read the grid.
+  await page.goto(`/ru/guilds/${GUILD_ID}/analytics`);
+  await expect(page.getByText(/Тренды и модерация/).first()).toBeVisible({ timeout: 15_000 });
+  const peak = page.getByText(/Пик активности:/).first();
+  await expect(peak).toBeVisible({ timeout: 15_000 });
+  expect(await peak.innerText()).toMatch(/Пик активности:\s+\S+.*\d{2}:00/);
+});
+
 test('analytics charts render through the mount-gate with no NaN geometry', async ({ page }) => {
   // ApexCharts measures its parent on mount; a 0-width container (first client
   // paint, an un-laid-out SimpleGrid column, a device-emulation viewport) made

@@ -181,6 +181,8 @@ const EN: Record<string, string> = {
   'Активности пока нет. Счётчики начинают копиться с этого момента.':
     'No activity yet. Counters start accumulating from now on.',
   'сообщений': 'messages',
+  'Пик активности': 'Peak activity',
+  'Активнее всего': 'Busiest',
   'Пн': 'Mon',
   'Вт': 'Tue',
   'Ср': 'Wed',
