@@ -452,7 +452,7 @@ const MembersPage: NextPageWithLayout = () => {
         </Heading>
       </Box>
 
-      <InputGroup maxW={{ base: 'full', sm: '420px' }}>
+      <InputGroup maxW={{ base: 'full', md: '420px' }}>
         <InputLeftElement pointerEvents="none" h="full">
           <Icon as={IoSearch} color="TextSecondary" />
         </InputLeftElement>

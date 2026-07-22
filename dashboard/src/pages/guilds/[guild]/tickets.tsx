@@ -346,8 +346,8 @@ const TicketsPage: NextPageWithLayout = () => {
       <QueryStatus query={query} loading={<TicketsSkeleton />} error={tt('Не удалось загрузить тикеты.')}>
         <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" justify="space-between" gap={3} mb={4} wrap="wrap">
-            <Flex gap={3} wrap="wrap" flex={1} w={{ base: 'full', sm: 'auto' }}>
-              <InputGroup maxW={{ base: 'full', sm: '280px' }}>
+            <Flex gap={3} wrap="wrap" flex={1} w={{ base: 'full', md: 'auto' }}>
+              <InputGroup maxW={{ base: 'full', md: '280px' }}>
                 <InputLeftElement pointerEvents="none">
                   <Icon as={MdSearch} color="TextSecondary" />
                 </InputLeftElement>
@@ -360,7 +360,7 @@ const TicketsPage: NextPageWithLayout = () => {
               </InputGroup>
               <Select
                 variant="main"
-                maxW={{ base: 'full', sm: '170px' }}
+                maxW={{ base: 'full', md: '170px' }}
                 value={status}
                 onChange={(ev) => setStatus(ev.target.value as 'all' | 'open' | 'closed')}
               >
@@ -370,7 +370,7 @@ const TicketsPage: NextPageWithLayout = () => {
               </Select>
               <Select
                 variant="main"
-                maxW={{ base: 'full', sm: '190px' }}
+                maxW={{ base: 'full', md: '190px' }}
                 value={priority}
                 onChange={(ev) => setPriority(ev.target.value as 'all' | TicketPriority)}
               >

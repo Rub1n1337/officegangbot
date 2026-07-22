@@ -236,7 +236,7 @@ function OverviewMetrics({ stats }: { stats: GuildStats }) {
 function OverviewSkeleton() {
   return (
     <Flex direction="column" gap={4}>
-      <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={3}>
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>
         {Array.from({ length: 6 }).map((_, i) => (
           <Box key={i} bg="CardBackground" rounded="2xl" p={5}>
             <Skeleton h="14px" w="55%" mb={3} rounded="md" />
