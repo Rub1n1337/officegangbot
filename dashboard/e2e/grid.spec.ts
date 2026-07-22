@@ -1,0 +1,36 @@
+import { test, expect } from '@playwright/test';
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+
+// Phase 3 guard for the grid refactor: keeps the spacing on the 4px scale and
+// the type scale free of half-pixels once they've been cleaned up. A pure
+// source scan (no browser) — fails the moment someone reintroduces a raw-px
+// gutter or a N.5px font size.
+function walkTsx(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...walkTsx(p));
+    else if (p.endsWith('.tsx')) out.push(p);
+  }
+  return out;
+}
+
+test('grid: spacing stays on the scale and font sizes have no half-pixels', () => {
+  const files = walkTsx('src');
+  // gap / padding / margin props with a raw px value. 1px is allowed (hairlines).
+  const spacing = /\b(?:gap|p|px|py|pt|pb|pl|pr|m|mt|mb|ml|mr|mx|my)="(\d+)px"/g;
+  const halfPx = /fontSize="\d+\.5px"/;
+  const bad: string[] = [];
+
+  for (const f of files) {
+    const src = readFileSync(f, 'utf8');
+    if (halfPx.test(src)) bad.push(`${f}: half-pixel fontSize (use an integer / textStyle)`);
+    let m: RegExpExecArray | null;
+    while ((m = spacing.exec(src)) !== null) {
+      if (m[1] !== '1') bad.push(`${f}: raw-px gutter ${m[0]} (use a 4px scale token, e.g. {3}=12px)`);
+    }
+  }
+
+  expect(bad, `off-grid values:\n${bad.join('\n')}`).toEqual([]);
+});

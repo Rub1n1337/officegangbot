@@ -38,7 +38,7 @@ const HomePage: NextPageWithLayout = () => {
         <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
           {tt('Выберите сервер')}
         </Heading>
-        <Text fontSize="13.5px" color="TextSecondary" mt={1}>
+        <Text fontSize="14px" color="TextSecondary" mt={1}>
           {tt('Серверы, где у вас есть права администратора.')}
         </Text>
       </Box>

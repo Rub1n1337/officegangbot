@@ -136,21 +136,21 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
         <PriorityBadge priority={t.priority} />
         <Box minW={0}>
           <Flex align="center" gap={2} wrap="wrap">
-            <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
+            <Text fontSize="14px" fontWeight="600" isTruncated maxW="100%">
               {t.subject || (t.openerName ?? t.openerId)}
             </Text>
             <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="20px" px={2} flexShrink={0}>
               {t.status === 'open' ? tt('открыт') : tt('закрыт')}
             </Badge>
           </Flex>
-          <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, md: 1 }} mt={0.5}>
+          <Text fontSize="12px" color="TextSecondary" noOfLines={{ base: 2, md: 1 }} mt={0.5}>
             {t.subject && `${t.openerName ?? t.openerId} · `}
             {tt('Открыт')} {timeAgo(t.openedAt, lang)}
             {t.closedAt && ` · ${tt('закрыт')} ${timeAgo(t.closedAt, lang)}`}
             {t.closedByName && `, ${t.closedByName}`}
           </Text>
           {t.closeComment && (
-            <Text fontSize="12.5px" color="TextSecondary" noOfLines={2} mt={1}>
+            <Text fontSize="13px" color="TextSecondary" noOfLines={2} mt={1}>
               «{t.closeComment}»
             </Text>
           )}
@@ -229,11 +229,11 @@ function TranscriptHits({
               <Flex gap={3} flex="1" minW={0} align="flex-start">
                 <PriorityBadge priority={t.priority} />
                 <Box minW={0}>
-                  <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
+                  <Text fontSize="14px" fontWeight="600" isTruncated maxW="100%">
                     {t.openerName ?? t.openerId}
                   </Text>
                   {t.snippet && (
-                    <Text fontSize="11.5px" color="TextSecondary" noOfLines={2} mt={0.5}>
+                    <Text fontSize="12px" color="TextSecondary" noOfLines={2} mt={0.5}>
                       …
                       <Highlight
                         query={query}
@@ -338,7 +338,7 @@ const TicketsPage: NextPageWithLayout = () => {
             </Badge>
           )}
         </Flex>
-        <Text fontSize="13.5px" color="TextSecondary" mt={1}>
+        <Text fontSize="14px" color="TextSecondary" mt={1}>
           {tt('Тикеты поддержки с приоритетом, комментариями при закрытии и полными транскриптами закрытых обращений.')}
         </Text>
       </Box>

@@ -204,7 +204,7 @@ const AuditPage: NextPageWithLayout = () => {
         <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
           {tt('Активность дашборда')}
         </Heading>
-        <Text fontSize="13.5px" color="TextSecondary" mt={1}>
+        <Text fontSize="14px" color="TextSecondary" mt={1}>
           {tt('Каждое действие из этого дашборда — модерация, изменения функций и настроек — с автором и временем.')}
         </Text>
       </Box>

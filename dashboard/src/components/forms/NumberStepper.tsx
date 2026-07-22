@@ -51,7 +51,7 @@ export function NumberStepper({
         isDisabled={value <= min}
         onClick={() => set(value - step)}
       />
-      <Text fontSize="13.5px" fontWeight="700" minW="34px" textAlign="center">
+      <Text fontSize="14px" fontWeight="700" minW="34px" textAlign="center">
         {value}
         {suffix ?? ''}
       </Text>
