@@ -111,7 +111,7 @@ export function GuildSelect() {
 
   return (
     <Flex direction="column" gap={4}>
-      <InputGroup maxW={{ base: 'full', sm: 'sm' }}>
+      <InputGroup maxW={{ base: 'full', md: 'sm' }}>
         <InputLeftElement pointerEvents="none">
           <Icon as={IoSearch} color="TextSecondary" />
         </InputLeftElement>

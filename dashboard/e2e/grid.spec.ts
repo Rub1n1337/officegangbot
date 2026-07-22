@@ -48,3 +48,16 @@ test('no bare /guilds/:id navigation — always route to a sub-page', () => {
   }
   expect(bad, `bare /guilds/:id navigation (append a sub-route like /settings): ${bad.join(', ')}`).toEqual([]);
 });
+
+test('no {base, sm} two-key responsive props — sm is 320px, use md for mobile/desktop', () => {
+  // The theme sets sm=320px, so a two-key {base, sm} applies the sm value on
+  // every phone and the base value never shows — the exact landmine that made
+  // the ticket filters render at fixed narrow widths on mobile. Mobile-vs-
+  // desktop must use {base, md}.
+  const twoKey = /\{\s*base:[^,{}]+,\s*sm:[^,{}]+\}/;
+  const bad: string[] = [];
+  for (const f of walkTsx('src')) {
+    if (twoKey.test(readFileSync(f, 'utf8'))) bad.push(f);
+  }
+  expect(bad, `two-key {base, sm} responsive props (use {base, md}): ${bad.join(', ')}`).toEqual([]);
+});
