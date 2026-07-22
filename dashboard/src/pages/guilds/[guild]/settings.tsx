@@ -319,7 +319,7 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
         <Icon as={MdBolt} boxSize="22px" color="brand.200" />
       </Flex>
       <Box flex="1" minW={0}>
-        <Text fontSize="14.5px" fontWeight="700" sx={tabularNums}>
+        <Text fontSize="15px" fontWeight="700" sx={tabularNums}>
           {allDone
             ? tt('Базовые функции настроены')
             : `${tt('Базовая настройка:')} ${core.length - missing.length} ${tt('из')} ${core.length}`}
@@ -395,12 +395,12 @@ function FeatureCard({
         </Flex>
         <Box flex="1" minW={0}>
           <Flex align="center" gap={2}>
-            <Text fontWeight="600" fontSize="14.5px">
+            <Text fontWeight="600" fontSize="15px">
               {m.name}
             </Text>
             {on && <Box w="7px" h="7px" rounded="full" bg="green.400" flexShrink={0} />}
           </Flex>
-          <Text fontSize="12.5px" color="TextSecondary" mt={1} lineHeight="1.4" noOfLines={2}>
+          <Text fontSize="13px" color="TextSecondary" mt={1} lineHeight="1.4" noOfLines={2}>
             {m.description}
           </Text>
         </Box>
@@ -771,7 +771,7 @@ function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFea
         </Text>
         <Flex gap={4} mt={2} wrap="wrap">
           {parts.map((p) => (
-            <Flex key={p.label} align="center" gap={2} fontSize="12.5px" sx={tabularNums}>
+            <Flex key={p.label} align="center" gap={2} fontSize="13px" sx={tabularNums}>
               <Box w="8px" h="8px" rounded="full" flexShrink={0} bg={p.ok ? 'green.400' : 'secondaryGray.500'} />
               {p.label}
               {p.detail}
@@ -807,7 +807,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
             {tt('Здоровье сервера')}
           </Heading>
-          <Text fontSize="13.5px" color="TextSecondary" mt={1}>
+          <Text fontSize="14px" color="TextSecondary" mt={1}>
             {tt('Ключевые метрики и функции бота — на одном экране.')}
           </Text>
         </Box>

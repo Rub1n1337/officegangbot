@@ -65,7 +65,7 @@ function PrefRow({
         <Text fontSize="14px" fontWeight="600">
           {title}
         </Text>
-        <Text fontSize="12.5px" color="TextSecondary" mt="1px">
+        <Text fontSize="13px" color="TextSecondary" mt="1px">
           {desc}
         </Text>
       </Box>
@@ -105,7 +105,7 @@ const ProfilePage: NextPageWithLayout = () => {
           <Heading fontSize="24px" fontWeight="800" letterSpacing="-0.02em">
             {user.username}
           </Heading>
-          <Text fontSize="13.5px" color="TextSecondary" mt={0.5}>
+          <Text fontSize="14px" color="TextSecondary" mt={0.5}>
             @{user.username} · {tt('Администратор')}
           </Text>
         </Box>

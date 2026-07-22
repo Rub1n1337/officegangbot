@@ -239,13 +239,13 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
           {shown.map((w) => (
             <Flex key={w.id} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Box flex="1" minW={0}>
-                <Text fontSize="13.5px" fontWeight="600" isTruncated>
+                <Text fontSize="14px" fontWeight="600" isTruncated>
                   {w.userName}
                 </Text>
-                <Text fontSize="12.5px" color="TextSecondary" noOfLines={2}>
+                <Text fontSize="13px" color="TextSecondary" noOfLines={2}>
                   {w.reason}
                 </Text>
-                <Text fontSize="11.5px" color="TextSecondary" opacity={0.75} mt={0.5}>
+                <Text fontSize="12px" color="TextSecondary" opacity={0.75} mt={0.5}>
                   {w.moderatorName} · {timeAgo(w.createdAt, lang)}
                 </Text>
               </Box>
@@ -292,7 +292,7 @@ function Punishments({ rows }: { rows: ModerationPunishment[] }) {
             <Flex key={p.userId} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Pill tone={p.type === 'ban' ? 'red' : 'amber'}>{p.type === 'ban' ? tt('бан') : tt('мут')}</Pill>
               <Box flex="1" minW={0}>
-                <Text fontSize="13.5px" fontWeight="600" isTruncated>
+                <Text fontSize="14px" fontWeight="600" isTruncated>
                   {p.userName}
                 </Text>
                 {p.reason && (
@@ -332,7 +332,7 @@ function Strikes({ data }: { data: ModerationStrikes }) {
       </Text>
       {/* What the pill colours mean — new moderators shouldn't have to guess. */}
       {data.enabled && data.users.length > 0 && (
-        <Flex gap={4} mb={3} fontSize="11.5px" color="TextSecondary" wrap="wrap">
+        <Flex gap={4} mb={3} fontSize="12px" color="TextSecondary" wrap="wrap">
           <Flex align="center" gap={1}><Box w="8px" h="8px" rounded="full" bg="red.400" /> {tt('порог достигнут')}</Flex>
           <Flex align="center" gap={1}><Box w="8px" h="8px" rounded="full" bg="orange.400" /> {tt('1 до порога')}</Flex>
           <Flex align="center" gap={1}><Box w="8px" h="8px" rounded="full" bg="yellow.400" /> {tt('активные')}</Flex>
@@ -350,7 +350,7 @@ function Strikes({ data }: { data: ModerationStrikes }) {
                 {u.count} {pluralStrikes(u.count, lang)}
               </Pill>
               <Box flex="1" minW={0}>
-                <Text fontSize="13.5px" fontWeight="600" isTruncated>
+                <Text fontSize="14px" fontWeight="600" isTruncated>
                   {u.userName}
                 </Text>
               </Box>
@@ -416,10 +416,10 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
               <Box key={a.id} rounded="11px" py={3} px={4} {...INSET}>
                 <Flex align="center" gap={2.5} wrap="wrap">
                   <Pill tone={st.tone}>{tt(st.label)}</Pill>
-                  <Text fontSize="13.5px" fontWeight="600" isTruncated>
+                  <Text fontSize="14px" fontWeight="600" isTruncated>
                     {a.userName ?? a.userId}
                   </Text>
-                  <Text fontSize="11.5px" color="TextSecondary" opacity={0.75}>
+                  <Text fontSize="12px" color="TextSecondary" opacity={0.75}>
                     {timeAgo(a.createdAt, lang)}
                   </Text>
                   {a.status === 'pending' && (
@@ -469,13 +469,13 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
                     </Flex>
                   )}
                   {a.status !== 'pending' && a.decidedByName && (
-                    <Text ml="auto" fontSize="11.5px" color="TextSecondary" flexShrink={0}>
+                    <Text ml="auto" fontSize="12px" color="TextSecondary" flexShrink={0}>
                       {tt('решение:')} {a.decidedByName}
                     </Text>
                   )}
                 </Flex>
                 {a.reason && (
-                  <Text fontSize="12.5px" color="TextSecondary" mt={2} whiteSpace="pre-wrap">
+                  <Text fontSize="13px" color="TextSecondary" mt={2} whiteSpace="pre-wrap">
                     {a.reason}
                   </Text>
                 )}
@@ -507,19 +507,19 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
           {shown.map((e) => (
             <Flex key={e.id} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Box flex="1" minW={0}>
-                <Text fontSize="13.5px" isTruncated>
+                <Text fontSize="14px" isTruncated>
                   <Text as="span" fontWeight="600">
                     {e.actorName ?? tt('Кто-то')}
                   </Text>{' '}
                   {describeAudit(e, lang)}
                 </Text>
                 {isModerationAction(e.action) && e.detail && (
-                  <Text fontSize="11.5px" color="TextSecondary" noOfLines={1}>
+                  <Text fontSize="12px" color="TextSecondary" noOfLines={1}>
                     {e.detail}
                   </Text>
                 )}
               </Box>
-              <Text fontSize="11.5px" color="TextSecondary" flexShrink={0}>
+              <Text fontSize="12px" color="TextSecondary" flexShrink={0}>
                 {timeAgo(e.createdAt, lang)}
               </Text>
             </Flex>

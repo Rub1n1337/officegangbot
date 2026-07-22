@@ -157,7 +157,7 @@ function PanelContent({
                 <Text fontSize="13px" fontWeight="600" noOfLines={1}>
                   {n.title}
                 </Text>
-                <Text fontSize="11.5px" color="TextSecondary">
+                <Text fontSize="12px" color="TextSecondary">
                   {timeAgo(n.when, lang)}
                 </Text>
               </Box>
@@ -229,7 +229,7 @@ export function NotificationsBell({ guild }: { guild: string }) {
               rounded="full"
               bg="red.400"
               color="white"
-              fontSize="9.5px"
+              fontSize="10px"
               fontWeight="700"
               align="center"
               justify="center"

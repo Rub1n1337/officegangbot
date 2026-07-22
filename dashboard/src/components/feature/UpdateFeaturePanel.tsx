@@ -128,7 +128,7 @@ export function UpdateFeaturePanel({
             <Heading fontSize="22px" fontWeight="700">
               {name}
             </Heading>
-            <Text fontSize="13.5px" color="TextSecondary" mt={1}>
+            <Text fontSize="14px" color="TextSecondary" mt={1}>
               {description}
             </Text>
           </Box>

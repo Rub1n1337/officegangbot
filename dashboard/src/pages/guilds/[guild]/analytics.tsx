@@ -101,7 +101,7 @@ function ChartCard({
         </Text>
       )}
       {insight && !isEmpty && (
-        <Flex align="center" gap={2} mt={2.5} fontSize="12.5px" fontWeight="600" color="brand.200" sx={tabularNums}>
+        <Flex align="center" gap={2} mt={2.5} fontSize="13px" fontWeight="600" color="brand.200" sx={tabularNums}>
           <Icon as={MdInsights} boxSize="15px" flexShrink={0} />
           <Text>{insight}</Text>
         </Flex>
@@ -397,7 +397,7 @@ const AnalyticsPage: NextPageWithLayout = () => {
           <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
             {tt('Тренды и модерация')}
           </Heading>
-          <Text fontSize="13.5px" color="TextSecondary" mt={1}>
+          <Text fontSize="14px" color="TextSecondary" mt={1}>
             {tt('Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений — содержимое, автор и время не хранятся.')}
           </Text>
         </Box>

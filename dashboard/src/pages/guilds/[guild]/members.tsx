@@ -350,8 +350,8 @@ function DetailCard({
           <Flex direction="column" gap={2}>
             {data.warnings.map((w) => (
               <Box key={w.id} rounded="11px" py={3} px={3} {...INSET}>
-                <Text fontSize="13.5px">{w.reason}</Text>
-                <Text fontSize="11.5px" color="TextSecondary" mt={0.5}>
+                <Text fontSize="14px">{w.reason}</Text>
+                <Text fontSize="12px" color="TextSecondary" mt={0.5}>
                   {w.moderatorName} · {fmtDate(w.createdAt)}
                 </Text>
               </Box>
@@ -370,8 +370,8 @@ function DetailCard({
           <Flex direction="column" gap={2}>
             {data.notes.map((n) => (
               <Box key={n.id} rounded="11px" py={3} px={3} {...INSET}>
-                <Text fontSize="13.5px" whiteSpace="pre-wrap">{n.note}</Text>
-                <Text fontSize="11.5px" color="TextSecondary" mt={0.5}>
+                <Text fontSize="14px" whiteSpace="pre-wrap">{n.note}</Text>
+                <Text fontSize="12px" color="TextSecondary" mt={0.5}>
                   #{n.id} · {n.authorName ?? '—'} · {fmtDate(n.createdAt)}
                 </Text>
               </Box>
@@ -391,14 +391,14 @@ function DetailCard({
             {data.cases.map((c) => (
               <Flex key={c.caseNumber} align="center" justify="space-between" gap={2.5} rounded="11px" py={3} px={3} {...INSET}>
                 <Box minW={0}>
-                  <Text fontSize="13.5px" fontWeight="600" isTruncated textTransform="capitalize">
+                  <Text fontSize="14px" fontWeight="600" isTruncated textTransform="capitalize">
                     #{c.caseNumber} · {c.action}
                   </Text>
-                  <Text fontSize="11.5px" color="TextSecondary" noOfLines={1}>
+                  <Text fontSize="12px" color="TextSecondary" noOfLines={1}>
                     {c.reason ?? tt('Без причины')} · {c.moderatorName ?? '—'}
                   </Text>
                 </Box>
-                <Text fontSize="11.5px" color="TextSecondary" flexShrink={0}>
+                <Text fontSize="12px" color="TextSecondary" flexShrink={0}>
                   {fmtDate(c.createdAt)}
                 </Text>
               </Flex>

@@ -87,7 +87,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
           _focusVisible={{ outline: 'none', boxShadow: 'normal' }}
         >
           <PopoverBody p={2}>
-            <Text fontSize="10.5px" fontWeight="700" letterSpacing="0.1em" color="TextSecondary" px={2.5} pt={2} pb={1}>
+            <Text fontSize="11px" fontWeight="700" letterSpacing="0.1em" color="TextSecondary" px={2.5} pt={2} pb={1}>
               {tt('ВАШИ СЕРВЕРЫ')}
             </Text>
             <Box maxH="300px" overflowY="auto">
@@ -124,7 +124,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
                       {g.name}
                     </Text>
                     {knowPresence && !present.has(g.id) && (
-                      <Text fontSize="10.5px" color="TextSecondary" flexShrink={0}>
+                      <Text fontSize="11px" color="TextSecondary" flexShrink={0}>
                         {tt('нет бота')}
                       </Text>
                     )}
