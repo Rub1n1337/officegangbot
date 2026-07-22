@@ -25,7 +25,10 @@ test('unauthenticated /user/home is redirected to sign-in', async ({ page }) => 
   await expect(page).toHaveURL(/\/auth\/signin/);
 });
 
-test('root redirects toward sign-in when unauthenticated', async ({ page }) => {
+test('root serves the public landing page (no login required)', async ({ page }) => {
+  // The root is now the marketing landing — the public front door — not a
+  // redirect into the dashboard. It must render for a logged-out visitor.
   await page.goto('/');
-  await expect(page).toHaveURL(/\/auth\/signin/);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: /autopilot/i })).toBeVisible({ timeout: 15_000 });
 });
