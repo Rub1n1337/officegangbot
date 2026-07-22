@@ -240,6 +240,7 @@ function CommandPalette() {
           <Input
             ref={inputRef}
             variant="unstyled"
+            color="TextPrimary"
             px={2}
             placeholder={tt('Перейти к серверу или функции…')}
             value={q}

@@ -49,10 +49,17 @@ export const inputStyles = defineMultiStyleConfig({
   baseStyle: definePartsStyle({
     field: {
       fontWeight: 400,
+      // Theme-aware text colour on the base style so EVERY input is legible in
+      // both modes — inputs that don't pick the `main` variant (the members
+      // search, the ⌘K palette, colour/emoji pickers) otherwise inherited the
+      // light-mode body colour (a dark slate) and the typed text was nearly
+      // invisible on the dark theme.
       _light: {
+        color: 'secondaryGray.900',
         borderColor: 'secondaryGray.400',
       },
       _dark: {
+        color: 'white',
         borderColor: 'navy.600',
       },
       borderRadius: '8px',
