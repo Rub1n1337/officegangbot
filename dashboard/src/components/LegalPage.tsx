@@ -1,5 +1,7 @@
-import { Box, Container, Heading, Text } from '@chakra-ui/react';
+import { Box, Container, Flex, Heading, Icon, Text } from '@chakra-ui/react';
 import Head from 'next/head';
+import Link from 'next/link';
+import { MdSmartToy } from 'react-icons/md';
 import { ReactNode } from 'react';
 
 // Shared shell for the public legal pages (/terms, /privacy). Deliberately
@@ -20,6 +22,33 @@ export function LegalPage({
         <title>{`${title} — OfficeGangBot`}</title>
         <meta name="robots" content="index,follow" />
       </Head>
+      {/* Slim header with a home link — these pages used to be dead-ends
+          (reachable from the footer, but no way back to the site). */}
+      <Flex
+        as="header"
+        align="center"
+        px={6}
+        py={4}
+        borderBottom="1px solid"
+        borderColor="CardBorder"
+      >
+        <Flex as={Link} href="/" align="center" gap={3} _hover={{ opacity: 0.85 }}>
+          <Flex
+            w="34px"
+            h="34px"
+            rounded="11px"
+            align="center"
+            justify="center"
+            bgGradient="linear(135deg, #8B7CFF, #6E56F5)"
+            flexShrink={0}
+          >
+            <Icon as={MdSmartToy} boxSize="20px" color="white" />
+          </Flex>
+          <Text fontWeight="800" fontSize="17px" letterSpacing="-0.01em">
+            OfficeGangBot
+          </Text>
+        </Flex>
+      </Flex>
       <Container maxW="3xl" py={12} px={6}>
         <Heading as="h1" size="lg" mb={1}>
           {title}
