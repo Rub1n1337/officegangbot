@@ -1,5 +1,6 @@
 // Chakra imports
 import { Box, HStack, Icon, Spacer, Text } from '@chakra-ui/react';
+import Link from 'next/link';
 import { config } from '@/config/common';
 import { ReactNode } from 'react';
 import { SelectField } from '../forms/SelectField';
@@ -19,10 +20,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         px={{ base: 5, lg: 10 }}
         py={2}
       >
-        {config.icon != null && <Icon color="TextPrimary" as={config.icon} w={10} h={10} />}
-        <Text fontWeight="600" fontSize="lg">
-          {config.name}
-        </Text>
+        {/* Logo links home so the sign-in screen isn't a dead-end. */}
+        <HStack as={Link} href="/" spacing={2}>
+          {config.icon != null && <Icon color="TextPrimary" as={config.icon} w={10} h={10} />}
+          <Text fontWeight="600" fontSize="lg">
+            {config.name}
+          </Text>
+        </HStack>
         <Spacer />
         <Box w="150px">
           <LanguageSelect />

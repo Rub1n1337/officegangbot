@@ -20,3 +20,11 @@ test('landing in Russian renders localized', async ({ page }) => {
   await expect(page.getByText('Добавить на сервер').first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('на автопилоте')).toBeVisible();
 });
+
+test('legal pages are not dead-ends — the logo returns home', async ({ page }) => {
+  await page.goto('/privacy');
+  await expect(page.getByRole('heading', { name: /Privacy/i }).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('link', { name: /OfficeGangBot/ }).first().click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: /autopilot/i })).toBeVisible({ timeout: 10_000 });
+});

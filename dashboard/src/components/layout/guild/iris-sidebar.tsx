@@ -137,8 +137,9 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
       borderColor="CardBorder"
       onClick={onNavigate}
     >
-      {/* Brand */}
-      <Flex align="center" gap={3} px={2} pt={2} pb={4}>
+      {/* Brand → the public landing (the universal "home" affordance; it was a
+          dead, unclickable logo before). */}
+      <Flex as={Link} href="/" align="center" gap={3} px={2} pt={2} pb={4} _hover={{ opacity: 0.85 }}>
         <Flex
           w="36px"
           h="36px"

@@ -31,7 +31,9 @@ export default function IrisUserLayout({ children }: { children: ReactNode }) {
         bg="white"
         _dark={{ bg: '#0D0D18' }}
       >
-        <Flex as={Link} href="/user/home" align="center" gap={3}>
+        {/* The logo is the universal "home" affordance — it goes to the public
+            landing so there's always a way out of the dashboard. */}
+        <Flex as={Link} href="/" align="center" gap={3}>
           <Flex
             w="34px"
             h="34px"

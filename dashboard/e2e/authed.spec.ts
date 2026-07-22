@@ -384,6 +384,21 @@ test('sidebar: nav and enabled-feature icons share one optical column', async ({
   expect(Math.abs(navIcon - featIcon), 'sidebar icon boxes are different sizes').toBeLessThanOrEqual(2);
 });
 
+test('the dashboard is not a dead-end — the logo returns to the landing', async ({ page }) => {
+  // From the server picker and from a guild page there was no way back out to
+  // the public site (the guild sidebar logo wasn't even a link). The logo is
+  // now the universal "home" affordance everywhere.
+  await page.goto(`/ru/user/home`);
+  await expect(page.getByText(/Выберите сервер|Pick a server/).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('link', { name: /OfficeGangBot/ }).first().click();
+  await expect(page.getByRole('heading', { name: /автопилоте|autopilot/i })).toBeVisible({ timeout: 15_000 });
+
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('Здоровье сервера').first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('link', { name: /OfficeGangBot/ }).first().click();
+  await expect(page.getByRole('heading', { name: /автопилоте|autopilot/i })).toBeVisible({ timeout: 15_000 });
+});
+
 test('typed input text is legible on the dark theme', async ({ page }) => {
   // Inputs that don't use the `main` variant (members search, ⌘K palette, the
   // pickers) had no explicit colour and inherited the light-mode body colour —
