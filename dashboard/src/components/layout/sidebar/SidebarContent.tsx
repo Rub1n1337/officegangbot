@@ -78,7 +78,7 @@ export function SidebarContent() {
                 key={guild.id}
                 guild={guild}
                 active={selectedGroup === guild.id}
-                href={`/guilds/${guild.id}`}
+                href={`/guilds/${guild.id}/settings`}
               />
             ))
           )}

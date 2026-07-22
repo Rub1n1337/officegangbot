@@ -384,6 +384,41 @@ test('sidebar: nav and enabled-feature icons share one optical column', async ({
   expect(Math.abs(navIcon - featIcon), 'sidebar icon boxes are different sizes').toBeLessThanOrEqual(2);
 });
 
+test('the number stepper stays legible on the dark theme', async ({ page }) => {
+  // The pill used a separate `sx={{ _dark }}` that shallow-clobbered the `_dark`
+  // bg override, so on dark mode it stayed light and the grey −/+ glyphs
+  // vanished into it (reported from the live app). Now one `_dark` object, plus
+  // explicit high-contrast glyph colours per theme.
+  await page.goto(`/ru/guilds/${GUILD_ID}/features/anti-raid`);
+  await expect(page.getByText(/Порог заходов|Join threshold/).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Сменить тему' }).click(); // → dark
+  await page.waitForTimeout(300);
+  const contrast = await page.evaluate(() => {
+    const btn = document.querySelector('button[aria-label="decrease"]') as HTMLElement;
+    const pill = btn.parentElement as HTMLElement;
+    const n = (s: string) => (s.match(/\d+/g) || []).map(Number);
+    const lum = (c: number[]) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+    return Math.abs(lum(n(getComputedStyle(pill).backgroundColor)) - lum(n(getComputedStyle(btn.querySelector('svg')!).color)));
+  });
+  expect(contrast, 'stepper −/+ glyphs are too low-contrast on dark').toBeGreaterThan(60);
+});
+
+test('mobile: the server picker opens inside the drawer without closing it', async ({ page }) => {
+  // The sidebar root onClick closes the mobile drawer on any tap; the picker
+  // trigger didn't stop the bubble, so on a phone the drawer closed and
+  // unmounted the trigger before the popover could open — you couldn't switch
+  // servers at all.
+  await page.setViewportSize({ width: 390, height: 840 });
+  await page.goto(`/ru/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText('Здоровье сервера').first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Меню' }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toBeVisible();
+  await drawer.getByText('Сменить сервер').click();
+  await expect(page.getByText('ВАШИ СЕРВЕРЫ')).toBeVisible();
+  await expect(drawer, 'the drawer closed when the picker was tapped').toBeVisible();
+});
+
 test('the number stepper is a comfortable tap target', async ({ page }) => {
   // The +/- buttons were 28px — hard to hit on a phone. An invisible ::after
   // hit-zone can't help here (the feature-form cards clip overflow:hidden and

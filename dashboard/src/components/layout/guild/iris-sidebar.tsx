@@ -114,14 +114,13 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
   // While the id is unknown (build-time render) the items carry no href and
   // render non-clickable, so an early click does nothing instead of navigating
   // to a bogus URL.
-  const base = guildId ? `/guilds/${guildId}` : undefined;
   const nav = [
-    { href: base && `${base}/settings`, icon: MdSpaceDashboard, label: t.bn.settings, route: '/guilds/[guild]/settings' },
-    { href: base && `${base}/moderation`, icon: MdGavel, label: t.bn.moderation, route: '/guilds/[guild]/moderation' },
-    { href: base && `${base}/members`, icon: MdPeople, label: t.bn.members, route: '/guilds/[guild]/members' },
-    { href: base && `${base}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets', badge: openTickets },
-    { href: base && `${base}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
-    { href: base && `${base}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
+    { href: guildId && `/guilds/${guildId}/settings`, icon: MdSpaceDashboard, label: t.bn.settings, route: '/guilds/[guild]/settings' },
+    { href: guildId && `/guilds/${guildId}/moderation`, icon: MdGavel, label: t.bn.moderation, route: '/guilds/[guild]/moderation' },
+    { href: guildId && `/guilds/${guildId}/members`, icon: MdPeople, label: t.bn.members, route: '/guilds/[guild]/members' },
+    { href: guildId && `/guilds/${guildId}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets', badge: openTickets },
+    { href: guildId && `/guilds/${guildId}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
+    { href: guildId && `/guilds/${guildId}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
   ];
 
   return (

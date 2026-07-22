@@ -97,7 +97,7 @@ export function UpdateFeaturePanel({
         separator={<Icon as={IoChevronForward} fontSize="0.7em" />}
       >
         <BreadcrumbItem>
-          <BreadcrumbLink as={Link} href={guild ? `/guilds/${guild}` : '/user/home'}>
+          <BreadcrumbLink as={Link} href={guild ? `/guilds/${guild}/settings` : '/user/home'}>
             {guildPreview?.name ?? 'Server'}
           </BreadcrumbLink>
         </BreadcrumbItem>
