@@ -278,7 +278,7 @@ export default function Landing() {
                     [tt('Открыто тикетов'), '3'],
                   ].map(([label, value]) => (
                     <Box key={label} bg="secondaryGray.100" _dark={{ bg: 'navy.600' }} rounded="12px" p={3}>
-                      <Text fontSize="10.5px" fontWeight="600">
+                      <Text fontSize="11px" fontWeight="600">
                         {label}
                       </Text>
                       <Text fontSize="18px" fontWeight="800" color="TextPrimary" mt={1}>
@@ -360,7 +360,7 @@ export default function Landing() {
               </Box>
             </Flex>
           </Flex>
-          <Text fontSize="12.5px" color="TextSecondary" mt={5}>
+          <Text fontSize="13px" color="TextSecondary" mt={5}>
             © {new Date().getFullYear()} {config.name}
           </Text>
         </Container>
