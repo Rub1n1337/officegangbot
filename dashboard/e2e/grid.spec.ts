@@ -34,3 +34,17 @@ test('grid: spacing stays on the scale and font sizes have no half-pixels', () =
 
   expect(bad, `off-grid values:\n${bad.join('\n')}`).toEqual([]);
 });
+
+test('no bare /guilds/:id navigation — always route to a sub-page', () => {
+  // Pushing/linking the bare /guilds/:id relied on the next.config redirect,
+  // which on a client-side navigation could hang on the page-less route instead
+  // of loading (reported live when switching servers). Every guild link must
+  // carry a sub-route (/settings, /features/..., etc.).
+  const bare = /`\/guilds\/\$\{[^}]+\}`/; // template ending right after ${...}
+  const bad: string[] = [];
+  for (const f of walkTsx('src')) {
+    const src = readFileSync(f, 'utf8');
+    if (bare.test(src)) bad.push(f);
+  }
+  expect(bad, `bare /guilds/:id navigation (append a sub-route like /settings): ${bad.join(', ')}`).toEqual([]);
+});

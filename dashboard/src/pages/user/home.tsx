@@ -135,7 +135,7 @@ export function GuildSelect() {
                 key={guild.id}
                 variant="primary"
                 as={Link}
-                href={`/guilds/${guild.id}`}
+                href={`/guilds/${guild.id}/settings`}
                 transition="transform 0.15s ease, box-shadow 0.15s ease"
                 _hover={{ transform: 'translateY(-2px)', shadow: 'md' }}
                 _focusVisible={{

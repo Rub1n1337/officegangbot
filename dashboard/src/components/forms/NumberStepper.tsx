@@ -32,10 +32,12 @@ export function NumberStepper({
       rounded="12px"
       p={1}
       bg="secondaryGray.100"
-      _dark={{ bg: 'navy.600' }}
+      // Both dark overrides in one object: a separate `sx={{ _dark }}` shallow-
+      // merged over this prop and dropped the bg, so the pill stayed light on
+      // dark mode and the grey −/+ glyphs vanished into it.
+      _dark={{ bg: 'navy.600', borderColor: 'whiteAlpha.200' }}
       border="1px solid"
       borderColor="blackAlpha.200"
-      sx={{ _dark: { borderColor: 'whiteAlpha.200' } }}
       flexShrink={0}
     >
       <IconButton
@@ -47,7 +49,8 @@ export function NumberStepper({
         minW="36px"
         rounded="9px"
         variant="ghost"
-        color="TextSecondary"
+        color="secondaryGray.800"
+        _dark={{ color: 'whiteAlpha.900' }}
         isDisabled={value <= min}
         onClick={() => set(value - step)}
       />
@@ -64,7 +67,8 @@ export function NumberStepper({
         minW="36px"
         rounded="9px"
         variant="ghost"
-        color="TextSecondary"
+        color="secondaryGray.800"
+        _dark={{ color: 'whiteAlpha.900' }}
         isDisabled={value >= max}
         onClick={() => set(value + step)}
       />

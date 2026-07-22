@@ -114,7 +114,7 @@ function CommandPalette() {
     list.push({ id: 'home', label: tt('Сменить сервер'), hint: tt('Главная'), href: '/user/home' });
     for (const g of guilds.data ?? []) {
       if (config.guild.filter(g) && g.id !== guildId) {
-        list.push({ id: `g-${g.id}`, label: g.name, hint: tt('Сервер'), href: `/guilds/${g.id}` });
+        list.push({ id: `g-${g.id}`, label: g.name, hint: tt('Сервер'), href: `/guilds/${g.id}/settings` });
       }
     }
     return list;

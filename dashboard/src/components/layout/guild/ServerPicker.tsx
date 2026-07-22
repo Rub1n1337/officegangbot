@@ -39,7 +39,10 @@ export function ServerPicker({ guildId }: { guildId: string }) {
 
   const go = (id: string) => {
     onClose();
-    if (id !== guildId) router.push(`/guilds/${id}`);
+    // Route straight to the Overview. Pushing the bare /guilds/:id relied on the
+    // next.config redirect, which on a client-side navigation could land on the
+    // page-less route and hang instead of loading.
+    if (id !== guildId) router.push(`/guilds/${id}/settings`);
   };
 
   const initials = (name?: string) => (name ?? 'OG').slice(0, 2).toUpperCase();
@@ -49,6 +52,10 @@ export function ServerPicker({ guildId }: { guildId: string }) {
       <PopoverTrigger>
         <Flex
           as="button"
+          // Stop the tap bubbling to the sidebar's onClick, which closes the
+          // mobile drawer — on a phone that unmounted the trigger before the
+          // popover could open, so you couldn't switch servers at all.
+          onClick={(e) => e.stopPropagation()}
           align="center"
           gap={2.5}
           py={2} px={2.5}
