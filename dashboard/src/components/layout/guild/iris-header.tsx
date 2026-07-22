@@ -75,9 +75,9 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   return (
     <Flex
       align="center"
-      gap={{ base: '10px', md: '16px' }}
-      px={{ base: '16px', md: '28px' }}
-      py="15px"
+      gap={{ base: 2.5, md: 4 }}
+      px={{ base: 4, md: 7 }}
+      py={4}
       borderBottom="1px solid"
       borderColor="CardBorder"
       bg="white"
@@ -115,17 +115,17 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           bgGradient="linear(135deg, #8B7CFF, #6E56F5)"
           color="white"
           fontWeight="700"
-          fontSize="13px"
+          textStyle="body"
           display={{ base: 'none', '2sm': 'flex' }}
         >
           {(guild?.name ?? 'OG').slice(0, 2).toUpperCase()}
         </Flex>
       )}
       <Box lineHeight="1.25" minW={0} flex="1">
-        <Text fontSize="15px" fontWeight="700" noOfLines={1}>
+        <Text textStyle="h3" noOfLines={1}>
           {guild?.name ?? '—'}
         </Text>
-        <Flex align="center" gap="5px" fontSize="11.5px" color="TextSecondary">
+        <Flex align="center" gap={1} textStyle="caption" color="TextSecondary">
           <Box
             w="7px"
             h="7px"
@@ -144,19 +144,19 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
         </Flex>
       </Box>
 
-      <Flex ml="auto" align="center" gap={{ base: '6px', md: '10px' }} flexShrink={0}>
+      <Flex ml="auto" align="center" gap={{ base: 2, md: 2.5 }} flexShrink={0}>
         <Flex
           as="button"
           display={{ base: 'none', md: 'flex' }}
           align="center"
-          gap="8px"
-          px="14px"
-          py="8px"
+          gap={2}
+          px={4}
+          py={2}
           rounded="11px"
           border="1px solid"
           borderColor="CardBorder"
           color="TextSecondary"
-          fontSize="13px"
+          textStyle="body"
           minW="180px"
           transition="border-color .15s ease"
           _hover={{ borderColor: 'brand.400' }}
@@ -164,7 +164,7 @@ export function IrisHeader({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
         >
           <Icon as={MdSearch} boxSize="17px" />
           {tt('Быстрый переход')}
-          <Box as="span" ml="auto" fontSize="11px" border="1px solid" borderColor="CardBorder" rounded="6px" px="6px">
+          <Box as="span" ml="auto" textStyle="micro" border="1px solid" borderColor="CardBorder" rounded="6px" px={2}>
             ⌘K
           </Box>
         </Flex>
