@@ -13,7 +13,7 @@ function render(message: string, serverName: string): ReactNode {
     switch (part) {
       case '{user.mention}':
         return (
-          <Text as="span" key={i} bg="blue.500" color="white" px="3px" rounded="sm" fontWeight="500">
+          <Text as="span" key={i} bg="blue.500" color="white" px={1} rounded="sm" fontWeight="500">
             @NewMember
           </Text>
         );

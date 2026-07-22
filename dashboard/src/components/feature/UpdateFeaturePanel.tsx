@@ -109,7 +109,7 @@ export function UpdateFeaturePanel({
       </Breadcrumb>
 
       <Flex direction={{ base: 'column', md: 'row' }} mx={{ '3sm': 5 }} justify="space-between" gap={3} align={{ md: 'center' }}>
-        <Flex align="center" gap="14px" minW={0}>
+        <Flex align="center" gap={4} minW={0}>
           <Flex
             w="52px"
             h="52px"
@@ -128,7 +128,7 @@ export function UpdateFeaturePanel({
             <Heading fontSize="22px" fontWeight="700">
               {name}
             </Heading>
-            <Text fontSize="13.5px" color="TextSecondary" mt="3px">
+            <Text fontSize="13.5px" color="TextSecondary" mt={1}>
               {description}
             </Text>
           </Box>
@@ -139,8 +139,8 @@ export function UpdateFeaturePanel({
             fontSize="12px"
             fontWeight="700"
             rounded="20px"
-            px="11px"
-            py="4px"
+            px={3}
+            py={1}
             color={enabled ? 'green.500' : 'TextSecondary'}
             bg={enabled ? 'green.100' : 'blackAlpha.100'}
             _dark={{

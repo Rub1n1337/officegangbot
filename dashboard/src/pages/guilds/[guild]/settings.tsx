@@ -58,7 +58,7 @@ function Sparkline({ points }: { points: number[] }) {
     .map((v, i) => `${(i * step).toFixed(1)},${(h - 3 - ((v - min) / span) * (h - 6)).toFixed(1)}`)
     .join(' ');
   return (
-    <Box as="svg" viewBox={`0 0 ${w} ${h}`} w="120px" h="26px" mt="8px" aria-hidden>
+    <Box as="svg" viewBox={`0 0 ${w} ${h}`} w="120px" h="26px" mt={2} aria-hidden>
       <polyline points={path} fill="none" stroke="var(--chakra-colors-brand-400)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </Box>
   );
@@ -74,7 +74,7 @@ function DeltaChip({ delta, suffix = '' }: { delta: number; suffix?: string }) {
       fontSize="11px"
       fontWeight="700"
       rounded="20px"
-      px="8px"
+      px={2}
       py="1px"
       color={up ? 'green.500' : 'red.400'}
       bg={up ? 'rgba(63,208,126,0.13)' : 'rgba(241,106,106,0.12)'}
@@ -108,23 +108,23 @@ function IrisStat({
       border="1px solid"
       borderColor="CardBorder"
       rounded="16px"
-      p="16px"
+      p={4}
       boxShadow="normal"
       transition="transform .18s ease, border-color .18s ease"
       _hover={{ transform: 'translateY(-4px)', borderColor: 'brand.400' }}
     >
-      <Flex align="center" gap="8px">
+      <Flex align="center" gap={2}>
         <Text fontSize="12px" color="TextSecondary" fontWeight="500">
           {label}
         </Text>
         {delta != null && <DeltaChip delta={delta} suffix={deltaSuffix} />}
       </Flex>
-      <Text fontSize="27px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="9px" sx={tabularNums}>
+      <Text fontSize="27px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt={2} sx={tabularNums}>
         {value}
       </Text>
       {spark && <Sparkline points={spark} />}
       {hint && (
-        <Text fontSize="11px" color="TextSecondary" mt="6px" sx={tabularNums}>
+        <Text fontSize="11px" color="TextSecondary" mt={2} sx={tabularNums}>
           {hint}
         </Text>
       )}
@@ -205,7 +205,7 @@ function OverviewMetrics({ stats }: { stats: GuildStats }) {
     <Box
       display="grid"
       gridTemplateColumns="repeat(auto-fit, minmax(210px, 1fr))"
-      gap="16px"
+      gap={4}
     >
       <IrisStat
         label={tt('Участников')}
@@ -308,12 +308,12 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
   return (
     <Flex
       align="center"
-      gap="16px"
+      gap={4}
       bgGradient="linear(90deg, var(--chakra-colors-brandAlpha-100), transparent)"
       border="1px solid"
       borderColor="brandAlpha.100"
       rounded="16px"
-      p="16px 20px"
+      py={4} px={5}
     >
       <Flex w="42px" h="42px" rounded="12px" bg="brandAlpha.100" align="center" justify="center" flexShrink={0}>
         <Icon as={MdBolt} boxSize="22px" color="brand.200" />
@@ -324,7 +324,7 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
             ? tt('Базовые функции настроены')
             : `${tt('Базовая настройка:')} ${core.length - missing.length} ${tt('из')} ${core.length}`}
         </Text>
-        <Text fontSize="13px" color="TextSecondary" mt="2px">
+        <Text fontSize="13px" color="TextSecondary" mt={0.5}>
           {allDone
             ? tt('Загляните в аналитику или добавьте новые функции ниже.')
             : tt('Включите ключевые функции, чтобы бот заработал в полную силу.')}
@@ -335,7 +335,7 @@ function HighlightBanner({ guild, enabledFeatures }: { guild: string; enabledFea
         href={target}
         flexShrink={0}
         rounded="11px"
-        px="16px"
+        px={4}
         h="40px"
         color="white"
         bgGradient={GRADIENT}
@@ -369,17 +369,17 @@ function FeatureCard({
   return (
     <Flex
       direction="column"
-      gap="12px"
+      gap={3}
       bg="CardBackground"
       border="1px solid"
       borderColor="CardBorder"
       rounded="16px"
-      p="16px"
+      p={4}
       boxShadow="normal"
       transition="transform .18s ease, border-color .18s ease"
       _hover={{ transform: 'translateY(-4px)', borderColor: 'brand.400' }}
     >
-      <Flex align="flex-start" gap="12px">
+      <Flex align="flex-start" gap={3}>
         <Flex
           w="42px"
           h="42px"
@@ -394,13 +394,13 @@ function FeatureCard({
           {feature.icon}
         </Flex>
         <Box flex="1" minW={0}>
-          <Flex align="center" gap="7px">
+          <Flex align="center" gap={2}>
             <Text fontWeight="600" fontSize="14.5px">
               {m.name}
             </Text>
             {on && <Box w="7px" h="7px" rounded="full" bg="green.400" flexShrink={0} />}
           </Flex>
-          <Text fontSize="12.5px" color="TextSecondary" mt="4px" lineHeight="1.4" noOfLines={2}>
+          <Text fontSize="12.5px" color="TextSecondary" mt={1} lineHeight="1.4" noOfLines={2}>
             {m.description}
           </Text>
         </Box>
@@ -458,17 +458,17 @@ function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFea
   ];
 
   return (
-    <Flex direction="column" gap="14px">
-      <Flex align="center" justify="space-between" wrap="wrap" gap="12px">
-        <Flex align="center" gap="11px">
+    <Flex direction="column" gap={4}>
+      <Flex align="center" justify="space-between" wrap="wrap" gap={3}>
+        <Flex align="center" gap={3}>
           <Heading fontSize="18px" fontWeight="700">
             {tt('Функции')}
           </Heading>
-          <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px="10px" py="3px" fontSize="12px">
+          <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px={2.5} py={1} fontSize="12px">
             {enabledCount} {tt('включено')}
           </Badge>
         </Flex>
-        <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p="3px" gap="2px">
+        <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p={1} gap={0.5}>
           {pills.map((p) => (
             <Button
               key={p.k}
@@ -490,11 +490,11 @@ function FeaturesSection({ guild, enabledFeatures }: { guild: string; enabledFea
         const items = all.filter((f) => f.category === cat.id && pass(f.id));
         if (items.length === 0) return null;
         return (
-          <Flex key={cat.id} direction="column" gap="14px">
+          <Flex key={cat.id} direction="column" gap={4}>
             <Text fontSize="11px" fontWeight="700" letterSpacing="0.08em" color="TextSecondary" textTransform="uppercase">
               {meta.category(cat.id, cat.label)}
             </Text>
-            <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(290px, 1fr))" gap="14px">
+            <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(290px, 1fr))" gap={4}>
               {items.map((f) => (
                 <FeatureCard key={f.id} guild={guild} feature={f} on={enabled.has(f.id)} meta={meta} />
               ))}
@@ -733,12 +733,12 @@ function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFea
     <Flex
       bg="CardBackground"
       rounded="16px"
-      p="18px 20px"
+      py={5} px={5}
       border="1px solid"
       borderColor="CardBorder"
       boxShadow="normal"
       align="center"
-      gap="20px"
+      gap={5}
       color="TextSecondary"
     >
       <Box position="relative" flexShrink={0} lineHeight={0}>
@@ -769,9 +769,9 @@ function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFea
         <Text fontSize="17px" fontWeight="800" color={color} mt="1px">
           {label}
         </Text>
-        <Flex gap="14px" mt="8px" wrap="wrap">
+        <Flex gap={4} mt={2} wrap="wrap">
           {parts.map((p) => (
-            <Flex key={p.label} align="center" gap="6px" fontSize="12.5px" sx={tabularNums}>
+            <Flex key={p.label} align="center" gap={2} fontSize="12.5px" sx={tabularNums}>
               <Box w="8px" h="8px" rounded="full" flexShrink={0} bg={p.ok ? 'green.400' : 'secondaryGray.500'} />
               {p.label}
               {p.detail}
@@ -798,16 +798,16 @@ const GuildOverviewPage: NextPageWithLayout = () => {
   const enabledFeatures = infoQuery.data?.enabledFeatures ?? [];
 
   return (
-    <Flex direction="column" gap="22px">
-      <Flex align="flex-end" justify="space-between" gap="12px" wrap="wrap">
+    <Flex direction="column" gap={6}>
+      <Flex align="flex-end" justify="space-between" gap={3} wrap="wrap">
         <Box>
           <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
             {tt('ОБЗОР')}
           </Text>
-          <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+          <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
             {tt('Здоровье сервера')}
           </Heading>
-          <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+          <Text fontSize="13.5px" color="TextSecondary" mt={1}>
             {tt('Ключевые метрики и функции бота — на одном экране.')}
           </Text>
         </Box>

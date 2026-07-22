@@ -23,15 +23,15 @@ export default function IrisUserLayout({ children }: { children: ReactNode }) {
     <Flex direction="column" minH="100vh" bg="MainBackground">
       <Flex
         align="center"
-        gap="12px"
+        gap={3}
         px={{ base: '16px', md: '28px' }}
-        py="14px"
+        py={4}
         borderBottom="1px solid"
         borderColor="CardBorder"
         bg="white"
         _dark={{ bg: '#0D0D18' }}
       >
-        <Flex as={Link} href="/user/home" align="center" gap="11px">
+        <Flex as={Link} href="/user/home" align="center" gap={3}>
           <Flex
             w="34px"
             h="34px"
@@ -54,7 +54,7 @@ export default function IrisUserLayout({ children }: { children: ReactNode }) {
           </Box>
         </Flex>
 
-        <Flex ml="auto" align="center" gap="10px">
+        <Flex ml="auto" align="center" gap={2.5}>
           <Flex
             as="button"
             title={tt('Сменить тему')}

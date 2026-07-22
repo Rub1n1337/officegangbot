@@ -50,8 +50,8 @@ export function ServerPicker({ guildId }: { guildId: string }) {
         <Flex
           as="button"
           align="center"
-          gap="10px"
-          p="9px 10px"
+          gap={2.5}
+          py={2} px={2.5}
           rounded="12px"
           bg="CardBackground"
           border="1px solid"
@@ -86,8 +86,8 @@ export function ServerPicker({ guildId }: { guildId: string }) {
           boxShadow="normal"
           _focusVisible={{ outline: 'none', boxShadow: 'normal' }}
         >
-          <PopoverBody p="6px">
-            <Text fontSize="10.5px" fontWeight="700" letterSpacing="0.1em" color="TextSecondary" px="10px" pt="6px" pb="4px">
+          <PopoverBody p={2}>
+            <Text fontSize="10.5px" fontWeight="700" letterSpacing="0.1em" color="TextSecondary" px={2.5} pt={2} pb={1}>
               {tt('ВАШИ СЕРВЕРЫ')}
             </Text>
             <Box maxH="300px" overflowY="auto">
@@ -99,10 +99,10 @@ export function ServerPicker({ guildId }: { guildId: string }) {
                     as="button"
                     onClick={() => go(g.id)}
                     align="center"
-                    gap="10px"
+                    gap={2.5}
                     w="full"
                     textAlign="left"
-                    p="8px 10px"
+                    py={2} px={2.5}
                     rounded="10px"
                     bg={active ? 'brandAlpha.100' : 'transparent'}
                     _hover={active ? {} : { bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
@@ -136,7 +136,7 @@ export function ServerPicker({ guildId }: { guildId: string }) {
                 );
               })}
             </Box>
-            <Box borderTop="1px solid" borderColor="CardBorder" mt="4px" pt="4px">
+            <Box borderTop="1px solid" borderColor="CardBorder" mt={1} pt={1}>
               {/* The real Discord invite (server picker inside Discord) — this
                   used to link to /user/home, which just dumped the user on the
                   start page instead of adding the bot anywhere. */}
@@ -146,8 +146,8 @@ export function ServerPicker({ guildId }: { guildId: string }) {
                 target="_blank"
                 rel="noreferrer"
                 align="center"
-                gap="10px"
-                p="8px 10px"
+                gap={2.5}
+                py={2} px={2.5}
                 rounded="10px"
                 color="TextSecondary"
                 fontSize="13px"

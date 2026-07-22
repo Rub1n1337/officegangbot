@@ -36,7 +36,7 @@ function NavbarLinksBox({ children }: { children?: ReactNode }) {
       align="center"
       direction="row"
       bg="CardBackground"
-      p="10px"
+      p={2.5}
       borderRadius="30px"
       boxShadow="normal"
     >

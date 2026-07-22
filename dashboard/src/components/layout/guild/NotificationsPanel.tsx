@@ -110,7 +110,7 @@ function PanelContent({
 
   return (
     <>
-      <Flex align="center" justify="space-between" p="12px 14px" borderBottom="1px solid" borderColor="CardBorder">
+      <Flex align="center" justify="space-between" py={3} px={4} borderBottom="1px solid" borderColor="CardBorder">
         <Text fontSize="14px" fontWeight="700">
           {tt('Уведомления')}
         </Text>
@@ -118,13 +118,13 @@ function PanelContent({
           {tt('Прочитать всё')}
         </Button>
       </Flex>
-      <Box maxH="320px" overflowY="auto" p="6px">
+      <Box maxH="320px" overflowY="auto" p={2}>
         {loading ? (
-          <Flex justify="center" py="24px">
+          <Flex justify="center" py={6}>
             <Spinner size="sm" />
           </Flex>
         ) : items.length === 0 ? (
-          <Text fontSize="13px" color="TextSecondary" textAlign="center" py="20px">
+          <Text fontSize="13px" color="TextSecondary" textAlign="center" py={5}>
             {tt('Пока тихо — открытых тикетов и апелляций нет.')}
           </Text>
         ) : (
@@ -134,10 +134,10 @@ function PanelContent({
               as="button"
               onClick={() => markOne(n.id)}
               align="center"
-              gap="11px"
+              gap={3}
               w="full"
               textAlign="left"
-              p="9px 10px"
+              py={2} px={2.5}
               rounded="10px"
               _hover={{ bg: 'blackAlpha.50', _dark: { bg: 'whiteAlpha.50' } }}
             >
@@ -166,7 +166,7 @@ function PanelContent({
           ))
         )}
       </Box>
-      <Flex p="8px" borderTop="1px solid" borderColor="CardBorder" justify="center">
+      <Flex p={2} borderTop="1px solid" borderColor="CardBorder" justify="center">
         <Button size="sm" variant="ghost" color="TextSecondary" onClick={onClose}>
           {tt('Закрыть')}
         </Button>
@@ -225,7 +225,7 @@ export function NotificationsBell({ guild }: { guild: string }) {
               right="5px"
               minW="15px"
               h="15px"
-              px="4px"
+              px={1}
               rounded="full"
               bg="red.400"
               color="white"

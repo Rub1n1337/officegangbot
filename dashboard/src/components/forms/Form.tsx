@@ -23,7 +23,7 @@ export function Form(props: FormControlProps) {
       direction="column"
       bg="CardBackground"
       rounded="16px"
-      p="20px"
+      p={5}
       boxShadow="normal"
       borderWidth="1px"
       borderColor="CardBorder"

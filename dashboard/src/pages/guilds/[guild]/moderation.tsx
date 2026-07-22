@@ -117,8 +117,8 @@ function Pill({ tone, children }: { tone: keyof typeof PILL_TONE; children: Reac
       fontSize="11px"
       fontWeight="700"
       rounded="7px"
-      px="10px"
-      py="3px"
+      px={2.5}
+      py={1}
       flexShrink={0}
       color={t.color}
       bg={t.bg}
@@ -150,8 +150,8 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
-      <Flex align="center" gap="10px" mb="14px">
+    <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
+      <Flex align="center" gap={2.5} mb={4}>
         <Box color="brand.200" display="flex" fontSize="20px">
           {icon}
         </Box>
@@ -163,7 +163,7 @@ function Section({
           bg="blackAlpha.100"
           _dark={{ bg: 'whiteAlpha.100' }}
           color="TextSecondary"
-          px="9px"
+          px={2}
           fontSize="12px"
         >
           {count}
@@ -235,9 +235,9 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
           {tt('Предупреждений нет.')}
         </Text>
       ) : (
-        <Flex direction="column" gap="8px">
+        <Flex direction="column" gap={2}>
           {shown.map((w) => (
-            <Flex key={w.id} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+            <Flex key={w.id} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Box flex="1" minW={0}>
                 <Text fontSize="13.5px" fontWeight="600" isTruncated>
                   {w.userName}
@@ -245,7 +245,7 @@ function Warnings({ rows, guild }: { rows: ModerationWarning[]; guild: string })
                 <Text fontSize="12.5px" color="TextSecondary" noOfLines={2}>
                   {w.reason}
                 </Text>
-                <Text fontSize="11.5px" color="TextSecondary" opacity={0.75} mt="2px">
+                <Text fontSize="11.5px" color="TextSecondary" opacity={0.75} mt={0.5}>
                   {w.moderatorName} · {timeAgo(w.createdAt, lang)}
                 </Text>
               </Box>
@@ -287,9 +287,9 @@ function Punishments({ rows }: { rows: ModerationPunishment[] }) {
           {tt('Активных мутов и банов нет.')}
         </Text>
       ) : (
-        <Flex direction="column" gap="8px">
+        <Flex direction="column" gap={2}>
           {rows.map((p) => (
-            <Flex key={p.userId} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+            <Flex key={p.userId} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Pill tone={p.type === 'ban' ? 'red' : 'amber'}>{p.type === 'ban' ? tt('бан') : tt('мут')}</Pill>
               <Box flex="1" minW={0}>
                 <Text fontSize="13.5px" fontWeight="600" isTruncated>
@@ -323,7 +323,7 @@ function Strikes({ data }: { data: ModerationStrikes }) {
 
   return (
     <Section icon={<Icon as={MdShield} />} title={tt('Активные страйки')} count={data.users.length}>
-      <Text fontSize="12px" color="TextSecondary" mb="14px">
+      <Text fontSize="12px" color="TextSecondary" mb={4}>
         {data.enabled ? tt('Страйки вкл') : tt('Страйки выкл')}
         {data.expiryHours > 0
           ? ` · ${tt('затухают через')} ${data.expiryHours}${tt('ч')}`
@@ -332,10 +332,10 @@ function Strikes({ data }: { data: ModerationStrikes }) {
       </Text>
       {/* What the pill colours mean — new moderators shouldn't have to guess. */}
       {data.enabled && data.users.length > 0 && (
-        <Flex gap="14px" mb="12px" fontSize="11.5px" color="TextSecondary" wrap="wrap">
-          <Flex align="center" gap="5px"><Box w="8px" h="8px" rounded="full" bg="red.400" /> {tt('порог достигнут')}</Flex>
-          <Flex align="center" gap="5px"><Box w="8px" h="8px" rounded="full" bg="orange.400" /> {tt('1 до порога')}</Flex>
-          <Flex align="center" gap="5px"><Box w="8px" h="8px" rounded="full" bg="yellow.400" /> {tt('активные')}</Flex>
+        <Flex gap={4} mb={3} fontSize="11.5px" color="TextSecondary" wrap="wrap">
+          <Flex align="center" gap={1}><Box w="8px" h="8px" rounded="full" bg="red.400" /> {tt('порог достигнут')}</Flex>
+          <Flex align="center" gap={1}><Box w="8px" h="8px" rounded="full" bg="orange.400" /> {tt('1 до порога')}</Flex>
+          <Flex align="center" gap={1}><Box w="8px" h="8px" rounded="full" bg="yellow.400" /> {tt('активные')}</Flex>
         </Flex>
       )}
       {data.users.length === 0 ? (
@@ -343,9 +343,9 @@ function Strikes({ data }: { data: ModerationStrikes }) {
           {tt('Ни у кого нет активных страйков.')}
         </Text>
       ) : (
-        <Flex direction="column" gap="8px">
+        <Flex direction="column" gap={2}>
           {shown.map((u) => (
-            <Flex key={u.userId} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+            <Flex key={u.userId} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Pill tone={toneFromScheme(strikeColor(u.count, data))}>
                 {u.count} {pluralStrikes(u.count, lang)}
               </Pill>
@@ -392,7 +392,7 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
 
   return (
     <Section icon={<Icon as={MdOutlineHowToReg} />} title={tt('Апелляции на бан')} count={pendingCount}>
-      <Flex align="center" justify="space-between" gap="12px" rounded="11px" p="12px 14px" mb="12px" {...INSET}>
+      <Flex align="center" justify="space-between" gap={3} rounded="11px" py={3} px={4} mb={3} {...INSET}>
         <Text fontSize="13px" color="TextSecondary" flex="1">
           {tt('В бан-DM добавляется кнопка «Апелляция». Заявки появляются здесь на рассмотрение.')}
         </Text>
@@ -409,12 +409,12 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
           {data.enabled ? tt('Заявок пока нет.') : tt('Апелляции на бан выключены.')}
         </Text>
       ) : (
-        <Flex direction="column" gap="8px">
+        <Flex direction="column" gap={2}>
           {data.items.map((a) => {
             const st = APPEAL_STATUS[a.status] ?? { tone: 'gray' as const, label: a.status };
             return (
-              <Box key={a.id} rounded="11px" p="12px 14px" {...INSET}>
-                <Flex align="center" gap="10px" wrap="wrap">
+              <Box key={a.id} rounded="11px" py={3} px={4} {...INSET}>
+                <Flex align="center" gap={2.5} wrap="wrap">
                   <Pill tone={st.tone}>{tt(st.label)}</Pill>
                   <Text fontSize="13.5px" fontWeight="600" isTruncated>
                     {a.userName ?? a.userId}
@@ -427,7 +427,7 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
                     // don't fit beside the name under ~360px); inline and
                     // right-aligned from sm up.
                     <Flex
-                      gap="8px"
+                      gap={2}
                       ml="auto"
                       flexShrink={0}
                       // Side by side the two Russian labels are ~270px, wider
@@ -475,7 +475,7 @@ function BanAppeals({ data, guild }: { data: ModerationAppeals; guild: string })
                   )}
                 </Flex>
                 {a.reason && (
-                  <Text fontSize="12.5px" color="TextSecondary" mt="8px" whiteSpace="pre-wrap">
+                  <Text fontSize="12.5px" color="TextSecondary" mt={2} whiteSpace="pre-wrap">
                     {a.reason}
                   </Text>
                 )}
@@ -503,9 +503,9 @@ function AuditActivity({ rows }: { rows: AuditEntry[] }) {
           {tt('Действий из дашборда пока нет.')}
         </Text>
       ) : (
-        <Flex direction="column" gap="8px">
+        <Flex direction="column" gap={2}>
           {shown.map((e) => (
-            <Flex key={e.id} align="center" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
+            <Flex key={e.id} align="center" gap={3} rounded="11px" py={3} px={4} {...INSET}>
               <Box flex="1" minW={0}>
                 <Text fontSize="13.5px" isTruncated>
                   <Text as="span" fontWeight="600">
@@ -556,12 +556,12 @@ const ModerationPage: NextPageWithLayout = () => {
   const audit = useAuditQuery(guild);
 
   return (
-    <Flex direction="column" gap="16px">
+    <Flex direction="column" gap={4}>
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
           {tt('МОДЕРАЦИЯ')}
         </Text>
-        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
           {tt('Предупреждения, наказания и апелляции')}
         </Heading>
       </Box>

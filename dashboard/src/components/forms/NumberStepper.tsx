@@ -28,9 +28,9 @@ export function NumberStepper({
   return (
     <Flex
       align="center"
-      gap="2px"
+      gap={0.5}
       rounded="12px"
-      p="3px"
+      p={1}
       bg="secondaryGray.100"
       _dark={{ bg: 'navy.600' }}
       border="1px solid"
