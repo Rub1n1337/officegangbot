@@ -384,6 +384,26 @@ test('sidebar: nav and enabled-feature icons share one optical column', async ({
   expect(Math.abs(navIcon - featIcon), 'sidebar icon boxes are different sizes').toBeLessThanOrEqual(2);
 });
 
+test('typed input text is legible on the dark theme', async ({ page }) => {
+  // Inputs that don't use the `main` variant (members search, ⌘K palette, the
+  // pickers) had no explicit colour and inherited the light-mode body colour —
+  // a dark slate that was near-invisible on the dark theme (reported live). The
+  // base input style now carries a theme-aware colour.
+  const lum = (c: number[]) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  const parse = (x: string) => (x.match(/\d+/g) || []).map(Number);
+  await page.goto(`/ru/guilds/${GUILD_ID}/members`);
+  await expect(page.getByText(/Поиск и модерация/).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Сменить тему' }).click();
+  await page.waitForTimeout(300);
+  const search = page.getByPlaceholder(/Поиск по имени/);
+  await search.fill('contrast check');
+  const c = await search.evaluate((el) => {
+    const cs = getComputedStyle(el as HTMLElement);
+    return { c: cs.color, b: cs.backgroundColor };
+  });
+  expect(Math.abs(lum(parse(c.c)) - lum(parse(c.b))), 'input text too low-contrast on dark').toBeGreaterThan(80);
+});
+
 test('the number stepper stays legible on the dark theme', async ({ page }) => {
   // The pill used a separate `sx={{ _dark }}` that shallow-clobbered the `_dark`
   // bg override, so on dark mode it stayed light and the grey −/+ glyphs
