@@ -19,7 +19,7 @@ export function UserMenu(props: { color: string; shadow: string; bg: string }) {
 
   return (
     <Menu>
-      <MenuButton p="0px">
+      <MenuButton p={0}>
         <Avatar
           _hover={{ cursor: 'pointer' }}
           color="white"
@@ -42,12 +42,12 @@ function List(props: { textColor: string; shadow: string; menuBg: string; user: 
   const logout = useLogoutMutation();
 
   return (
-    <MenuList boxShadow={shadow} p="0px" mt="10px" borderRadius="20px" bg={menuBg} border="none">
-      <Flex w="100%" mb="0px">
+    <MenuList boxShadow={shadow} p={0} mt={2.5} borderRadius="20px" bg={menuBg} border="none">
+      <Flex w="100%" mb={0}>
         <Text
           ps="20px"
-          pt="16px"
-          pb="10px"
+          pt={4}
+          pb={2.5}
           w="100%"
           borderBottom="1px solid"
           borderColor={borderColor}
@@ -61,12 +61,12 @@ function List(props: { textColor: string; shadow: string; menuBg: string; user: 
           &nbsp; Hey, {user.username}
         </Text>
       </Flex>
-      <Flex flexDirection="column" p="10px">
+      <Flex flexDirection="column" p={2.5}>
         <MenuItem
           _hover={{ bg: 'none' }}
           _focus={{ bg: 'none' }}
           borderRadius="8px"
-          px="14px"
+          px={4}
           as={Link}
           href={`/user/profile`}
         >
@@ -78,7 +78,7 @@ function List(props: { textColor: string; shadow: string; menuBg: string; user: 
           color="red.400"
           borderRadius="8px"
           onClick={() => logout.mutate()}
-          px="14px"
+          px={4}
         >
           <Text fontSize="sm">{t.logout}</Text>
         </MenuItem>

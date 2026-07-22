@@ -79,7 +79,7 @@ const ACTION_RU: Record<ModerateAction, string> = {
 // A rounded status pill in one of the Iris tones.
 function Pill({ children, color, bg, dark }: { children: ReactNode; color: string; bg: string; dark?: object }) {
   return (
-    <Box as="span" fontSize="12px" fontWeight="600" rounded="20px" px="12px" py="5px" color={color} bg={bg} _dark={dark} sx={tabularNums}>
+    <Box as="span" fontSize="12px" fontWeight="600" rounded="20px" px={3} py={1} color={color} bg={bg} _dark={dark} sx={tabularNums}>
       {children}
     </Box>
   );
@@ -88,7 +88,7 @@ function Pill({ children, color, bg, dark }: { children: ReactNode; color: strin
 // A uppercase section label with an accent-ink icon.
 function SectionLabel({ icon, children }: { icon: any; children: ReactNode }) {
   return (
-    <Flex align="center" gap="8px" mb="8px">
+    <Flex align="center" gap={2} mb={2}>
       <Icon as={icon} color="brand.200" boxSize="16px" />
       <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary">
         {children}
@@ -157,8 +157,8 @@ function ModerateBar({
   };
 
   return (
-    <Box borderTop="1px solid" borderColor="CardBorder" pt="16px">
-      <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb="10px">
+    <Box borderTop="1px solid" borderColor="CardBorder" pt={4}>
+      <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb={2.5}>
         {tt('Действия')}
       </Text>
       <Wrap spacing="8px">
@@ -261,15 +261,15 @@ function DetailCard({
   return (
     <Flex
       direction="column"
-      gap="18px"
+      gap={5}
       bg="CardBackground"
       rounded="18px"
-      p="22px"
+      p={6}
       border="1px solid"
       borderColor="CardBorder"
       boxShadow="normal"
     >
-      <Flex align="center" gap="14px">
+      <Flex align="center" gap={4}>
         <Avatar src={data.avatar ?? undefined} name={data.displayName} size="lg" />
         <Box flex="1" minW={0}>
           <Heading fontSize="20px" fontWeight="700" isTruncated>
@@ -294,7 +294,7 @@ function DetailCard({
         </Button>
       </Flex>
 
-      <Flex gap="10px" wrap="wrap">
+      <Flex gap={2.5} wrap="wrap">
         <Pill color="brand.200" bg="brandAlpha.100">
           {tt('Уровень')} {data.level} · {data.xp.toLocaleString('ru-RU')} XP
         </Pill>
@@ -312,7 +312,7 @@ function DetailCard({
 
       {data.roles.length > 0 && (
         <Box>
-          <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb="8px">
+          <Text fontSize="11px" fontWeight="700" textTransform="uppercase" letterSpacing="0.06em" color="TextSecondary" mb={2}>
             {tt('Роли')}
           </Text>
           <Wrap>
@@ -324,8 +324,8 @@ function DetailCard({
                     fontSize="12px"
                     fontWeight="500"
                     rounded="8px"
-                    px="11px"
-                    py="4px"
+                    px={3}
+                    py={1}
                     border="1px solid"
                     borderColor="CardBorder"
                     {...INSET}
@@ -347,11 +347,11 @@ function DetailCard({
             {tt('Предупреждений нет.')}
           </Text>
         ) : (
-          <Flex direction="column" gap="8px">
+          <Flex direction="column" gap={2}>
             {data.warnings.map((w) => (
-              <Box key={w.id} rounded="11px" p="11px 13px" {...INSET}>
+              <Box key={w.id} rounded="11px" py={3} px={3} {...INSET}>
                 <Text fontSize="13.5px">{w.reason}</Text>
-                <Text fontSize="11.5px" color="TextSecondary" mt="2px">
+                <Text fontSize="11.5px" color="TextSecondary" mt={0.5}>
                   {w.moderatorName} · {fmtDate(w.createdAt)}
                 </Text>
               </Box>
@@ -367,11 +367,11 @@ function DetailCard({
             {tt('Заметок нет. Добавьте через /note в Discord — участник их не видит.')}
           </Text>
         ) : (
-          <Flex direction="column" gap="8px">
+          <Flex direction="column" gap={2}>
             {data.notes.map((n) => (
-              <Box key={n.id} rounded="11px" p="11px 13px" {...INSET}>
+              <Box key={n.id} rounded="11px" py={3} px={3} {...INSET}>
                 <Text fontSize="13.5px" whiteSpace="pre-wrap">{n.note}</Text>
-                <Text fontSize="11.5px" color="TextSecondary" mt="2px">
+                <Text fontSize="11.5px" color="TextSecondary" mt={0.5}>
                   #{n.id} · {n.authorName ?? '—'} · {fmtDate(n.createdAt)}
                 </Text>
               </Box>
@@ -387,9 +387,9 @@ function DetailCard({
             {tt('Кейсов модерации нет.')}
           </Text>
         ) : (
-          <Flex direction="column" gap="8px">
+          <Flex direction="column" gap={2}>
             {data.cases.map((c) => (
-              <Flex key={c.caseNumber} align="center" justify="space-between" gap="10px" rounded="11px" p="11px 13px" {...INSET}>
+              <Flex key={c.caseNumber} align="center" justify="space-between" gap={2.5} rounded="11px" py={3} px={3} {...INSET}>
                 <Box minW={0}>
                   <Text fontSize="13.5px" fontWeight="600" isTruncated textTransform="capitalize">
                     #{c.caseNumber} · {c.action}
@@ -442,12 +442,12 @@ const MembersPage: NextPageWithLayout = () => {
   const hasQuery = debounced.trim().length >= 2;
 
   return (
-    <Flex direction="column" gap="18px">
+    <Flex direction="column" gap={5}>
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
           {tt('УЧАСТНИКИ')}
         </Text>
-        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
           {tt('Поиск и модерация')}
         </Heading>
       </Box>
@@ -491,7 +491,7 @@ const MembersPage: NextPageWithLayout = () => {
       ) : !hasQuery ? (
         // Before a search this page was a bare grey line in a sea of empty
         // space. A centered prompt fills it and says what the page is for.
-        <Flex direction="column" align="center" textAlign="center" py="56px" gap="14px">
+        <Flex direction="column" align="center" textAlign="center" py={14} gap={4}>
           <Flex w="58px" h="58px" rounded="18px" bg="brandAlpha.100" align="center" justify="center">
             <Icon as={IoSearch} boxSize="27px" color="brand.200" />
           </Flex>
@@ -499,7 +499,7 @@ const MembersPage: NextPageWithLayout = () => {
             <Text fontWeight="700" fontSize="16px">
               {tt('Найдите участника')}
             </Text>
-            <Text color="TextSecondary" fontSize="14px" mt="5px" maxW="380px" lineHeight="1.5">
+            <Text color="TextSecondary" fontSize="14px" mt={1} maxW="380px" lineHeight="1.5">
               {tt('Введите имя или @ник, чтобы открыть историю, предупреждения и заметки — и применить меры.')}
             </Text>
           </Box>
@@ -523,8 +523,8 @@ const MembersPage: NextPageWithLayout = () => {
               w="full"
               aria-label={`View ${m.displayName}`}
               align="center"
-              gap="13px"
-              p="12px 14px"
+              gap={3}
+              py={3} px={4}
               rounded="14px"
               cursor="pointer"
               bg="CardBackground"

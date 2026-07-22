@@ -101,7 +101,7 @@ function AuditRow({ e, lang }: { e: AuditEntry; lang: Languages }) {
       justify="space-between"
       gap={{ base: 1.5, md: 3 }}
       rounded="11px"
-      p="12px 14px"
+      py={3} px={4}
       bg="secondaryGray.100"
       _dark={{ bg: 'navy.600' }}
     >
@@ -115,7 +115,7 @@ function AuditRow({ e, lang }: { e: AuditEntry; lang: Languages }) {
         minW={0}
         flex="1"
       >
-        <Badge colorScheme={auditActionColor(e.action)} rounded="20px" px="9px" mt="1px" flexShrink={0}>
+        <Badge colorScheme={auditActionColor(e.action)} rounded="20px" px={2} mt="1px" flexShrink={0}>
           {actionLabel(e.action, lang)}
         </Badge>
         <Box minW={0}>
@@ -196,21 +196,21 @@ const AuditPage: NextPageWithLayout = () => {
   const filtersActive = q !== '' || action !== 'all' || period !== 'all';
 
   return (
-    <Flex direction="column" gap="18px">
+    <Flex direction="column" gap={5}>
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
           {tt('ЖУРНАЛ')}
         </Text>
-        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
           {tt('Активность дашборда')}
         </Heading>
-        <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+        <Text fontSize="13.5px" color="TextSecondary" mt={1}>
           {tt('Каждое действие из этого дашборда — модерация, изменения функций и настроек — с автором и временем.')}
         </Text>
       </Box>
 
       <QueryStatus query={query} loading={<AuditSkeleton />} error={tt('Не удалось загрузить журнал.')}>
-        <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" gap={3} mb={4} wrap="wrap">
             <InputGroup maxW="260px">
               <InputLeftElement pointerEvents="none">

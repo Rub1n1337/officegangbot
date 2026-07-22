@@ -53,7 +53,7 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
     <Box
       bg="CardBackground"
       rounded="16px"
-      p="18px"
+      p={5}
       border="1px solid"
       borderColor="CardBorder"
       boxShadow="normal"
@@ -63,11 +63,11 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
       <Text fontSize="12px" color="TextSecondary" fontWeight="500">
         {label}
       </Text>
-      <Text fontSize="28px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt="7px" sx={tabularNums}>
+      <Text fontSize="28px" fontWeight="800" letterSpacing="-0.02em" lineHeight="1" mt={2} sx={tabularNums}>
         {value}
       </Text>
       {hint && (
-        <Text fontSize="11px" color="TextSecondary" mt="6px">
+        <Text fontSize="11px" color="TextSecondary" mt={2}>
           {hint}
         </Text>
       )}
@@ -93,7 +93,7 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+    <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
       <Heading fontSize="15px" fontWeight="700">{title}</Heading>
       {subtitle && (
         <Text fontSize="xs" color="TextSecondary" mt={1}>
@@ -101,7 +101,7 @@ function ChartCard({
         </Text>
       )}
       {insight && !isEmpty && (
-        <Flex align="center" gap="6px" mt="10px" fontSize="12.5px" fontWeight="600" color="brand.200" sx={tabularNums}>
+        <Flex align="center" gap={2} mt={2.5} fontSize="12.5px" fontWeight="600" color="brand.200" sx={tabularNums}>
           <Icon as={MdInsights} boxSize="15px" flexShrink={0} />
           <Text>{insight}</Text>
         </Flex>
@@ -351,8 +351,8 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
         </ChartCard>
       </SimpleGrid>
 
-      <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
-        <Heading fontSize="15px" fontWeight="700" mb="18px">
+      <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Heading fontSize="15px" fontWeight="700" mb={5}>
           {tt('Топ модераторов')}
         </Heading>
         {data.topModerators.length === 0 ? (
@@ -360,9 +360,9 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
             {tt('Кейсов модерации за период нет.')}
           </Text>
         ) : (
-          <Flex direction="column" gap="15px">
+          <Flex direction="column" gap={4}>
             {data.topModerators.map((m) => (
-              <Flex key={m.name} align="center" gap="10px">
+              <Flex key={m.name} align="center" gap={2.5}>
                 <Text fontSize="13px" fontWeight="600" minW="90px" isTruncated>
                   {m.name}
                 </Text>
@@ -388,16 +388,16 @@ const AnalyticsPage: NextPageWithLayout = () => {
   const tt = useText();
 
   return (
-    <Flex direction="column" gap="18px">
-      <Flex align="flex-end" justify="space-between" gap="12px" wrap="wrap">
+    <Flex direction="column" gap={5}>
+      <Flex align="flex-end" justify="space-between" gap={3} wrap="wrap">
         <Box>
           <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
             {tt('АНАЛИТИКА')}
           </Text>
-          <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+          <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
             {tt('Тренды и модерация')}
           </Heading>
-          <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+          <Text fontSize="13.5px" color="TextSecondary" mt={1}>
             {tt('Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений — содержимое, автор и время не хранятся.')}
           </Text>
         </Box>

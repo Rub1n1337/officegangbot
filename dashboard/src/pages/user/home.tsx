@@ -30,15 +30,15 @@ import Link from 'next/link';
 const HomePage: NextPageWithLayout = () => {
   const tt = useText();
   return (
-    <Flex direction="column" gap="18px">
+    <Flex direction="column" gap={5}>
       <Box>
         <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
           {tt('СЕРВЕРЫ')}
         </Text>
-        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+        <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
           {tt('Выберите сервер')}
         </Heading>
-        <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+        <Text fontSize="13.5px" color="TextSecondary" mt={1}>
           {tt('Серверы, где у вас есть права администратора.')}
         </Text>
       </Box>

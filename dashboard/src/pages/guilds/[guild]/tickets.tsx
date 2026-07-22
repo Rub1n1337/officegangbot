@@ -131,26 +131,26 @@ function TicketRow({ t, onView }: { t: Ticket; onView: (id: number) => void }) {
   const lang = provider.useLang();
   const tt = useText();
   return (
-    <Flex align="flex-start" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
-      <Flex gap="12px" flex="1" minW={0} align="flex-start">
+    <Flex align="flex-start" gap={3} rounded="11px" py={3} px={4} {...INSET}>
+      <Flex gap={3} flex="1" minW={0} align="flex-start">
         <PriorityBadge priority={t.priority} />
         <Box minW={0}>
-          <Flex align="center" gap="8px" wrap="wrap">
+          <Flex align="center" gap={2} wrap="wrap">
             <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
               {t.subject || (t.openerName ?? t.openerId)}
             </Text>
-            <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="20px" px="9px" flexShrink={0}>
+            <Badge colorScheme={t.status === 'open' ? 'green' : 'gray'} rounded="20px" px={2} flexShrink={0}>
               {t.status === 'open' ? tt('открыт') : tt('закрыт')}
             </Badge>
           </Flex>
-          <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, md: 1 }} mt="2px">
+          <Text fontSize="11.5px" color="TextSecondary" noOfLines={{ base: 2, md: 1 }} mt={0.5}>
             {t.subject && `${t.openerName ?? t.openerId} · `}
             {tt('Открыт')} {timeAgo(t.openedAt, lang)}
             {t.closedAt && ` · ${tt('закрыт')} ${timeAgo(t.closedAt, lang)}`}
             {t.closedByName && `, ${t.closedByName}`}
           </Text>
           {t.closeComment && (
-            <Text fontSize="12.5px" color="TextSecondary" noOfLines={2} mt="4px">
+            <Text fontSize="12.5px" color="TextSecondary" noOfLines={2} mt={1}>
               «{t.closeComment}»
             </Text>
           )}
@@ -204,12 +204,12 @@ function TranscriptHits({
   const tt = useText();
   if (query.length < 2) return null;
   return (
-    <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
-      <Flex align="center" gap="10px" mb="14px">
+    <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
+      <Flex align="center" gap={2.5} mb={4}>
         <Icon as={MdSearch} color="brand.200" boxSize="20px" />
         <Heading fontSize="15px" fontWeight="700">{tt('Найдено в транскриптах')}</Heading>
         {hits.length > 0 && (
-          <Box as="span" fontSize="12px" fontWeight="700" rounded="20px" px="9px" color="TextSecondary" bg="blackAlpha.100" _dark={{ bg: 'whiteAlpha.100' }}>
+          <Box as="span" fontSize="12px" fontWeight="700" rounded="20px" px={2} color="TextSecondary" bg="blackAlpha.100" _dark={{ bg: 'whiteAlpha.100' }}>
             {hits.length}
           </Box>
         )}
@@ -225,8 +225,8 @@ function TranscriptHits({
       ) : (
         <Flex direction="column" gap={2}>
           {hits.map((t) => (
-            <Flex key={t.id} align="flex-start" gap="12px" rounded="11px" p="12px 14px" {...INSET}>
-              <Flex gap="12px" flex="1" minW={0} align="flex-start">
+            <Flex key={t.id} align="flex-start" gap={3} rounded="11px" py={3} px={4} {...INSET}>
+              <Flex gap={3} flex="1" minW={0} align="flex-start">
                 <PriorityBadge priority={t.priority} />
                 <Box minW={0}>
                   <Text fontSize="13.5px" fontWeight="600" isTruncated maxW="100%">
@@ -321,30 +321,30 @@ const TicketsPage: NextPageWithLayout = () => {
   );
 
   return (
-    <Flex direction="column" gap="18px">
+    <Flex direction="column" gap={5}>
       <Box>
-        <Flex align="center" gap="12px" wrap="wrap">
+        <Flex align="center" gap={3} wrap="wrap">
           <Box>
             <Text fontSize="11px" fontWeight="700" letterSpacing="0.12em" color="brand.200">
               {tt('ТИКЕТЫ')}
             </Text>
-            <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt="3px">
+            <Heading fontSize="26px" fontWeight="800" letterSpacing="-0.02em" mt={1}>
               {tt('Поддержка')}
             </Heading>
           </Box>
           {openCount > 0 && (
-            <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px="11px" py="4px" fontSize="12px">
+            <Badge color="green.500" bg="green.100" _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }} rounded="20px" px={3} py={1} fontSize="12px">
               {openCount} {tt('открыто')}
             </Badge>
           )}
         </Flex>
-        <Text fontSize="13.5px" color="TextSecondary" mt="4px">
+        <Text fontSize="13.5px" color="TextSecondary" mt={1}>
           {tt('Тикеты поддержки с приоритетом, комментариями при закрытии и полными транскриптами закрытых обращений.')}
         </Text>
       </Box>
 
       <QueryStatus query={query} loading={<TicketsSkeleton />} error={tt('Не удалось загрузить тикеты.')}>
-        <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
           <Flex align="center" justify="space-between" gap={3} mb={4} wrap="wrap">
             <Flex gap={3} wrap="wrap" flex={1} w={{ base: 'full', sm: 'auto' }}>
               <InputGroup maxW={{ base: 'full', sm: '280px' }}>

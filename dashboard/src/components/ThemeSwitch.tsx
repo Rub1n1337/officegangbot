@@ -34,7 +34,7 @@ export function ThemeSwitch({ secondary }: { secondary?: boolean }) {
     <Button
       variant="no-hover"
       bg="transparent"
-      p="0px"
+      p={0}
       minW="unset"
       minH="unset"
       h="18px"

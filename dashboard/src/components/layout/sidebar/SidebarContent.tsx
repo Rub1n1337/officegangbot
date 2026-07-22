@@ -60,7 +60,7 @@ export function SidebarContent() {
 
       <Stack direction="column" mb="auto">
         <Items />
-        <Box px="10px">
+        <Box px={2.5}>
           <SearchBar
             w="full"
             input={{
@@ -69,7 +69,7 @@ export function SidebarContent() {
             }}
           />
         </Box>
-        <Flex direction="column" px="10px" gap={3}>
+        <Flex direction="column" px={2.5} gap={3}>
           {filteredGuilds == null ? (
             <GuildItemsSkeleton />
           ) : (
@@ -110,7 +110,7 @@ function Items() {
   const active = useActiveSidebarItem();
 
   return (
-    <Flex direction="column" px="10px" gap={0}>
+    <Flex direction="column" px={2.5} gap={0}>
       {items
         .filter((item) => !item.hidden)
         .map((route: SidebarItemInfo, index: number) => (

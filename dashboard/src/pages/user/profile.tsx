@@ -30,7 +30,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p="3px" gap="2px" flexShrink={0}>
+    <Flex bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="11px" p={1} gap={0.5} flexShrink={0}>
       {options.map((o) => (
         <Button
           key={o.value}
@@ -60,7 +60,7 @@ function PrefRow({
   control: React.ReactNode;
 }) {
   return (
-    <Flex align="center" justify="space-between" gap="12px" rounded="11px" p="14px" {...INSET}>
+    <Flex align="center" justify="space-between" gap={3} rounded="11px" p={4} {...INSET}>
       <Box minW={0}>
         <Text fontSize="14px" fontWeight="600">
           {title}
@@ -83,12 +83,12 @@ const ProfilePage: NextPageWithLayout = () => {
   const tt = useText();
 
   return (
-    <Flex direction="column" gap="20px" maxW="720px" mx="auto" w="full">
+    <Flex direction="column" gap={5} maxW="720px" mx="auto" w="full">
       <Flex
         as={Link}
         href="/user/home"
         align="center"
-        gap="6px"
+        gap={2}
         fontSize="13px"
         color="TextSecondary"
         _hover={{ color: 'TextPrimary' }}
@@ -99,24 +99,24 @@ const ProfilePage: NextPageWithLayout = () => {
       </Flex>
 
       {/* Header */}
-      <Flex align="center" gap="16px">
+      <Flex align="center" gap={4}>
         <Avatar src={avatarUrl(user)} name={user.username} w="72px" h="72px" />
         <Box minW={0}>
           <Heading fontSize="24px" fontWeight="800" letterSpacing="-0.02em">
             {user.username}
           </Heading>
-          <Text fontSize="13.5px" color="TextSecondary" mt="2px">
+          <Text fontSize="13.5px" color="TextSecondary" mt={0.5}>
             @{user.username} · {tt('Администратор')}
           </Text>
         </Box>
       </Flex>
 
       {/* Discord account */}
-      <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
-        <Text fontSize="15px" fontWeight="700" mb="14px">
+      <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Text fontSize="15px" fontWeight="700" mb={4}>
           {tt('Аккаунт Discord')}
         </Text>
-        <Flex align="center" gap="12px" rounded="11px" p="14px" {...INSET}>
+        <Flex align="center" gap={3} rounded="11px" p={4} {...INSET}>
           <Flex w="40px" h="40px" rounded="11px" align="center" justify="center" bg="#5865F2" color="white" flexShrink={0}>
             <Icon as={FaDiscord} boxSize="22px" />
           </Flex>
@@ -133,8 +133,8 @@ const ProfilePage: NextPageWithLayout = () => {
             fontSize="11px"
             fontWeight="700"
             rounded="20px"
-            px="10px"
-            py="4px"
+            px={2.5}
+            py={1}
             color="green.500"
             bg="green.100"
             _dark={{ bg: 'whiteAlpha.100', color: 'green.400' }}
@@ -146,11 +146,11 @@ const ProfilePage: NextPageWithLayout = () => {
       </Box>
 
       {/* Preferences */}
-      <Box bg="CardBackground" rounded="16px" p="20px" border="1px solid" borderColor="CardBorder" boxShadow="normal">
-        <Text fontSize="15px" fontWeight="700" mb="14px">
+      <Box bg="CardBackground" rounded="16px" p={5} border="1px solid" borderColor="CardBorder" boxShadow="normal">
+        <Text fontSize="15px" fontWeight="700" mb={4}>
           {tt('Настройки')}
         </Text>
-        <Flex direction="column" gap="10px">
+        <Flex direction="column" gap={2.5}>
           <PrefRow
             title={tt('Оформление')}
             desc={tt('Тема интерфейса дашборда')}
