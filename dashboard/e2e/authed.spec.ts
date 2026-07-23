@@ -454,6 +454,27 @@ test('mobile: the server picker opens inside the drawer without closing it', asy
   await expect(drawer, 'the drawer closed when the picker was tapped').toBeVisible();
 });
 
+test('AutoMod beta presets: one click configures, advanced stays collapsed', async ({ page }) => {
+  // §5 progressive-disclosure pilot: a Resident picks a preset instead of tuning
+  // ten thresholds; the advanced block is hidden until asked for.
+  await page.goto(`/ru/guilds/${GUILD_ID}/features/automod`);
+  await expect(page.getByText('Быстрая настройка')).toBeVisible({ timeout: 15_000 });
+  // advanced section is collapsed by default
+  expect(await page.getByText('Анти-спам и упоминания').isVisible().catch(() => false)).toBeFalsy();
+
+  await page.getByRole('button', { name: /Сбалансированный/ }).click();
+  await expect(page.getByText(/Применено/)).toBeVisible();
+
+  await page.getByRole('button', { name: /Расширенные настройки/ }).click();
+  await expect(page.getByText('Порог спама (сообщений)')).toBeVisible();
+  const spam = await page.evaluate(() => {
+    const label = Array.from(document.querySelectorAll('*')).find((e) => e.textContent?.trim() === 'Порог спама (сообщений)');
+    const card = label?.closest('div[class*="css"]')?.parentElement?.parentElement;
+    return card?.querySelector('button[aria-label="decrease"]')?.parentElement?.querySelector('p')?.textContent ?? '?';
+  });
+  expect(spam, 'balanced preset should set the spam threshold to 6').toBe('6');
+});
+
 test('the number stepper is a comfortable tap target', async ({ page }) => {
   // The +/- buttons were 28px — hard to hit on a phone. An invisible ::after
   // hit-zone can't help here (the feature-form cards clip overflow:hidden and

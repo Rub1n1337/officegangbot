@@ -21,6 +21,18 @@ const RU: Record<string, string> = {
   Description: 'Описание',
 
   // --- AutoMod --------------------------------------------------------------
+  'Beta': 'Бета',
+  'Quick setup': 'Быстрая настройка',
+  'One click applies sensible settings — tweak anything after.': 'Один клик задаёт разумные настройки — потом можно всё подправить.',
+  'Strict': 'Строгий',
+  'Balanced': 'Сбалансированный',
+  'Soft': 'Мягкий',
+  'Aggressive — blocks links & invites, low spam tolerance.': 'Жёстко — блок ссылок и инвайтов, низкий порог спама.',
+  'Recommended — solid protection, room to talk.': 'Рекомендуется — надёжная защита, не душит общение.',
+  'Light — only the essentials, no strikes.': 'Легко — только базовое, без страйков.',
+  'Applied — review below and Save.': 'Применено — проверьте ниже и нажмите «Сохранить».',
+  'Advanced settings': 'Расширенные настройки',
+
   'Content filter': 'Контент-фильтр',
   'Block invite links': 'Блокировать инвайты',
   'Delete messages containing Discord invite links (discord.gg/…).':
