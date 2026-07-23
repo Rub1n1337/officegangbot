@@ -194,7 +194,17 @@ class MyBot(commands.Bot):
 
     async def on_ready(self):
         """Called when the bot is ready and connected to Discord."""
-        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="the server"))
+        # A branded, useful presence (like Dyno's "dyno.gg | ?help") instead of
+        # the bland "Watching the server": point people at the help command and
+        # show reach. Refreshed on every (re)connect, so the count stays current.
+        guild_count = len(self.guilds)
+        plural = "server" if guild_count == 1 else "servers"
+        await self.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"/help • {guild_count} {plural}",
+            )
+        )
         logger.info(f'Logged in as {self.user} (ID: {self.user.id})')
 
         # Perform an initial sync to ensure commands are registered with Discord.
