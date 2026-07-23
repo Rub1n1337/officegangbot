@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import {
+  Badge,
   Box,
   Button,
   Divider,
@@ -11,6 +12,7 @@ import {
   IconButton,
   Input,
   Select,
+  SimpleGrid,
   Switch,
   Tag,
   TagCloseButton,
@@ -29,6 +31,10 @@ import {
   MdDelete,
   MdRule,
   MdScience,
+  MdTune,
+  MdCheck,
+  MdExpandMore,
+  MdExpandLess,
 } from 'react-icons/md';
 import { FormCardController } from '@/components/forms/Form';
 import { NumberStepper } from '@/components/forms/NumberStepper';
@@ -74,6 +80,17 @@ const schema = z.object({
 });
 
 type Input = z.infer<typeof schema>;
+
+// §5 pilot (Beta): one-click presets. Each is just a bundle of field values
+// applied to the form — no backend concept, the admin still reviews and Saves
+// normally. Serves the "Resident" who wants sensible protection without tuning
+// ten thresholds; the "Advanced settings" section stays for anyone who does.
+type PresetKey = 'strict' | 'balanced' | 'soft';
+const PRESETS: Record<PresetKey, Partial<Input>> = {
+  strict: { dryRun: false, blockInvites: true, blockLinks: true, blockMassMentions: true, spamCount: 4, spamWindow: 8, mentionLimit: 4, strikesEnabled: true, strikeExpiryHours: 168, strikeMuteAt: 2, strikeKickAt: 4, strikeBanAt: 6 },
+  balanced: { dryRun: false, blockInvites: true, blockLinks: false, blockMassMentions: true, spamCount: 6, spamWindow: 10, mentionLimit: 6, strikesEnabled: true, strikeExpiryHours: 168, strikeMuteAt: 3, strikeKickAt: 5, strikeBanAt: 8 },
+  soft: { dryRun: false, blockInvites: false, blockLinks: false, blockMassMentions: true, spamCount: 10, spamWindow: 10, mentionLimit: 8, strikesEnabled: false, strikeExpiryHours: 168, strikeMuteAt: 0, strikeKickAt: 0, strikeBanAt: 0 },
+};
 
 // Accepts a domain, a full URL, or several separated by space/comma/newline,
 // and reduces each to a bare host (no scheme/path/www).
@@ -311,9 +328,74 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
   const strikesEnabled = watch('strikesEnabled');
   const dryRun = watch('dryRun');
 
+  // Beta: preset selector + collapsible advanced section (§5 progressive
+  // disclosure). Applying a preset just setValue()s a bundle; nothing saves
+  // until the admin hits Save.
+  const [activePreset, setActivePreset] = useState<PresetKey | null>(null);
+  const [advanced, setAdvanced] = useState(false);
+  const applyPreset = (key: PresetKey) => {
+    for (const [field, value] of Object.entries(PRESETS[key])) {
+      setValue(field as keyof Input, value as never, { shouldDirty: true });
+    }
+    setActivePreset(key);
+  };
+
   return {
     component: (
       <Flex direction="column" gap={3}>
+        {/* Beta: one-click presets (§5 progressive disclosure) */}
+        <Box bg="brandAlpha.100" border="1px solid" borderColor="brand.400" rounded="16px" p={4}>
+          <Flex align="center" gap={2} mb={1}>
+            <Icon as={MdTune} color="brand.200" />
+            <Text fontWeight="700">{ft('Quick setup')}</Text>
+            <Badge colorScheme="purple" rounded="full" px={2}>
+              {ft('Beta')}
+            </Badge>
+          </Flex>
+          <Text fontSize="sm" color="TextSecondary" mb={3}>
+            {ft('One click applies sensible settings — tweak anything after.')}
+          </Text>
+          <SimpleGrid columns={{ base: 1, md: 3 }} gap={2}>
+            {([
+              ['strict', ft('Strict'), ft('Aggressive — blocks links & invites, low spam tolerance.')],
+              ['balanced', ft('Balanced'), ft('Recommended — solid protection, room to talk.')],
+              ['soft', ft('Soft'), ft('Light — only the essentials, no strikes.')],
+            ] as [PresetKey, string, string][]).map(([key, name, desc]) => (
+              <Box
+                as="button"
+                key={key}
+                type="button"
+                onClick={() => applyPreset(key)}
+                textAlign="left"
+                bg="CardBackground"
+                border="1px solid"
+                borderColor={activePreset === key ? 'brand.400' : 'CardBorder'}
+                rounded="12px"
+                p={3}
+                transition="border-color .15s ease"
+                _hover={{ borderColor: 'brand.400' }}
+              >
+                <Flex align="center" gap={1.5}>
+                  <Text fontWeight="700" fontSize="sm">
+                    {name}
+                  </Text>
+                  {activePreset === key && <Icon as={MdCheck} color="brand.200" boxSize="15px" />}
+                </Flex>
+                <Text fontSize="12px" color="TextSecondary" mt={1} lineHeight={1.4}>
+                  {desc}
+                </Text>
+              </Box>
+            ))}
+          </SimpleGrid>
+          {activePreset && (
+            <Text fontSize="sm" color="brand.200" fontWeight="600" mt={3}>
+              {ft('Applied — review below and Save.')}
+            </Text>
+          )}
+        </Box>
+
+        <Divider my={1} />
+
         <ToggleRule
           icon={MdScience}
           title={ft('Dry-run (test mode)')}
@@ -427,6 +509,19 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
 
         <Divider my={1} />
 
+        {/* Advanced tuning, collapsed by default (§5): a preset already sets
+            these; only power users need to open them. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          alignSelf="flex-start"
+          leftIcon={<Icon as={advanced ? MdExpandLess : MdExpandMore} />}
+          onClick={() => setAdvanced((v) => !v)}
+        >
+          {ft('Advanced settings')}
+        </Button>
+        {advanced && (
+          <>
         <Text fontWeight="600">{ft('Anti-spam & mentions')}</Text>
         <Text fontSize="sm" color="TextSecondary">
           {ft('These limits run whenever AutoMod is enabled. Tune the thresholds to fit your server.')}
@@ -592,6 +687,8 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
             'Members with “Manage Messages” bypass all AutoMod rules. Actions are recorded in your punishment log when the Logging feature is enabled.'
           )}
         </Text>
+          </>
+        )}
       </Flex>
     ),
     onSubmit: handleSubmit(async (e) => {
