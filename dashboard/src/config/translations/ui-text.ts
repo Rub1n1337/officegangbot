@@ -21,6 +21,7 @@ const EN: Record<string, string> = {
   'Не удалось загрузить данные пользователя.': 'Failed to load user info.',
 
   // --- Shell (sidebar / header / popovers) -----------------------------------
+  'изменение с начала наблюдения': 'change since tracking started',
   'ПУЛЬС СЕРВЕРА': 'SERVER PULSE',
   'Онлайн': 'Online',
   'Настроен': 'Configured',
