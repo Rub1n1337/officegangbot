@@ -425,10 +425,12 @@ function FeatureCard({
           <Button
             size="sm"
             rounded="10px"
-            color="white"
-            bgGradient={GRADIENT}
-            boxShadow="0 6px 16px -7px rgba(110,86,245,.7)"
-            _hover={{ filter: 'brightness(1.08)' }}
+            // Brand-tinted, not a full gradient: seven disabled cards each with a
+            // heavy gradient CTA pulled the eye seven ways. The one gradient CTA
+            // is reserved for the setup banner's guided "Продолжить".
+            bg="brandAlpha.100"
+            color="brand.200"
+            _hover={{ bg: 'brandAlpha.200' }}
             leftIcon={<Icon as={MdAdd} boxSize="16px" />}
             isLoading={enableMut.isLoading}
             onClick={() => enableMut.mutate({ guild, feature: feature.id, enabled: true })}
@@ -726,6 +728,24 @@ function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFea
   const color = score >= 80 ? '#22C55E' : score >= 50 ? '#EAB308' : '#F16A6A';
   const label = score >= 80 ? tt('Отлично') : score >= 50 ? tt('Хорошо') : tt('Нужно внимание');
 
+  // Trend over time. We don't store the pulse server-side, so accumulate it in
+  // localStorage (one point per day, capped at two weeks) and show the delta
+  // vs the earliest point we have — it fills in as the admin comes back, like
+  // the KPI sparklines.
+  const [delta, setDelta] = useState<number | null>(null);
+  useEffect(() => {
+    const key = `pulse-history-${stats.id}`;
+    try {
+      const hist: Array<{ d: string; s: number }> = JSON.parse(localStorage.getItem(key) ?? '[]');
+      const today = new Date().toISOString().slice(0, 10);
+      const past = hist.filter((h) => h.d !== today);
+      localStorage.setItem(key, JSON.stringify([...past, { d: today, s: score }].slice(-14)));
+      setDelta(past.length ? score - past[0].s : null);
+    } catch {
+      /* private mode — the trend just won't persist */
+    }
+  }, [stats.id, score]);
+
   const R = 30;
   const CIRC = 2 * Math.PI * R;
 
@@ -763,9 +783,24 @@ function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFea
         </Flex>
       </Box>
       <Box minW={0} flex="1">
-        <Text fontSize="11px" fontWeight="700" letterSpacing="0.1em">
-          {tt('ПУЛЬС СЕРВЕРА')}
-        </Text>
+        <Flex align="center" gap={2}>
+          <Text fontSize="11px" fontWeight="700" letterSpacing="0.1em">
+            {tt('ПУЛЬС СЕРВЕРА')}
+          </Text>
+          {delta != null && delta !== 0 && (
+            <Text
+              as="span"
+              title={tt('изменение с начала наблюдения')}
+              fontSize="11px"
+              fontWeight="700"
+              color={delta > 0 ? 'green.400' : 'red.400'}
+              sx={tabularNums}
+            >
+              {delta > 0 ? '▲' : '▼'}
+              {Math.abs(delta)}
+            </Text>
+          )}
+        </Flex>
         <Text fontSize="17px" fontWeight="800" color={color} mt="1px">
           {label}
         </Text>
