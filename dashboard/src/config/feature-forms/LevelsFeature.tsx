@@ -1,4 +1,5 @@
 import { useForm, useFieldArray } from 'react-hook-form';
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -18,6 +19,7 @@ import { MdAdd, MdDelete, MdMic, MdBolt } from 'react-icons/md';
 import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
+import { PresetPicker } from '@/components/forms/PresetPicker';
 import { useFormText } from '@/config/translations/form-text';
 import type { LevelsFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
@@ -50,6 +52,16 @@ const schema = z.object({
 });
 
 type Input = z.infer<typeof schema>;
+
+// §5 pilot (Beta): XP-pacing presets — how fast members level up. Just an
+// xp-multiplier + voice-XP bundle applied via setValue (see PresetPicker);
+// rewards/roles stay server-specific and untouched.
+type PresetKey = 'slow' | 'standard' | 'fast';
+const PRESETS: Record<PresetKey, Partial<Input>> = {
+  slow: { xpMultiplier: 0.75, voiceXpEnabled: true, voiceXpPerMin: 2 },
+  standard: { xpMultiplier: 1, voiceXpEnabled: true, voiceXpPerMin: 3 },
+  fast: { xpMultiplier: 1.75, voiceXpEnabled: true, voiceXpPerMin: 5 },
+};
 
 function defaultsFrom(data: Partial<LevelsFeature>): Input {
   return {
@@ -91,9 +103,27 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
   const voiceEnabled = watch('voiceXpEnabled');
   const season = data.season ?? 1;
 
+  const [activePreset, setActivePreset] = useState<PresetKey | null>(null);
+  const applyPreset = (key: PresetKey) => {
+    for (const [field, value] of Object.entries(PRESETS[key])) {
+      setValue(field as keyof Input, value as never, { shouldDirty: true });
+    }
+    setActivePreset(key);
+  };
+
   return {
     component: (
       <Flex direction="column" gap={4}>
+        {/* Beta: XP-pacing presets (§5 progressive disclosure) */}
+        <PresetPicker<PresetKey>
+          active={activePreset}
+          onPick={applyPreset}
+          presets={[
+            { key: 'slow', name: ft('Relaxed'), desc: ft('Calm pacing — lower XP, less grind.') },
+            { key: 'standard', name: ft('Standard'), desc: ft('Recommended — balanced XP, with voice.') },
+            { key: 'fast', name: ft('Fast'), desc: ft('Quick leveling — higher XP, active servers.') },
+          ]}
+        />
         <Box bg="CardBackground" rounded="2xl" p={4}>
           <Flex justify="space-between" align="center" mb={2}>
             <Text fontWeight="600" fontSize="sm">
