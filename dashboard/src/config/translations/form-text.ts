@@ -23,6 +23,13 @@ const RU: Record<string, string> = {
   // --- AutoMod --------------------------------------------------------------
   'Beta': 'Бета',
   'Quick setup': 'Быстрая настройка',
+  'Relaxed': 'Медленный',
+  'Standard': 'Стандартный',
+  'Fast': 'Быстрый',
+  'Calm pacing — lower XP, less grind.': 'Размеренный темп — меньше XP, без гринда.',
+  'Recommended — balanced XP, with voice.': 'Рекомендуется — сбалансированный XP, с голосом.',
+  'Quick leveling — higher XP, active servers.': 'Быстрая прокачка — больше XP, для активных серверов.',
+
   'Low threshold, timeout, protects new accounts.': 'Низкий порог, таймаут, бережёт новые аккаунты.',
   'Recommended — catches raids, tolerant of normal waves.': 'Рекомендуется — ловит рейды, терпим к обычным волнам.',
   'Alert only on big spikes, no action.': 'Только оповещение на крупных всплесках, без мер.',
