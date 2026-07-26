@@ -23,6 +23,10 @@ const RU: Record<string, string> = {
   // --- AutoMod --------------------------------------------------------------
   'Beta': 'Бета',
   'Quick setup': 'Быстрая настройка',
+  'Low threshold, timeout, protects new accounts.': 'Низкий порог, таймаут, бережёт новые аккаунты.',
+  'Recommended — catches raids, tolerant of normal waves.': 'Рекомендуется — ловит рейды, терпим к обычным волнам.',
+  'Alert only on big spikes, no action.': 'Только оповещение на крупных всплесках, без мер.',
+
   'One click applies sensible settings — tweak anything after.': 'Один клик задаёт разумные настройки — потом можно всё подправить.',
   'Strict': 'Строгий',
   'Balanced': 'Сбалансированный',

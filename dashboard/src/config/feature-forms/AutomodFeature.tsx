@@ -3,7 +3,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import {
-  Badge,
   Box,
   Button,
   Divider,
@@ -12,7 +11,6 @@ import {
   IconButton,
   Input,
   Select,
-  SimpleGrid,
   Switch,
   Tag,
   TagCloseButton,
@@ -31,11 +29,10 @@ import {
   MdDelete,
   MdRule,
   MdScience,
-  MdTune,
-  MdCheck,
   MdExpandMore,
   MdExpandLess,
 } from 'react-icons/md';
+import { PresetPicker } from '@/components/forms/PresetPicker';
 import { FormCardController } from '@/components/forms/Form';
 import { NumberStepper } from '@/components/forms/NumberStepper';
 import { ChannelMultiSelectForm } from '@/components/forms/ChannelSelect';
@@ -344,55 +341,15 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
     component: (
       <Flex direction="column" gap={3}>
         {/* Beta: one-click presets (§5 progressive disclosure) */}
-        <Box bg="brandAlpha.100" border="1px solid" borderColor="brand.400" rounded="16px" p={4}>
-          <Flex align="center" gap={2} mb={1}>
-            <Icon as={MdTune} color="brand.200" />
-            <Text fontWeight="700">{ft('Quick setup')}</Text>
-            <Badge colorScheme="purple" rounded="full" px={2}>
-              {ft('Beta')}
-            </Badge>
-          </Flex>
-          <Text fontSize="sm" color="TextSecondary" mb={3}>
-            {ft('One click applies sensible settings — tweak anything after.')}
-          </Text>
-          <SimpleGrid columns={{ base: 1, md: 3 }} gap={2}>
-            {([
-              ['strict', ft('Strict'), ft('Aggressive — blocks links & invites, low spam tolerance.')],
-              ['balanced', ft('Balanced'), ft('Recommended — solid protection, room to talk.')],
-              ['soft', ft('Soft'), ft('Light — only the essentials, no strikes.')],
-            ] as [PresetKey, string, string][]).map(([key, name, desc]) => (
-              <Box
-                as="button"
-                key={key}
-                type="button"
-                onClick={() => applyPreset(key)}
-                textAlign="left"
-                bg="CardBackground"
-                border="1px solid"
-                borderColor={activePreset === key ? 'brand.400' : 'CardBorder'}
-                rounded="12px"
-                p={3}
-                transition="border-color .15s ease"
-                _hover={{ borderColor: 'brand.400' }}
-              >
-                <Flex align="center" gap={1.5}>
-                  <Text fontWeight="700" fontSize="sm">
-                    {name}
-                  </Text>
-                  {activePreset === key && <Icon as={MdCheck} color="brand.200" boxSize="15px" />}
-                </Flex>
-                <Text fontSize="12px" color="TextSecondary" mt={1} lineHeight={1.4}>
-                  {desc}
-                </Text>
-              </Box>
-            ))}
-          </SimpleGrid>
-          {activePreset && (
-            <Text fontSize="sm" color="brand.200" fontWeight="600" mt={3}>
-              {ft('Applied — review below and Save.')}
-            </Text>
-          )}
-        </Box>
+        <PresetPicker<PresetKey>
+          active={activePreset}
+          onPick={applyPreset}
+          presets={[
+            { key: 'strict', name: ft('Strict'), desc: ft('Aggressive — blocks links & invites, low spam tolerance.') },
+            { key: 'balanced', name: ft('Balanced'), desc: ft('Recommended — solid protection, room to talk.') },
+            { key: 'soft', name: ft('Soft'), desc: ft('Light — only the essentials, no strikes.') },
+          ]}
+        />
 
         <Divider my={1} />
 

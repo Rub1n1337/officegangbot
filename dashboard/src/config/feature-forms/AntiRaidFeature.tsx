@@ -1,10 +1,12 @@
 import { useForm } from 'react-hook-form';
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Box, Flex, Icon, Select, Text } from '@chakra-ui/react';
 import { NumberStepper } from '@/components/forms/NumberStepper';
 import { MdGroupAdd, MdTimer, MdGavel, MdHourglassBottom, MdVerifiedUser } from 'react-icons/md';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
+import { PresetPicker } from '@/components/forms/PresetPicker';
 import { useFormText } from '@/config/translations/form-text';
 import type { AntiRaidFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
@@ -19,6 +21,15 @@ const schema = z.object({
 });
 
 type Input = z.infer<typeof schema>;
+
+// §5 pilot (Beta): raid-protection intensity presets — a bundle of field values
+// applied on the frontend (see PresetPicker). No backend concept.
+type PresetKey = 'strict' | 'balanced' | 'soft';
+const PRESETS: Record<PresetKey, Partial<Input>> = {
+  strict: { joinCount: 5, joinWindow: 10, action: 'timeout', duration: 600, minAccountAgeDays: 7 },
+  balanced: { joinCount: 8, joinWindow: 10, action: 'timeout', duration: 300, minAccountAgeDays: 3 },
+  soft: { joinCount: 15, joinWindow: 20, action: 'notify', duration: 300, minAccountAgeDays: 0 },
+};
 
 function Row({
   icon,
@@ -62,6 +73,14 @@ export const useAntiRaidFeature: UseFormRender<AntiRaidFeature> = (data, onSubmi
 
   const action = watch('action');
 
+  const [activePreset, setActivePreset] = useState<PresetKey | null>(null);
+  const applyPreset = (key: PresetKey) => {
+    for (const [field, value] of Object.entries(PRESETS[key])) {
+      setValue(field as keyof Input, value as never, { shouldDirty: true });
+    }
+    setActivePreset(key);
+  };
+
   const numberField = (name: 'joinCount' | 'joinWindow' | 'duration' | 'minAccountAgeDays', min: number, max: number) => (
     <NumberStepper
       value={watch(name)}
@@ -74,6 +93,16 @@ export const useAntiRaidFeature: UseFormRender<AntiRaidFeature> = (data, onSubmi
   return {
     component: (
       <Flex direction="column" gap={3}>
+        {/* Beta: raid-protection presets (§5 progressive disclosure) */}
+        <PresetPicker<PresetKey>
+          active={activePreset}
+          onPick={applyPreset}
+          presets={[
+            { key: 'strict', name: ft('Strict'), desc: ft('Low threshold, timeout, protects new accounts.') },
+            { key: 'balanced', name: ft('Balanced'), desc: ft('Recommended — catches raids, tolerant of normal waves.') },
+            { key: 'soft', name: ft('Soft'), desc: ft('Alert only on big spikes, no action.') },
+          ]}
+        />
         <Text fontSize="sm" color="TextSecondary">
           {ft(
             'When this many members join within the time window, raid mode activates: everyone in the wave (and anyone joining while it lasts) gets the chosen action. A raid alert is posted to your punishment log channel.'
