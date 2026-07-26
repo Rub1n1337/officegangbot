@@ -1,9 +1,11 @@
 import { useForm } from 'react-hook-form';
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Box, Divider, Flex, Icon, SimpleGrid, Switch, Text } from '@chakra-ui/react';
 import { NumberStepper } from '@/components/forms/NumberStepper';
 import { MdGavel } from 'react-icons/md';
+import { PresetPicker } from '@/components/forms/PresetPicker';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { useFormText } from '@/config/translations/form-text';
 import type { ModerationFeature } from '@/config/types/custom-types';
@@ -24,6 +26,16 @@ const schema = z.object({
 });
 
 type Input = z.infer<typeof schema>;
+
+// §5 pilot (Beta): warn-escalation intensity presets. Each bundle turns
+// escalation on and sets the mute/kick/ban thresholds + expiry via setValue
+// (see PresetPicker) — command permissions stay server-specific and untouched.
+type PresetKey = 'strict' | 'balanced' | 'soft';
+const PRESETS: Record<PresetKey, Partial<Input>> = {
+  strict: { warnEscalationEnabled: true, warnMuteAt: 2, warnKickAt: 4, warnBanAt: 6, warnExpiryHours: 0 },
+  balanced: { warnEscalationEnabled: true, warnMuteAt: 3, warnKickAt: 5, warnBanAt: 7, warnExpiryHours: 720 },
+  soft: { warnEscalationEnabled: true, warnMuteAt: 4, warnKickAt: 0, warnBanAt: 0, warnExpiryHours: 168 },
+};
 
 const PERMISSIONS: { name: keyof Input; label: string; description: string }[] = [
   { name: 'config', label: 'Config', description: 'Can use /config and /setup' },
@@ -58,6 +70,14 @@ export const useModerationFeature: UseFormRender<ModerationFeature> = (
   });
 
   const escalationOn = watch('warnEscalationEnabled');
+
+  const [activePreset, setActivePreset] = useState<PresetKey | null>(null);
+  const applyPreset = (key: PresetKey) => {
+    for (const [field, value] of Object.entries(PRESETS[key])) {
+      setValue(field as keyof Input, value as never, { shouldDirty: true });
+    }
+    setActivePreset(key);
+  };
 
   const numberField = (name: 'warnExpiryHours' | 'warnMuteAt' | 'warnKickAt' | 'warnBanAt', max: number) => (
     <NumberStepper
@@ -109,6 +129,17 @@ export const useModerationFeature: UseFormRender<ModerationFeature> = (
             onChange={(e) => setValue('warnEscalationEnabled', e.target.checked, { shouldDirty: true })}
           />
         </Flex>
+
+        {/* Beta: warn-escalation intensity presets (§5 progressive disclosure) */}
+        <PresetPicker<PresetKey>
+          active={activePreset}
+          onPick={applyPreset}
+          presets={[
+            { key: 'strict', name: ft('Strict'), desc: ft('Fast escalation — mute at 2, ban at 6, warnings never expire.') },
+            { key: 'balanced', name: ft('Balanced'), desc: ft('Recommended — mute at 3, ban at 7, 30-day expiry.') },
+            { key: 'soft', name: ft('Soft'), desc: ft('Gentle — mute only, warnings fade after a week.') },
+          ]}
+        />
 
         {escalationOn && (
           <Flex direction="column" gap={2}>

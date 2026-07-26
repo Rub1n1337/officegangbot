@@ -25,6 +25,10 @@ const RU: Record<string, string> = {
   'Quick setup': 'Быстрая настройка',
   'Relaxed': 'Медленный',
   'Standard': 'Стандартный',
+  'Fast escalation — mute at 2, ban at 6, warnings never expire.': 'Быстрая эскалация — мут на 2, бан на 6, предупреждения не сгорают.',
+  'Recommended — mute at 3, ban at 7, 30-day expiry.': 'Рекомендуется — мут на 3, бан на 7, срок 30 дней.',
+  'Gentle — mute only, warnings fade after a week.': 'Мягко — только мут, предупреждения сгорают через неделю.',
+
   'Fast': 'Быстрый',
   'Calm pacing — lower XP, less grind.': 'Размеренный темп — меньше XP, без гринда.',
   'Recommended — balanced XP, with voice.': 'Рекомендуется — сбалансированный XP, с голосом.',
