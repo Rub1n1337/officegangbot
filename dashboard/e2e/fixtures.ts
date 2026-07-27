@@ -46,6 +46,7 @@ const GUILD_INFO = {
   enabledFeatures: ['levels', 'tickets', 'automod', 'logging'],
   premium: true,
   embedColor: 0x2ecc71,
+  footerText: 'Trials Gang',
 };
 
 const STATS = {

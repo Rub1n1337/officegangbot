@@ -19,7 +19,8 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'ticket_support_role_id', 'ticket_category_id', 'ticket_auto_close_hours',
     'verification_role_id', 'ban_appeals_enabled', 'enabled_features',
     'antiraid_min_account_age_days', 'antiraid_ping_role_id',
-    'locale', 'premium_embed_color', 'automod_block_invites', 'automod_block_links',
+    'locale', 'premium_embed_color', 'premium_footer_text',
+    'automod_block_invites', 'automod_block_links',
     'automod_allowed_domains', 'automod_spam_count', 'automod_spam_window',
     'automod_mention_limit', 'automod_block_mass_mentions',
 })

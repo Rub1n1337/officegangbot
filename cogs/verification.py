@@ -8,7 +8,7 @@ from discord import app_commands
 from core.logger import logger
 from core.i18n import t
 from core.permissions import role_is_assignable
-from core.discord_utils import guild_accent_color
+from core.discord_utils import guild_accent_color, apply_branded_footer
 from .utils import reply
 from typing import Optional
 
@@ -122,7 +122,7 @@ class VerificationCog(commands.Cog, name="✅ Verification"):
             description=t(loc, "verify.panel_desc"),
             color=panel_color,
         )
-        embed.set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
+        await apply_branded_footer(embed, self.bot.db, ctx.guild)
         try:
             await channel.send(embed=embed, view=VerifyView(loc))
         except discord.Forbidden:

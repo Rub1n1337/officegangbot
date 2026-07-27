@@ -5,8 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 import discord
 
+import discord as _discord
+
 from core.db.premium import _PremiumMixin
-from core.discord_utils import guild_accent_color
+from core.discord_utils import guild_accent_color, apply_branded_footer
 
 
 class _FakeConn:
@@ -149,3 +151,38 @@ def test_accent_color_free_is_default_even_if_color_set():
 def test_accent_color_bad_value_falls_back_to_default():
     db = _FakeColorDB(premium=True, color="not-an-int")
     assert _run(guild_accent_color(db, 1, DEFAULT)) == DEFAULT
+
+
+# --- apply_branded_footer (powered-by / custom footer) ----------------------
+
+class _FakeFooterDB:
+    def __init__(self, premium, footer):
+        self._premium = premium
+        self._footer = footer
+
+    async def is_premium(self, guild_id):
+        return self._premium
+
+    async def get_guild_setting(self, guild_id, key, default=None):
+        return self._footer
+
+
+_GUILD = type("G", (), {"id": 1, "icon": None})()
+
+
+def _footer_of(premium, footer):
+    embed = _discord.Embed(title="x")
+    _run(apply_branded_footer(embed, _FakeFooterDB(premium, footer), _GUILD))
+    return embed.footer.text
+
+
+def test_free_gets_attribution_footer():
+    assert _footer_of(premium=False, footer=None) == "via OfficeGangBot"
+
+
+def test_premium_without_custom_footer_has_none():
+    assert _footer_of(premium=True, footer=None) is None
+
+
+def test_premium_with_custom_footer():
+    assert _footer_of(premium=True, footer="Best Server") == "Best Server"

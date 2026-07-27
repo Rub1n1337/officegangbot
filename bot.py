@@ -28,7 +28,7 @@ from core.permissions import bot_can_act_on, role_is_assignable
 from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules, validate_pattern
 from core.limits import limit_for, limit_error
-from core.discord_utils import guild_accent_color
+from core.discord_utils import guild_accent_color, apply_branded_footer
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from core.observability import init_sentry
@@ -489,7 +489,7 @@ class MyBot(commands.Bot):
         _needs_guild = {
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
-            "get_moderation", "delete_warning", "set_locale", "set_embed_color",
+            "get_moderation", "delete_warning", "set_locale", "set_embed_color", "set_footer_text",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
             "get_analytics", "set_ban_appeals", "decide_ban_appeal",
@@ -517,6 +517,7 @@ class MyBot(commands.Bot):
             "decide_ban_appeal": self._rpc_decide_ban_appeal,
             "set_locale": self._rpc_set_locale,
             "set_embed_color": self._rpc_set_embed_color,
+            "set_footer_text": self._rpc_set_footer_text,
             "search_members": self._rpc_search_members,
             "get_member": self._rpc_get_member,
             "moderate_member": self._rpc_moderate_member,
@@ -556,6 +557,7 @@ class MyBot(commands.Bot):
             "enabledFeatures": enabled_features,
             "premium": premium,
             "embedColor": settings.get("premium_embed_color"),
+            "footerText": settings.get("premium_footer_text"),
         }
 
     async def _rpc_get_guild_stats(self, guild_id, payload):
@@ -987,6 +989,19 @@ class MyBot(commands.Bot):
         await self.db.set_guild_setting(guild_id, "premium_embed_color", value)
         await self._record_audit(guild_id, payload, "set_embed_color", detail=str(value))
         return {"success": True, "color": value}
+
+    async def _rpc_set_footer_text(self, guild_id, payload):
+        """Premium branding: set (or clear, with text=None/empty) the guild's
+        custom embed footer. Rejected for non-premium guilds."""
+        if not self.db:
+            return {"error": "Database unavailable"}
+        if not await self.db.is_premium(guild_id):
+            return {"error": "Premium required"}
+        text = payload.get("text")
+        text = (str(text).strip()[:2048] if text else None) or None
+        await self.db.set_guild_setting(guild_id, "premium_footer_text", text)
+        await self._record_audit(guild_id, payload, "set_footer_text", detail=text or "cleared")
+        return {"success": True, "text": text}
 
     async def _rpc_search_members(self, guild_id, payload):
         guild = self.get_guild(guild_id)
@@ -1690,6 +1705,7 @@ class MyBot(commands.Bot):
             description=build_menu_body(description, item_lines),
             color=color,
         )
+        await apply_branded_footer(embed, self.db, guild)
         if message_id:
             try:
                 msg = await channel.fetch_message(int(message_id))

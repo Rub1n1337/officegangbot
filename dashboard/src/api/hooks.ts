@@ -24,6 +24,7 @@ import {
   searchMembers,
   setGuildLocale,
   setGuildEmbedColor,
+  setGuildFooterText,
   updateFeature,
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
@@ -493,6 +494,40 @@ export function useSetEmbedColorMutation() {
       onError() {
         toast({
           title: 'Failed to update embed colour',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
+}
+
+export function useSetFooterTextMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, text }: { guild: string; text: string | null }) =>
+      setGuildFooterText(session!!, guild, text),
+    {
+      onSuccess(_, { guild, text }) {
+        client.setQueryData<CustomGuildInfo | null>(Keys.guild_info(guild), (prev) =>
+          prev ? { ...prev, footerText: text } : prev
+        );
+        client.invalidateQueries(['audit', guild]);
+        toast({
+          title: 'Embed footer updated',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError() {
+        toast({
+          title: 'Failed to update embed footer',
           status: 'error',
           duration: 4000,
           isClosable: true,

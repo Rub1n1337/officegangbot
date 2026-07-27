@@ -17,6 +17,9 @@ export type CustomGuildInfo = GuildInfo & {
   premium?: boolean;
   // Premium custom embed accent colour (0xRRGGBB) or null/undefined for default.
   embedColor?: number | null;
+  // Premium custom embed footer text (null/undefined = "via OfficeGangBot" on
+  // free, or no footer on premium).
+  footerText?: string | null;
 };
 
 export type GuildStatsTopXp = {

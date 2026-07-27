@@ -294,6 +294,20 @@ export async function setGuildEmbedColor(session: AccessToken, guild: string, co
   );
 }
 
+/** Premium: sets the guild's custom embed footer text (empty/null to clear). */
+export async function setGuildFooterText(session: AccessToken, guild: string, text: string | null) {
+  return await callDefault(
+    `/api/guild/${guild}/footer`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      },
+    })
+  );
+}
+
 export type GuildEmoji = {
   id: string;
   name: string;
