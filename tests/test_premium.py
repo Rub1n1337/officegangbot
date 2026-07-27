@@ -3,7 +3,10 @@ is_premium), using a fake asyncpg pool and the PREMIUM_GUILD_IDS env allowlist."
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+import discord
+
 from core.db.premium import _PremiumMixin
+from core.discord_utils import guild_accent_color
 
 
 class _FakeConn:
@@ -109,3 +112,40 @@ def test_db_outage_falls_back_to_cache(monkeypatch):
 
     db.pool = _BoomPool()
     assert _run(db.is_premium(7)) is True  # last-known value, not an error
+
+
+# --- guild_accent_color (premium embed branding) ---------------------------
+
+class _FakeColorDB:
+    def __init__(self, premium, color):
+        self._premium = premium
+        self._color = color
+
+    async def is_premium(self, guild_id):
+        return self._premium
+
+    async def get_guild_setting(self, guild_id, key, default=None):
+        return self._color
+
+
+DEFAULT = discord.Color.gold()
+
+
+def test_accent_color_premium_with_color():
+    db = _FakeColorDB(premium=True, color=0x5865F2)
+    assert _run(guild_accent_color(db, 1, DEFAULT)) == discord.Color(0x5865F2)
+
+
+def test_accent_color_premium_without_color_is_default():
+    db = _FakeColorDB(premium=True, color=None)
+    assert _run(guild_accent_color(db, 1, DEFAULT)) == DEFAULT
+
+
+def test_accent_color_free_is_default_even_if_color_set():
+    db = _FakeColorDB(premium=False, color=0x5865F2)
+    assert _run(guild_accent_color(db, 1, DEFAULT)) == DEFAULT
+
+
+def test_accent_color_bad_value_falls_back_to_default():
+    db = _FakeColorDB(premium=True, color="not-an-int")
+    assert _run(guild_accent_color(db, 1, DEFAULT)) == DEFAULT

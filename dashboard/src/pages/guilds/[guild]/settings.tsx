@@ -23,14 +23,15 @@ import {
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import { StyledChart } from '@/components/chart/StyledChart';
-import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload } from 'react-icons/md';
+import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload, MdFormatColorReset } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
+import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { NextPageWithLayout } from '@/pages/_app';
-import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useEnableFeatureMutation } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useEnableFeatureMutation } from '@/api/hooks';
 import { getFeature, updateFeature } from '@/api/bot';
 import { useSession } from '@/utils/auth/hooks';
 import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
@@ -818,6 +819,82 @@ function ServerPulse({ stats, enabledFeatures }: { stats: GuildStats; enabledFea
   );
 }
 
+// Premium branding: pick an accent colour for the bot's embeds. Free servers
+// see the swatches locked with an Upgrade nudge; the actual gate is enforced on
+// the bot (set_embed_color rejects non-premium guilds).
+const ACCENT_SWATCHES = [0x6e56f5, 0x5865f2, 0x2ecc71, 0xf1c40f, 0xe67e22, 0xe74c3c, 0xeb459e, 0x1abc9c];
+const hex6 = (n: number) => '#' + n.toString(16).padStart(6, '0');
+
+function BrandingCard({
+  guild,
+  premium,
+  embedColor,
+}: {
+  guild: string;
+  premium: boolean;
+  embedColor: number | null;
+}) {
+  const tt = useText();
+  const mutation = useSetEmbedColorMutation();
+  const pick = (color: number | null) => {
+    if (premium && !mutation.isLoading) mutation.mutate({ guild, color });
+  };
+  const Swatch = ({ color, children }: { color: number | null; children?: ReactNode }) => {
+    const active = embedColor === color || (color === null && embedColor == null);
+    return (
+      <Box
+        as="button"
+        type="button"
+        disabled={!premium}
+        onClick={() => pick(color)}
+        w="34px"
+        h="34px"
+        rounded="full"
+        flexShrink={0}
+        bg={color === null ? 'transparent' : hex6(color)}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        borderWidth={color === null ? '2px' : '3px'}
+        borderColor={active ? 'brand.400' : color === null ? 'CardBorder' : 'transparent'}
+        boxShadow={active && color !== null ? '0 0 0 2px var(--chakra-colors-brand-400)' : 'none'}
+        cursor={premium ? 'pointer' : 'not-allowed'}
+        transition="transform .12s ease"
+        _hover={premium ? { transform: 'scale(1.08)' } : {}}
+      >
+        {children}
+      </Box>
+    );
+  };
+  return (
+    <Box bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="20px" p={{ base: 5, md: 6 }}>
+      <Flex align="center" gap={2} mb={1} wrap="wrap">
+        <Icon as={FaCrown} color="brand.200" boxSize="14px" />
+        <Text fontWeight="700">{tt('Оформление эмбедов')}</Text>
+        <Badge colorScheme="purple" rounded="full" px={2}>
+          {tt('Премиум')}
+        </Badge>
+      </Flex>
+      <Text fontSize="sm" color="TextSecondary" mb={4}>
+        {tt('Акцентный цвет эмбедов бота — например, уведомлений о повышении уровня.')}
+      </Text>
+      <Flex gap={2.5} wrap="wrap" align="center" opacity={premium ? 1 : 0.55}>
+        <Swatch color={null}>
+          <Icon as={MdFormatColorReset} boxSize="18px" color="TextSecondary" />
+        </Swatch>
+        {ACCENT_SWATCHES.map((c) => (
+          <Swatch key={c} color={c} />
+        ))}
+      </Flex>
+      {!premium && (
+        <Box mt={4}>
+          <PremiumUpsell label={tt('Своя тема — на Премиуме')} />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -883,6 +960,13 @@ const GuildOverviewPage: NextPageWithLayout = () => {
       {infoQuery.data && <FeaturesSection guild={guild} enabledFeatures={enabledFeatures} />}
 
       {statsQuery.data && statsQuery.data.top_xp.length > 0 && <TopXp rows={statsQuery.data.top_xp} />}
+      {infoQuery.data && (
+        <BrandingCard
+          guild={guild}
+          premium={!!infoQuery.data.premium}
+          embedColor={infoQuery.data.embedColor ?? null}
+        />
+      )}
       <ConfigTransfer guild={guild} />
     </Flex>
   );

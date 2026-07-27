@@ -488,7 +488,7 @@ class MyBot(commands.Bot):
         _needs_guild = {
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
-            "get_moderation", "delete_warning", "set_locale",
+            "get_moderation", "delete_warning", "set_locale", "set_embed_color",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
             "get_analytics", "set_ban_appeals", "decide_ban_appeal",
@@ -515,6 +515,7 @@ class MyBot(commands.Bot):
             "set_ban_appeals": self._rpc_set_ban_appeals,
             "decide_ban_appeal": self._rpc_decide_ban_appeal,
             "set_locale": self._rpc_set_locale,
+            "set_embed_color": self._rpc_set_embed_color,
             "search_members": self._rpc_search_members,
             "get_member": self._rpc_get_member,
             "moderate_member": self._rpc_moderate_member,
@@ -553,6 +554,7 @@ class MyBot(commands.Bot):
             "settings": settings,
             "enabledFeatures": enabled_features,
             "premium": premium,
+            "embedColor": settings.get("premium_embed_color"),
         }
 
     async def _rpc_get_guild_stats(self, guild_id, payload):
@@ -962,6 +964,28 @@ class MyBot(commands.Bot):
         await self.db.set_locale(guild_id, locale)
         await self._record_audit(guild_id, payload, "set_locale", detail=locale)
         return {"success": True, "locale": locale}
+
+    async def _rpc_set_embed_color(self, guild_id, payload):
+        """Premium branding: set (or clear, with color=None) the guild's custom
+        embed accent colour. Rejected for non-premium guilds."""
+        if not self.db:
+            return {"error": "Database unavailable"}
+        if not await self.db.is_premium(guild_id):
+            return {"error": "Premium required"}
+        color = payload.get("color")
+        if color is None:
+            await self.db.set_guild_setting(guild_id, "premium_embed_color", None)
+            await self._record_audit(guild_id, payload, "set_embed_color", detail="cleared")
+            return {"success": True, "color": None}
+        try:
+            value = int(color)
+        except (TypeError, ValueError):
+            return {"error": "Invalid color"}
+        if not 0 <= value <= 0xFFFFFF:
+            return {"error": "Color out of range"}
+        await self.db.set_guild_setting(guild_id, "premium_embed_color", value)
+        await self._record_audit(guild_id, payload, "set_embed_color", detail=str(value))
+        return {"success": True, "color": value}
 
     async def _rpc_search_members(self, guild_id, payload):
         guild = self.get_guild(guild_id)

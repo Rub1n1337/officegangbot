@@ -45,6 +45,7 @@ const GUILD_INFO = {
   settings: {},
   enabledFeatures: ['levels', 'tickets', 'automod', 'logging'],
   premium: true,
+  embedColor: 0x2ecc71,
 };
 
 const STATS = {

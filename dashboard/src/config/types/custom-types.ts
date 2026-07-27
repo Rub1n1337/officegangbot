@@ -15,6 +15,8 @@ export type CustomGuildInfo = GuildInfo & {
   // Premium status for this server (from is_premium on the bot). Optional so a
   // bot on the old payload just reads as free.
   premium?: boolean;
+  // Premium custom embed accent colour (0xRRGGBB) or null/undefined for default.
+  embedColor?: number | null;
 };
 
 export type GuildStatsTopXp = {

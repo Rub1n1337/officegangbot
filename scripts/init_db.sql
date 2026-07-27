@@ -336,6 +336,9 @@ CREATE INDEX IF NOT EXISTS idx_mod_notes_member ON mod_notes(guild_id, user_id, 
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS enabled_features TEXT[] DEFAULT '{}';
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS usage_log_id BIGINT;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS locale VARCHAR(5) DEFAULT 'en';
+-- Premium: custom accent colour (0xRRGGBB) for the bot's branded embeds. NULL =
+-- the default per-embed colour. Only applied for premium guilds (see is_premium).
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS premium_embed_color BIGINT;
 -- AutoMod content-filter config (invite/link blocking).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_invites BOOLEAN DEFAULT FALSE;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_links BOOLEAN DEFAULT FALSE;
