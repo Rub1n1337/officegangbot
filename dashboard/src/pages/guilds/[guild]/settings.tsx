@@ -876,7 +876,7 @@ function BrandingCard({
         </Badge>
       </Flex>
       <Text fontSize="sm" color="TextSecondary" mb={4}>
-        {tt('Акцентный цвет эмбедов бота — например, уведомлений о повышении уровня.')}
+        {tt('Акцентный цвет эмбедов бота — уровни, меню ролей, тикеты, верификация.')}
       </Text>
       <Flex gap={2.5} wrap="wrap" align="center" opacity={premium ? 1 : 0.55}>
         <Swatch color={null}>

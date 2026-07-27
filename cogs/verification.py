@@ -8,6 +8,7 @@ from discord import app_commands
 from core.logger import logger
 from core.i18n import t
 from core.permissions import role_is_assignable
+from core.discord_utils import guild_accent_color
 from .utils import reply
 from typing import Optional
 
@@ -115,10 +116,11 @@ class VerificationCog(commands.Cog, name="✅ Verification"):
 
         await self.bot.db.set_guild_setting(ctx.guild.id, "verification_role_id", role.id)
 
+        panel_color = await guild_accent_color(self.bot.db, ctx.guild.id, discord.Color.green())
         embed = discord.Embed(
             title=t(loc, "verify.panel_title"),
             description=t(loc, "verify.panel_desc"),
-            color=discord.Color.green(),
+            color=panel_color,
         )
         embed.set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
         try:
