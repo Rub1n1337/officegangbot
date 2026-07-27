@@ -24,9 +24,12 @@ export default function TermsPage() {
         analytics, and a web dashboard for configuring these features.
       </p>
       <p>
-        The Service’s core features are provided free of charge. We may also offer an optional paid
-        “Premium” plan with additional features; where we do, its features, price, and terms will be
-        shown before any purchase, and the core features described above remain available for free.
+        The Service’s core features are provided free of charge. We also offer an optional paid
+        “Premium” plan with additional features, sold as a Discord App Subscription. Payment,
+        billing, tax, renewals, cancellations, and refunds are handled by Discord under Discord’s
+        Premium/Monetization terms — we do not process or store your payment details. Premium is a
+        per-server subscription; the core features described above remain available for free, and
+        losing Premium only removes the Premium extras.
       </p>
 
       <h2>2. Eligibility and Discord’s terms</h2>

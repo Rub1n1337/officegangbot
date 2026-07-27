@@ -449,6 +449,16 @@ const EN: Record<string, string> = {
   'Способы оплаты появятся к запуску. Следите за обновлениями в панели и на сервере поддержки.':
     'Payment methods will appear at launch. Watch for updates in the dashboard and the support server.',
   'Пока — начните бесплатно': 'For now — start free',
+  'Начните бесплатно сегодня': 'Start free today',
+  'Добавьте бота и настройте всё за минуты. Премиум — когда будете готовы.':
+    'Add the bot and set everything up in minutes. Premium whenever you’re ready.',
+  'Как оформить Премиум?': 'How do I get Premium?',
+  'Через подписки Discord: введите /premium на своём сервере или нажмите «Оформить в Discord» — оплату проведёт сам Discord.':
+    'Through Discord subscriptions: run /premium on your server or click “Subscribe on Discord” — Discord handles the payment.',
+  'Кто занимается оплатой и возвратами?': 'Who handles billing and refunds?',
+  'Оплатой, налогами и возвратами занимается Discord. Управлять подпиской можно в настройках Discord.':
+    'Discord handles billing, tax and refunds. You can manage the subscription in your Discord settings.',
+  'Оформить в Discord': 'Subscribe on Discord',
   'Добавьте бота и настройте всё уже сегодня. Премиум подключится позже.':
     'Add the bot and set everything up today. Premium arrives later.',
 };

@@ -67,6 +67,19 @@ class _PremiumMixin:
         self._premium_cache[guild_id] = (value, time.time())
         return value
 
+    async def list_active_premium_guilds(self, provider: Optional[str] = None) -> list:
+        """Guild ids with an active guild_premium row (optionally filtered by
+        provider). Used to reconcile the table against Discord's live
+        entitlements — any active guild not currently entitled gets revoked."""
+        query = "SELECT guild_id FROM guild_premium WHERE active = TRUE"
+        args = []
+        if provider is not None:
+            query += " AND provider = $1"
+            args.append(provider)
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, *args)
+        return [r["guild_id"] for r in rows]
+
     async def get_premium(self, guild_id: int) -> Optional[Dict[str, Any]]:
         """The full premium row for a guild (None if there is none). For
         inspection / admin tooling."""

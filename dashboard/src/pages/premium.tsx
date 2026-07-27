@@ -1,4 +1,4 @@
-import { Box, Flex, Text, Heading, Icon, Button, SimpleGrid, Container, Badge } from '@chakra-ui/react';
+import { Box, Flex, Text, Heading, Icon, Button, SimpleGrid, Container } from '@chakra-ui/react';
 import Head from 'next/head';
 import {
   MdWorkspacePremium,
@@ -18,6 +18,10 @@ import { GRADIENT, MarketingNav, MarketingFooter } from '@/components/marketing/
 // so this is the announced launch price — change it in one place when pricing
 // is finalized.
 const PRICE = '$2.99';
+
+// Premium is sold as a Discord App Subscription — checkout happens inside
+// Discord (or via /premium on the server). This is the app's store page.
+const SUBSCRIBE_URL = 'https://discord.com/application-directory/1220462982384058370/store';
 
 function CheckItem({ children, muted = false }: { children: string; muted?: boolean }) {
   return (
@@ -103,9 +107,9 @@ export default function Premium() {
   ];
 
   const faq: Array<[string, string]> = [
-    [tt('Когда запуск Премиума?'), tt('Скоро. Оплата ещё не подключена — страница показывает, что войдёт в план.')],
+    [tt('Как оформить Премиум?'), tt('Через подписки Discord: введите /premium на своём сервере или нажмите «Оформить в Discord» — оплату проведёт сам Discord.')],
     [tt('Текущие функции станут платными?'), tt('Нет. Всё, что работает сейчас, остаётся бесплатным. Премиум — это только дополнительные возможности.')],
-    [tt('Как можно будет оплатить?'), tt('Способы оплаты появятся к запуску. Следите за обновлениями в панели и на сервере поддержки.')],
+    [tt('Кто занимается оплатой и возвратами?'), tt('Оплатой, налогами и возвратами занимается Discord. Управлять подпиской можно в настройках Discord.')],
   ];
 
   return (
@@ -139,9 +143,6 @@ export default function Premium() {
         >
           <Icon as={MdWorkspacePremium} boxSize="15px" />
           {tt('ПРЕМИУМ')}
-          <Badge colorScheme="purple" rounded="full" px={2} textTransform="none" letterSpacing="normal">
-            {tt('Скоро')}
-          </Badge>
         </Flex>
         <Heading fontSize={{ base: '34px', md: '48px' }} fontWeight="800" letterSpacing="-0.03em" lineHeight={1.08}>
           {tt('Больше возможностей для')}{' '}
@@ -235,9 +236,6 @@ export default function Premium() {
               <Text fontSize="14px" fontWeight="700" color="brand.200" letterSpacing="0.04em">
                 {tt('Премиум')}
               </Text>
-              <Badge colorScheme="purple" rounded="full" px={2} textTransform="none">
-                {tt('Скоро')}
-              </Badge>
             </Flex>
             <Flex align="baseline" gap={2} mt={2}>
               <Text fontSize="40px" fontWeight="800" letterSpacing="-0.02em">
@@ -256,8 +254,18 @@ export default function Premium() {
               <CheckItem>{tt('Приоритет и ранний доступ')}</CheckItem>
               <CheckItem>{tt('Продвинутая аналитика и экспорт')}</CheckItem>
             </Flex>
-            <Button mt={7} isDisabled color="white" bgGradient={GRADIENT} _disabled={{ opacity: 0.7, cursor: 'not-allowed' }} leftIcon={<Icon as={MdWorkspacePremium} boxSize="18px" />}>
-              {tt('Скоро')}
+            <Button
+              as="a"
+              href={SUBSCRIBE_URL}
+              target="_blank"
+              rel="noreferrer"
+              mt={7}
+              color="white"
+              bgGradient={GRADIENT}
+              _hover={{ opacity: 0.92 }}
+              leftIcon={<Icon as={FaDiscord} boxSize="18px" />}
+            >
+              {tt('Оформить в Discord')}
             </Button>
           </Flex>
         </SimpleGrid>
@@ -309,10 +317,10 @@ export default function Premium() {
           boxShadow="0 30px 60px -25px rgba(110,86,245,.7)"
         >
           <Heading color="white" fontSize={{ base: '26px', md: '36px' }} fontWeight="800" letterSpacing="-0.02em">
-            {tt('Пока — начните бесплатно')}
+            {tt('Начните бесплатно сегодня')}
           </Heading>
           <Text color="whiteAlpha.900" fontSize={{ base: '15px', md: '17px' }} mt={3} maxW="560px" mx="auto">
-            {tt('Добавьте бота и настройте всё уже сегодня. Премиум подключится позже.')}
+            {tt('Добавьте бота и настройте всё за минуты. Премиум — когда будете готовы.')}
           </Text>
           <Button
             as="a"
