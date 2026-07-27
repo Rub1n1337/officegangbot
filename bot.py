@@ -26,7 +26,7 @@ from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
 from core.permissions import bot_can_act_on, role_is_assignable
 from core.content_filter import normalize_domain
-from core.automod_rules import sanitize_rules, validate_pattern, MAX_RULES
+from core.automod_rules import sanitize_rules, validate_pattern
 from core.limits import limit_for, limit_error
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
