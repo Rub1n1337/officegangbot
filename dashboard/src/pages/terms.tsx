@@ -24,8 +24,9 @@ export default function TermsPage() {
         analytics, and a web dashboard for configuring these features.
       </p>
       <p>
-        The Service is provided free of charge. There are no paid features, subscriptions, or
-        purchases.
+        The Service’s core features are provided free of charge. We may also offer an optional paid
+        “Premium” plan with additional features; where we do, its features, price, and terms will be
+        shown before any purchase, and the core features described above remain available for free.
       </p>
 
       <h2>2. Eligibility and Discord’s terms</h2>
