@@ -17,7 +17,7 @@ import { GRADIENT, MarketingNav, MarketingFooter } from '@/components/marketing/
 // Marketing price. Billing is not wired yet (the plan ships as "coming soon"),
 // so this is the announced launch price — change it in one place when pricing
 // is finalized.
-const PRICE = '$4.99';
+const PRICE = '$2.99';
 
 function CheckItem({ children, muted = false }: { children: string; muted?: boolean }) {
   return (
@@ -75,7 +75,7 @@ export default function Premium() {
       title: tt('Оформление и бренд'),
       items: [
         tt('Свои цвета эмбедов'),
-        tt('Свой ник и аватар бота'),
+        tt('Свой футер на эмбедах'),
         tt('Убрать «powered by»'),
         tt('Свои фоны для карточек рангов'),
       ],
@@ -95,7 +95,7 @@ export default function Premium() {
       title: tt('Продвинутые функции'),
       items: [
         tt('Расширенная аналитика и экспорт'),
-        tt('ИИ-помощь в авто-модерации'),
+        tt('Авто-бэкапы конфигурации'),
         tt('Синхронизация настроек между серверами'),
         tt('Свои слэш-команды'),
       ],
@@ -254,7 +254,7 @@ export default function Premium() {
               <CheckItem>{tt('Выше лимиты на всё')}</CheckItem>
               <CheckItem>{tt('Своё оформление и бренд')}</CheckItem>
               <CheckItem>{tt('Приоритет и ранний доступ')}</CheckItem>
-              <CheckItem>{tt('Продвинутая аналитика и ИИ')}</CheckItem>
+              <CheckItem>{tt('Продвинутая аналитика и экспорт')}</CheckItem>
             </Flex>
             <Button mt={7} isDisabled color="white" bgGradient={GRADIENT} _disabled={{ opacity: 0.7, cursor: 'not-allowed' }} leftIcon={<Icon as={MdWorkspacePremium} boxSize="18px" />}>
               {tt('Скоро')}
