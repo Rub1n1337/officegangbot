@@ -26,7 +26,8 @@ from core.member_queries import search_guild_members, build_member_profile
 from core.reaction_sync import plan_reaction_changes
 from core.permissions import bot_can_act_on, role_is_assignable
 from core.content_filter import normalize_domain
-from core.automod_rules import sanitize_rules, validate_pattern, MAX_RULES
+from core.automod_rules import sanitize_rules, validate_pattern
+from core.limits import limit_for, limit_error
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from core.observability import init_sentry
@@ -1141,8 +1142,9 @@ class MyBot(commands.Bot):
                     return {"error": "Invalid level-up channel id"}
             rewards = options.get("rewards")
             if isinstance(rewards, list):
-                if len(rewards) > 100:
-                    return {"error": "Too many level rewards (max 100)."}
+                premium = await self.db.is_premium(guild_id)
+                if len(rewards) > limit_for("level_rewards", premium):
+                    return {"error": limit_error("level_rewards", "level rewards", premium)}
                 desired: dict[int, int] = {}
                 for r in rewards:
                     lvl_raw, role_raw = r.get("level"), r.get("roleId")
@@ -1206,8 +1208,9 @@ class MyBot(commands.Bot):
         if feature == "scheduled-messages":
             items = options.get("items")
             if isinstance(items, list):
-                if len(items) > 50:
-                    return {"error": "Too many scheduled messages (max 50)."}
+                premium = await self.db.is_premium(guild_id)
+                if len(items) > limit_for("scheduled_messages", premium):
+                    return {"error": limit_error("scheduled_messages", "scheduled messages", premium)}
                 rows = []
                 for it in items:
                     ch = it.get("channelId")
@@ -1242,11 +1245,13 @@ class MyBot(commands.Bot):
             # Validate custom regex rules up front so a bad/unsafe pattern
             # rejects the whole save (no partial write) with a clear message,
             # instead of the config being written and the rule silently dropped.
+            premium = await self.db.is_premium(guild_id)
+            rules_cap = limit_for("automod_rules", premium)
             rules_raw = options.get("rules")
             if isinstance(rules_raw, list):
                 non_empty = [r for r in rules_raw if str(r.get("pattern", "")).strip()]
-                if len(non_empty) > MAX_RULES:
-                    return {"error": f"Too many custom filters (max {MAX_RULES})."}
+                if len(non_empty) > rules_cap:
+                    return {"error": limit_error("automod_rules", "custom filters", premium)}
                 for r in non_empty:
                     pattern = str(r.get("pattern", "")).strip()
                     reason = validate_pattern(pattern)
@@ -1282,8 +1287,8 @@ class MyBot(commands.Bot):
             banned_words = None
             if isinstance(words_raw, list):
                 banned_words = sorted({str(w).strip().lower()[:100] for w in words_raw if str(w).strip()})
-                if len(banned_words) > 500:
-                    return {"error": "Too many banned words (max 500)."}
+                if len(banned_words) > limit_for("banned_words", premium):
+                    return {"error": limit_error("banned_words", "banned words", premium)}
 
             await self.db.set_automod_config(
                 guild_id, block_invites, block_links, domains,
@@ -1305,7 +1310,7 @@ class MyBot(commands.Bot):
 
             # Persist the (already-validated above) custom regex rules.
             if isinstance(rules_raw, list):
-                await self.db.replace_automod_rules(guild_id, sanitize_rules(rules_raw))
+                await self.db.replace_automod_rules(guild_id, sanitize_rules(rules_raw, rules_cap))
 
             return await self._get_feature_payload(guild_id, feature)
 
@@ -1314,10 +1319,11 @@ class MyBot(commands.Bot):
         # posted message). Many messages per guild, so each uses a per-message
         # replace rather than the whole-source replace.
         if feature == "reaction-menus":
+            premium = await self.db.is_premium(guild_id)
             menus_in = options.get("menus")
             if isinstance(menus_in, list):
-                if len(menus_in) > 25:
-                    return {"error": "Too many role menus (max 25)."}
+                if len(menus_in) > limit_for("role_menus", premium):
+                    return {"error": limit_error("role_menus", "role menus", premium)}
                 guild = self.get_guild(guild_id)
                 if not guild:
                     return {"error": "Guild not found"}
@@ -1428,8 +1434,8 @@ class MyBot(commands.Bot):
             # Reaction Role feature, now a section of this card).
             standalone_in = options.get("standalone")
             if isinstance(standalone_in, list):
-                if len(standalone_in) > 100:
-                    return {"error": "Too many reaction roles (max 100)."}
+                if len(standalone_in) > limit_for("reaction_roles", premium):
+                    return {"error": limit_error("reaction_roles", "reaction roles", premium)}
                 rows = []
                 for it in standalone_in:
                     ch, msg = it.get("channelId"), it.get("messageId")

@@ -99,10 +99,11 @@ def validate_pattern(pattern: str) -> Optional[str]:
     return None
 
 
-def sanitize_rules(rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def sanitize_rules(rules: List[Dict[str, Any]], max_rules: int = MAX_RULES) -> List[Dict[str, Any]]:
     """Validates and caps a list of {pattern, action, enabled} dicts for
     persistence: drops empty/invalid/too-long/duplicate patterns and limits the
-    count to MAX_RULES."""
+    count to ``max_rules`` (defaults to MAX_RULES; premium guilds pass a higher
+    cap)."""
     out: List[Dict[str, Any]] = []
     seen = set()
     for r in rules or []:
@@ -119,7 +120,7 @@ def sanitize_rules(rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "enabled": bool(r.get("enabled", True)),
             }
         )
-        if len(out) >= MAX_RULES:
+        if len(out) >= max_rules:
             break
     return out
 
