@@ -178,8 +178,12 @@ const RU: Record<string, string> = {
   'Ban the member at this many strikes. 0 = off.':
     'Забанить участника при таком числе страйков. 0 = выкл.',
   'Custom filters (regex)': 'Свои фильтры (regex)',
-  'Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on). Up to 25 rules.':
-    'Удалять сообщения по шаблону. «Страйк» ещё и добавляет страйк (если страйки включены). До 25 правил.',
+  'Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on).':
+    'Удалять сообщения по шаблону. «Страйк» ещё и добавляет страйк (если страйки включены).',
+  'More rules with Premium': 'Больше правил на Премиуме',
+  'Up to': 'До',
+  'rules.': 'правил.',
+  'More multipliers with Premium': 'Больше множителей на Премиуме',
   'Add rule': 'Добавить правило',
   'No custom filters yet.': 'Пока нет своих фильтров.',
   'regex pattern, e.g. free\\s*nitro': 'regex-шаблон, напр. free\\s*nitro',

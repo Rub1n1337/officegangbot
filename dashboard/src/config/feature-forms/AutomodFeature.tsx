@@ -32,6 +32,10 @@ import {
   MdExpandMore,
   MdExpandLess,
 } from 'react-icons/md';
+import { useRouter } from 'next/router';
+import { useGuildInfoQuery } from '@/api/hooks';
+import { limitFor } from '@/config/limits';
+import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { PresetPicker } from '@/components/forms/PresetPicker';
 import { FormCardController } from '@/components/forms/Form';
 import { NumberStepper } from '@/components/forms/NumberStepper';
@@ -321,6 +325,9 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'rules' });
+  const guildId = useRouter().query.guild as string;
+  const premium = useGuildInfoQuery(guildId).data?.premium ?? false;
+  const rulesCap = limitFor('automod_rules', premium);
   const blockLinks = watch('blockLinks');
   const strikesEnabled = watch('strikesEnabled');
   const dryRun = watch('dryRun');
@@ -566,18 +573,22 @@ export const useAutomodFeature: UseFormRender<AutomodFeature> = (data, onSubmit)
 
         <Flex align="center" justify="space-between" gap={2}>
           <Box>
-            <Text fontWeight="600">{ft('Custom filters (regex)')}</Text>
+            <Flex align="center" gap={2} wrap="wrap">
+              <Text fontWeight="600">{ft('Custom filters (regex)')}</Text>
+              {!premium && <PremiumUpsell label={ft('More rules with Premium')} />}
+            </Flex>
             <Text fontSize="sm" color="TextSecondary">
               {ft(
-                'Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on). Up to 25 rules.'
-              )}
+                'Delete messages matching a pattern. “Strike” also adds a strike (when strikes are on).'
+              )}{' '}
+              {ft('Up to')} {rulesCap} {ft('rules.')}
             </Text>
           </Box>
           <Button
             size="sm"
             leftIcon={<Icon as={MdAdd} />}
             onClick={() => append({ pattern: '', action: 'delete', enabled: true })}
-            isDisabled={fields.length >= 25}
+            isDisabled={fields.length >= rulesCap}
             flexShrink={0}
           >
             {ft('Add rule')}

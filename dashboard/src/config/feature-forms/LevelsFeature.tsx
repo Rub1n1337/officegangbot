@@ -20,6 +20,10 @@ import { ChannelSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleSelectForm } from '@/components/forms/RoleSelect';
 import { InputForm } from '@/components/forms/InputForm';
 import { PresetPicker } from '@/components/forms/PresetPicker';
+import { PremiumUpsell } from '@/components/PremiumUpsell';
+import { useRouter } from 'next/router';
+import { useGuildInfoQuery } from '@/api/hooks';
+import { limitFor } from '@/config/limits';
 import { useFormText } from '@/config/translations/form-text';
 import type { LevelsFeature } from '@/config/types/custom-types';
 import type { UseFormRender } from '@/config/types/types';
@@ -99,6 +103,9 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
     append: appendMult,
     remove: removeMult,
   } = useFieldArray({ control, name: 'roleMultipliers' });
+  const guildId = useRouter().query.guild as string;
+  const premium = useGuildInfoQuery(guildId).data?.premium ?? false;
+  const multCap = limitFor('level_multipliers', premium);
 
   const voiceEnabled = watch('voiceXpEnabled');
   const season = data.season ?? 1;
@@ -244,16 +251,20 @@ export const useLevelsFeature: UseFormRender<LevelsFeature> = (data, onSubmit) =
         </SimpleGrid>
 
         <Box>
-          <Flex justify="space-between" align="center">
-            <Text fontWeight="600" fontSize="sm">
-              {ft('Per-role multipliers')}
-            </Text>
+          <Flex justify="space-between" align="center" gap={2}>
+            <Flex align="center" gap={2} wrap="wrap">
+              <Text fontWeight="600" fontSize="sm">
+                {ft('Per-role multipliers')}
+              </Text>
+              {!premium && <PremiumUpsell label={ft('More multipliers with Premium')} />}
+            </Flex>
             <Button
               size="sm"
               leftIcon={<Icon as={MdAdd} />}
               variant="action"
               onClick={() => appendMult({ roleId: undefined as unknown as string, multiplier: 2 })}
-              isDisabled={multFields.length >= 50}
+              isDisabled={multFields.length >= multCap}
+              flexShrink={0}
             >
               {ft('Add role')}
             </Button>
