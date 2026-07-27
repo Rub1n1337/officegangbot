@@ -12,6 +12,9 @@ export type CustomGuildInfo = GuildInfo & {
   owner_id: string;
   member_count: number;
   locale?: string;
+  // Premium status for this server (from is_premium on the bot). Optional so a
+  // bot on the old payload just reads as free.
+  premium?: boolean;
 };
 
 export type GuildStatsTopXp = {

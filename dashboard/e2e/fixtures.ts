@@ -44,6 +44,7 @@ const GUILD_INFO = {
   locale: 'ru',
   settings: {},
   enabledFeatures: ['levels', 'tickets', 'automod', 'logging'],
+  premium: true,
 };
 
 const STATS = {

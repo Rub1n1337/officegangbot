@@ -465,6 +465,22 @@ CREATE TABLE IF NOT EXISTS guild_metrics_daily (
 );
 ALTER TABLE guild_metrics_daily ENABLE ROW LEVEL SECURITY;
 
+-- Premium subscription status, one row per premium guild. The billing webhook
+-- (Phase 3) writes here; until then premium is granted via the PREMIUM_GUILD_IDS
+-- env allowlist and this table stays empty. is_premium() treats a guild as
+-- premium if it's in the allowlist OR has an active row here.
+CREATE TABLE IF NOT EXISTS guild_premium (
+    guild_id BIGINT PRIMARY KEY REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    plan TEXT NOT NULL DEFAULT 'premium',
+    current_period_end TIMESTAMPTZ,
+    provider TEXT,
+    provider_customer_id TEXT,
+    provider_subscription_id TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE guild_premium ENABLE ROW LEVEL SECURITY;
+
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
 -- this closes the auto-exposed Supabase/PostgREST API to the anon key.
@@ -485,3 +501,4 @@ ALTER TABLE automod_strikes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE automod_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE level_multiplier_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE level_seasons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guild_premium ENABLE ROW LEVEL SECURITY;
