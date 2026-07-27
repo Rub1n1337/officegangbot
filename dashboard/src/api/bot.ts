@@ -280,6 +280,20 @@ export async function setGuildLocale(session: AccessToken, guild: string, locale
   );
 }
 
+/** Premium: sets the guild's custom embed accent colour (0xRRGGBB, or null to clear). */
+export async function setGuildEmbedColor(session: AccessToken, guild: string, color: number | null) {
+  return await callDefault(
+    `/api/guild/${guild}/embed-color`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color }),
+      },
+    })
+  );
+}
+
 export type GuildEmoji = {
   id: string;
   name: string;

@@ -381,6 +381,12 @@ const EN: Record<string, string> = {
   'Канал и текст правил': 'Rules channel & message',
   'Отложенные сообщения': 'Scheduled messages',
 
+  // --- Premium branding (Overview) --------------------------------------------
+  'Оформление эмбедов': 'Embed branding',
+  'Акцентный цвет эмбедов бота — например, уведомлений о повышении уровня.':
+    'Accent colour for the bot’s embeds — e.g. level-up announcements.',
+  'По умолчанию': 'Default',
+  'Своя тема — на Премиуме': 'Custom theme with Premium',
   // --- Premium / pricing page --------------------------------------------------
   'Премиум': 'Premium',
   'больше возможностей для сообщества': 'more power for your community',

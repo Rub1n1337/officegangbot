@@ -290,6 +290,10 @@ class LocalePayload(BaseModel):
     locale: Literal["en", "ru"]
 
 
+class EmbedColorPayload(BaseModel):
+    color: Optional[int] = None
+
+
 class BanAppealsConfigPayload(BaseModel):
     enabled: bool
 
@@ -433,6 +437,14 @@ async def delete_warning(request: Request, guild_id: int, warning_id: int):
 async def set_locale(request: Request, guild_id: int, payload: LocalePayload):
     """Sets the guild's bot language ('en' / 'ru')."""
     data = await _rpc("set_locale", guild_id=guild_id, locale=payload.locale, **_actor(request))
+    return data
+
+
+@app.post("/api/guild/{guild_id}/embed-color", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def set_embed_color(request: Request, guild_id: int, payload: EmbedColorPayload):
+    """Premium: set the guild's custom embed accent colour (null to clear)."""
+    data = await _rpc("set_embed_color", guild_id=guild_id, color=payload.color, **_actor(request))
     return data
 
 @app.post("/api/guild/{guild_id}/appeals/config", dependencies=[Depends(verify_api_key)])

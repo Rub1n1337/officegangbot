@@ -5,6 +5,7 @@ from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
 from core.leveling import effective_multiplier, apply_multiplier, can_prestige
+from core.discord_utils import guild_accent_color
 from .utils import reply, send_paginated
 from .mod_tools import ConfirmView
 from core.i18n import t
@@ -199,10 +200,11 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
         if not channel:
             return
         loc = await self.bot.db.get_locale(guild.id)
+        color = await guild_accent_color(self.bot.db, guild.id, discord.Color.gold())
         embed = discord.Embed(
             title=t(loc, "levelup.title"),
             description=t(loc, "levelup.desc", mention=member.mention, level=new_level),
-            color=discord.Color.gold()
+            color=color
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.set_footer(text=guild.name, icon_url=guild.icon.url if guild.icon else None)

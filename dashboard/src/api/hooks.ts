@@ -23,6 +23,7 @@ import {
   moderateMember,
   searchMembers,
   setGuildLocale,
+  setGuildEmbedColor,
   updateFeature,
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
@@ -458,6 +459,40 @@ export function useSetLocaleMutation() {
       onError() {
         toast({
           title: 'Failed to update language',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
+}
+
+export function useSetEmbedColorMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+
+  return useMutation(
+    ({ guild, color }: { guild: string; color: number | null }) =>
+      setGuildEmbedColor(session!!, guild, color),
+    {
+      onSuccess(_, { guild, color }) {
+        client.setQueryData<CustomGuildInfo | null>(Keys.guild_info(guild), (prev) =>
+          prev ? { ...prev, embedColor: color } : prev
+        );
+        client.invalidateQueries(['audit', guild]);
+        toast({
+          title: 'Embed colour updated',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError() {
+        toast({
+          title: 'Failed to update embed colour',
           status: 'error',
           duration: 4000,
           isClosable: true,
