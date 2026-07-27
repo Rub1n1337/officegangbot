@@ -380,6 +380,67 @@ const EN: Record<string, string> = {
   'Реакция на существующем сообщении': 'Reaction on an existing message',
   'Канал и текст правил': 'Rules channel & message',
   'Отложенные сообщения': 'Scheduled messages',
+
+  // --- Premium / pricing page --------------------------------------------------
+  'Премиум': 'Premium',
+  'больше возможностей для сообщества': 'more power for your community',
+  'Премиум добавляет лимиты, оформление, приоритет и продвинутые функции. Все текущие возможности остаются бесплатными.':
+    'Premium adds higher limits, branding, priority and advanced features. Everything you have today stays free.',
+  'ПРЕМИУМ': 'PREMIUM',
+  'Скоро': 'Coming soon',
+  'Больше возможностей для': 'More power for',
+  'активных серверов': 'active servers',
+  'Премиум расширяет то, что уже работает: выше лимиты, своё оформление, приоритет и продвинутые инструменты.':
+    'Premium extends what already works: higher limits, your own branding, priority and advanced tools.',
+  'Все текущие функции остаются бесплатными — Премиум добавляет мощности, а не забирает их.':
+    'Every current feature stays free — Premium adds power, it doesn’t take any away.',
+  'Бесплатно': 'Free',
+  'навсегда': 'forever',
+  'Все основные функции': 'All core features',
+  'Модерация, тикеты, уровни, аналитика': 'Moderation, tickets, levels, analytics',
+  'Русский и English': 'Russian & English',
+  'Без ограничений по времени': 'No time limits',
+  'Самое популярное': 'Most popular',
+  '/мес': '/mo',
+  'Всё из «Бесплатно», плюс:': 'Everything in Free, plus:',
+  'Выше лимиты на всё': 'Higher limits across the board',
+  'Своё оформление и бренд': 'Custom branding & appearance',
+  'Приоритет и ранний доступ': 'Priority & early access',
+  'Продвинутая аналитика и ИИ': 'Advanced analytics & AI',
+  'ЧТО ВХОДИТ В ПРЕМИУМ': 'WHAT PREMIUM INCLUDES',
+  'Выше лимиты': 'Higher limits',
+  'Безлимитные меню ролей': 'Unlimited role menus',
+  'Больше отложенных сообщений': 'More scheduled messages',
+  'Больше правил авто-модерации': 'More AutoMod rules',
+  'Длинная история транскриптов': 'Extended transcript history',
+  'Оформление и бренд': 'Branding & appearance',
+  'Свои цвета эмбедов': 'Custom embed colors',
+  'Свой ник и аватар бота': 'Custom bot nickname & avatar',
+  'Убрать «powered by»': 'Remove the "powered by" footer',
+  'Свои фоны для карточек рангов': 'Custom rank-card backgrounds',
+  'Приоритет и поддержка': 'Priority & support',
+  'Приоритетная обработка команд': 'Priority command processing',
+  'Быстрее обновление статистики': 'Faster stats refresh',
+  'Премиум-канал поддержки': 'Premium support channel',
+  'Ранний доступ к бета-функциям': 'Early access to Beta features',
+  'Продвинутые функции': 'Advanced features',
+  'Расширенная аналитика и экспорт': 'Advanced analytics & export',
+  'ИИ-помощь в авто-модерации': 'AI-assisted AutoMod',
+  'Синхронизация настроек между серверами': 'Multi-server config sync',
+  'Свои слэш-команды': 'Custom slash commands',
+  'ВОПРОСЫ': 'FAQ',
+  'Когда запуск Премиума?': 'When does Premium launch?',
+  'Скоро. Оплата ещё не подключена — страница показывает, что войдёт в план.':
+    'Soon. Payments aren’t connected yet — this page shows what the plan will include.',
+  'Текущие функции станут платными?': 'Will current features become paid?',
+  'Нет. Всё, что работает сейчас, остаётся бесплатным. Премиум — это только дополнительные возможности.':
+    'No. Everything that works today stays free. Premium only adds extra capabilities.',
+  'Как можно будет оплатить?': 'How will I be able to pay?',
+  'Способы оплаты появятся к запуску. Следите за обновлениями в панели и на сервере поддержки.':
+    'Payment methods will appear at launch. Watch for updates in the dashboard and the support server.',
+  'Пока — начните бесплатно': 'For now — start free',
+  'Добавьте бота и настройте всё уже сегодня. Премиум подключится позже.':
+    'Add the bot and set everything up today. Premium arrives later.',
 };
 
 export function useText() {

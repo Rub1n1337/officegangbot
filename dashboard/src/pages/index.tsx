@@ -1,9 +1,7 @@
 import { Box, Flex, Text, Heading, Icon, Button, SimpleGrid, Container } from '@chakra-ui/react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import {
-  MdSmartToy,
   MdGavel,
   MdShield,
   MdConfirmationNumber,
@@ -13,36 +11,12 @@ import {
   MdCrisisAlert,
   MdVerifiedUser,
   MdArrowForward,
-  MdTranslate,
 } from 'react-icons/md';
 import { FaDiscord } from 'react-icons/fa';
 import type { IconType } from 'react-icons';
 import { config } from '@/config/common';
 import { useText } from '@/config/translations/ui-text';
-
-const GRADIENT = 'linear(135deg, #8B7CFF, #6E56F5)';
-
-function Logo() {
-  return (
-    <Flex align="center" gap={3}>
-      <Flex
-        w="38px"
-        h="38px"
-        rounded="11px"
-        align="center"
-        justify="center"
-        bgGradient={GRADIENT}
-        boxShadow="0 8px 18px -6px rgba(110,86,245,.6)"
-        flexShrink={0}
-      >
-        <Icon as={MdSmartToy} boxSize="22px" color="white" />
-      </Flex>
-      <Text fontSize="18px" fontWeight="800" letterSpacing="-0.01em">
-        {config.name}
-      </Text>
-    </Flex>
-  );
-}
+import { GRADIENT, MarketingNav, MarketingFooter } from '@/components/marketing/MarketingChrome';
 
 function FeatureCard({ icon, title, desc }: { icon: IconType; title: string; desc: string }) {
   return (
@@ -80,8 +54,6 @@ function FeatureCard({ icon, title, desc }: { icon: IconType; title: string; des
 
 export default function Landing() {
   const tt = useText();
-  const router = useRouter();
-  const other = router.locale === 'ru' ? 'en' : 'ru';
 
   const features: Array<{ icon: IconType; title: string; desc: string }> = [
     { icon: MdGavel, title: tt('Модерация'), desc: tt('Предупреждения, нумерованные кейсы, временные наказания и апелляции на бан.') },
@@ -106,52 +78,7 @@ export default function Landing() {
         <meta name="robots" content="index,follow" />
       </Head>
 
-      {/* Nav */}
-      <Flex
-        as="header"
-        position="sticky"
-        top={0}
-        zIndex="banner"
-        align="center"
-        gap={4}
-        px={{ base: 5, md: 10 }}
-        py={4}
-        borderBottom="1px solid"
-        borderColor="CardBorder"
-        bg="MainBackground"
-        sx={{ backdropFilter: 'saturate(180%) blur(8px)' }}
-      >
-        <Logo />
-        <Flex ml="auto" align="center" gap={{ base: 2, md: 3 }}>
-          <Button
-            as={Link}
-            href={router.asPath}
-            locale={other}
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon as={MdTranslate} boxSize="16px" />}
-            display={{ base: 'none', md: 'inline-flex' }}
-          >
-            {other.toUpperCase()}
-          </Button>
-          <Button as={Link} href={dash} variant="ghost" size="sm" display={{ base: 'none', md: 'inline-flex' }}>
-            {tt('Открыть панель')}
-          </Button>
-          <Button
-            as="a"
-            href={config.inviteUrl}
-            target="_blank"
-            rel="noreferrer"
-            size="sm"
-            color="white"
-            bgGradient={GRADIENT}
-            _hover={{ opacity: 0.92 }}
-            leftIcon={<Icon as={FaDiscord} boxSize="16px" />}
-          >
-            {tt('Добавить на сервер')}
-          </Button>
-        </Flex>
-      </Flex>
+      <MarketingNav />
 
       {/* Hero */}
       <Container maxW="6xl" px={{ base: 5, md: 8 }}>
@@ -343,28 +270,7 @@ export default function Landing() {
         </Box>
       </Container>
 
-      {/* Footer */}
-      <Box borderTop="1px solid" borderColor="CardBorder">
-        <Container maxW="6xl" px={{ base: 5, md: 8 }} py={8}>
-          <Flex direction={{ base: 'column', md: 'row' }} align={{ base: 'flex-start', md: 'center' }} gap={4}>
-            <Logo />
-            <Flex ml={{ md: 'auto' }} gap={6} fontSize="14px" color="TextSecondary" wrap="wrap">
-              <Box as={Link} href="/privacy" _hover={{ color: 'TextPrimary' }}>
-                {tt('Конфиденциальность')}
-              </Box>
-              <Box as={Link} href="/terms" _hover={{ color: 'TextPrimary' }}>
-                {tt('Условия')}
-              </Box>
-              <Box as={Link} href={dash} _hover={{ color: 'TextPrimary' }}>
-                {tt('Панель')}
-              </Box>
-            </Flex>
-          </Flex>
-          <Text fontSize="13px" color="TextSecondary" mt={5}>
-            © {new Date().getFullYear()} {config.name}
-          </Text>
-        </Container>
-      </Box>
+      <MarketingFooter />
     </Box>
   );
 }
