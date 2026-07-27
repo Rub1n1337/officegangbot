@@ -54,6 +54,14 @@ for (const p of PAGES) {
   });
 }
 
+test('Overview shows the Premium badge when the guild is premium', async ({ page }) => {
+  // GUILD_INFO in the fixtures carries premium:true — the badge proves the
+  // is_premium flag flows bot -> guild-info -> dashboard.
+  await page.goto(`/guilds/${GUILD_ID}/settings`);
+  await expect(page.getByText(/Server health|Здоровье сервера/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Premium|Премиум/).first()).toBeVisible();
+});
+
 // id -> a string the rendered form must show, so a form that silently fails to
 // mount can't pass.
 const FEATURES: Record<string, RegExp> = {

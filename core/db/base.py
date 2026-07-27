@@ -27,6 +27,9 @@ class _BaseDB:
         # Per-guild Levels config (voice XP, multipliers, prestige/season). Read
         # on every XP award; invalidated on set_levels_config / role-mult / season.
         self._levels_cache: Dict[int, Dict[str, Any]] = {}
+        # Per-guild premium status. Read on dashboard guild-info loads; TTL-
+        # bounded and invalidated on set_premium. guild_id -> (bool, stored_at).
+        self._premium_cache: Dict[int, tuple] = {}
 
     async def connect(self) -> None:
         """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""

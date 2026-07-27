@@ -846,7 +846,20 @@ const GuildOverviewPage: NextPageWithLayout = () => {
             {tt('Ключевые метрики и функции бота — на одном экране.')}
           </Text>
         </Box>
-        <Flex align="center" gap={3}>
+        <Flex align="center" gap={3} wrap="wrap" justify={{ base: 'flex-start', md: 'flex-end' }}>
+          {infoQuery.data?.premium && (
+            <Badge
+              colorScheme="purple"
+              rounded="full"
+              px={2}
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+            >
+              <Icon as={FaCrown} boxSize="11px" />
+              {tt('Премиум')}
+            </Badge>
+          )}
           {statsQuery.data?.online ? (
             <LiveIndicator updatedAt={statsQuery.dataUpdatedAt} />
           ) : statsQuery.data ? (

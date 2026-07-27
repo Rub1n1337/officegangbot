@@ -541,6 +541,7 @@ class MyBot(commands.Bot):
             for k, v in settings.items()
         }
         enabled_features = await self.db.get_enabled_features(guild_id)
+        premium = await self.db.is_premium(guild_id)
         return {
             "id": str(guild.id),
             "name": guild.name,
@@ -550,6 +551,7 @@ class MyBot(commands.Bot):
             "locale": settings.get("locale") or "en",
             "settings": settings,
             "enabledFeatures": enabled_features,
+            "premium": premium,
         }
 
     async def _rpc_get_guild_stats(self, guild_id, payload):
