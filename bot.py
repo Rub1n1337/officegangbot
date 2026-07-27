@@ -28,6 +28,7 @@ from core.permissions import bot_can_act_on, role_is_assignable
 from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules, validate_pattern
 from core.limits import limit_for, limit_error
+from core.discord_utils import guild_accent_color
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
 from core.observability import init_sentry
@@ -1683,10 +1684,11 @@ class MyBot(commands.Bot):
             return None
         if not isinstance(channel, discord.TextChannel):
             return None
+        color = await guild_accent_color(self.db, guild.id, discord.Color.blurple())
         embed = discord.Embed(
             title=(title or "Role Menu")[:256],
             description=build_menu_body(description, item_lines),
-            color=discord.Color.blurple(),
+            color=color,
         )
         if message_id:
             try:

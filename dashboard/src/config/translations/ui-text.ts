@@ -383,8 +383,8 @@ const EN: Record<string, string> = {
 
   // --- Premium branding (Overview) --------------------------------------------
   'Оформление эмбедов': 'Embed branding',
-  'Акцентный цвет эмбедов бота — например, уведомлений о повышении уровня.':
-    'Accent colour for the bot’s embeds — e.g. level-up announcements.',
+  'Акцентный цвет эмбедов бота — уровни, меню ролей, тикеты, верификация.':
+    'Accent colour for the bot’s embeds — level-ups, role menus, tickets, verification.',
   'По умолчанию': 'Default',
   'Своя тема — на Премиуме': 'Custom theme with Premium',
   // --- Premium / pricing page --------------------------------------------------

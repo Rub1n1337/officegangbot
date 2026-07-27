@@ -6,7 +6,7 @@ from core.logger import logger
 from core.i18n import t
 from core.tickets import build_transcript, normalize_priority, PRIORITY_LABELS
 from core.guild_context import GuildContext
-from core.discord_utils import safe_send
+from core.discord_utils import safe_send, guild_accent_color
 from .utils import reply
 from typing import Optional
 import asyncio
@@ -454,10 +454,11 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
         if category:
             await self.bot.db.set_guild_setting(ctx.guild.id, 'ticket_category_id', category.id)
 
+        panel_color = await guild_accent_color(self.bot.db, ctx.guild.id, discord.Color.blurple())
         embed = discord.Embed(
             title=t(loc, "tickets.panel_title"),
             description=t(loc, "tickets.panel_desc"),
-            color=discord.Color.blurple()
+            color=panel_color
         )
         embed.set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
 
