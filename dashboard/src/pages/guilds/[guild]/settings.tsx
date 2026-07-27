@@ -12,6 +12,7 @@ import {
   Flex,
   Heading,
   Icon,
+  Input,
   SimpleGrid,
   Skeleton,
   SkeletonText,
@@ -31,7 +32,7 @@ import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { NextPageWithLayout } from '@/pages/_app';
-import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useEnableFeatureMutation } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation } from '@/api/hooks';
 import { getFeature, updateFeature } from '@/api/bot';
 import { useSession } from '@/utils/auth/hooks';
 import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
@@ -829,13 +830,20 @@ function BrandingCard({
   guild,
   premium,
   embedColor,
+  footerText,
 }: {
   guild: string;
   premium: boolean;
   embedColor: number | null;
+  footerText: string | null;
 }) {
   const tt = useText();
   const mutation = useSetEmbedColorMutation();
+  const footerMut = useSetFooterTextMutation();
+  const saveFooter = (raw: string) => {
+    const next = raw.trim() || null;
+    if (premium && next !== (footerText ?? null)) footerMut.mutate({ guild, text: next });
+  };
   const pick = (color: number | null) => {
     if (premium && !mutation.isLoading) mutation.mutate({ guild, color });
   };
@@ -886,6 +894,29 @@ function BrandingCard({
           <Swatch key={c} color={c} />
         ))}
       </Flex>
+
+      <Box mt={5}>
+        <Text fontSize="sm" fontWeight="600" mb={1.5}>
+          {tt('Футер эмбедов')}
+        </Text>
+        <Input
+          key={footerText ?? ''}
+          size="sm"
+          maxW="360px"
+          maxLength={100}
+          defaultValue={footerText ?? ''}
+          isDisabled={!premium || footerMut.isLoading}
+          placeholder={premium ? tt('Пусто — без подписи') : 'via OfficeGangBot'}
+          onBlur={(e) => saveFooter(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
+        />
+        <Text fontSize="xs" color="TextSecondary" mt={1.5}>
+          {tt('На бесплатном плане эмбеды подписаны «via OfficeGangBot». Премиум убирает её или ставит свою.')}
+        </Text>
+      </Box>
+
       {!premium && (
         <Box mt={4}>
           <PremiumUpsell label={tt('Своя тема — на Премиуме')} />
@@ -965,6 +996,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           guild={guild}
           premium={!!infoQuery.data.premium}
           embedColor={infoQuery.data.embedColor ?? null}
+          footerText={infoQuery.data.footerText ?? null}
         />
       )}
       <ConfigTransfer guild={guild} />

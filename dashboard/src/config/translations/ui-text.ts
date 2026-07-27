@@ -387,6 +387,10 @@ const EN: Record<string, string> = {
     'Accent colour for the bot’s embeds — level-ups, role menus, tickets, verification.',
   'По умолчанию': 'Default',
   'Своя тема — на Премиуме': 'Custom theme with Premium',
+  'Футер эмбедов': 'Embed footer',
+  'Пусто — без подписи': 'Empty — no footer',
+  'На бесплатном плане эмбеды подписаны «via OfficeGangBot». Премиум убирает её или ставит свою.':
+    'On the free plan embeds are signed “via OfficeGangBot”. Premium removes it or sets its own.',
   // --- Premium / pricing page --------------------------------------------------
   'Премиум': 'Premium',
   'больше возможностей для сообщества': 'more power for your community',

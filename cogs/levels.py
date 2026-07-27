@@ -5,7 +5,7 @@ from discord import app_commands
 from core.logger import logger
 from core.permissions import has_permission
 from core.leveling import effective_multiplier, apply_multiplier, can_prestige
-from core.discord_utils import guild_accent_color
+from core.discord_utils import guild_accent_color, apply_branded_footer
 from .utils import reply, send_paginated
 from .mod_tools import ConfirmView
 from core.i18n import t
@@ -207,7 +207,7 @@ class LevelsCog(commands.Cog, name="⭐ Levels"):
             color=color
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_footer(text=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        await apply_branded_footer(embed, self.bot.db, guild)
         try:
             await channel.send(embed=embed)
         except discord.Forbidden:

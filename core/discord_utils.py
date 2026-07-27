@@ -35,6 +35,25 @@ async def guild_accent_color(db, guild_id: int, default: discord.Color) -> disco
         return default
 
 
+async def apply_branded_footer(embed: discord.Embed, db, guild) -> None:
+    """Premium branding on member-facing embeds. Free guilds get a small
+    "via OfficeGangBot" attribution footer; premium guilds get their custom
+    footer text, or no footer at all when they haven't set one (the "remove
+    powered by" perk). Defensive — any lookup error leaves the embed as-is, so
+    a paying guild is never wrongly branded."""
+    try:
+        icon = guild.icon.url if getattr(guild, "icon", None) else None
+        if await db.is_premium(guild.id):
+            text = await db.get_guild_setting(guild.id, "premium_footer_text")
+            if text:
+                embed.set_footer(text=str(text)[:2048], icon_url=icon)
+            # premium without a custom footer: leave it clean (no attribution)
+        else:
+            embed.set_footer(text="via OfficeGangBot", icon_url=icon)
+    except Exception:
+        pass
+
+
 def themed_embed(
     title: Optional[str] = None,
     description: Optional[str] = None,

@@ -6,7 +6,7 @@ from core.logger import logger
 from core.i18n import t
 from core.tickets import build_transcript, normalize_priority, PRIORITY_LABELS
 from core.guild_context import GuildContext
-from core.discord_utils import safe_send, guild_accent_color
+from core.discord_utils import safe_send, guild_accent_color, apply_branded_footer
 from .utils import reply
 from typing import Optional
 import asyncio
@@ -460,7 +460,7 @@ class TicketsCog(commands.Cog, name="🎫 Tickets"):
             description=t(loc, "tickets.panel_desc"),
             color=panel_color
         )
-        embed.set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
+        await apply_branded_footer(embed, self.bot.db, ctx.guild)
 
         try:
             await channel.send(embed=embed, view=OpenTicketView(loc))
