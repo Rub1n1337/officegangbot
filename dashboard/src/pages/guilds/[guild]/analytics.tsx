@@ -15,7 +15,8 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
-import { useAnalyticsQuery } from '@/api/hooks';
+import { useAnalyticsQuery, useGuildInfoQuery } from '@/api/hooks';
+import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { QueryStatus } from '@/components/panel/QueryPanel';
 import { StyledChart } from '@/components/chart/StyledChart';
 import { tabularNums } from '@/theme/numeric';
@@ -24,11 +25,14 @@ import { useText } from '@/config/translations/ui-text';
 import { MdDownload } from 'react-icons/md';
 import { Button, Icon as ChakraIcon } from '@chakra-ui/react';
 
-const PERIODS = [
+const PERIODS: Array<{ value: number; label: string; premium?: boolean }> = [
   { value: 7, label: 'За 7 дней' },
   { value: 30, label: 'За 30 дней' },
   { value: 90, label: 'За 90 дней' },
+  { value: 180, label: 'За 180 дней', premium: true },
+  { value: 365, label: 'За год', premium: true },
 ];
+const FREE_MAX_DAYS = 90;
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const BRAND = '#6E56F5';
@@ -207,8 +211,12 @@ function analyticsToCsv(data: AnalyticsData): string {
   return '﻿' + lines.join('\r\n');
 }
 
-function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+function analyticsToJson(data: AnalyticsData): string {
+  return JSON.stringify(data, null, 2);
+}
+
+function downloadBlob(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -217,6 +225,10 @@ function downloadCsv(filename: string, csv: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function downloadCsv(filename: string, csv: string) {
+  downloadBlob(filename, csv, 'text/csv;charset=utf-8;');
 }
 
 function AnalyticsBody({ data }: { data: AnalyticsData }) {
@@ -383,8 +395,12 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
 
 const AnalyticsPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
+  const premium = useGuildInfoQuery(guild).data?.premium ?? false;
   const [days, setDays] = useState(30);
-  const query = useAnalyticsQuery(guild, days);
+  // Guard the free ceiling client-side too (e.g. after a downgrade); the bot
+  // enforces it regardless.
+  const effDays = premium ? days : Math.min(days, FREE_MAX_DAYS);
+  const query = useAnalyticsQuery(guild, effDays);
   const tt = useText();
 
   return (
@@ -401,37 +417,60 @@ const AnalyticsPage: NextPageWithLayout = () => {
             {tt('Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений — содержимое, автор и время не хранятся.')}
           </Text>
         </Box>
-        <Select
-          bg="CardBackground"
-          border="1px solid"
-          borderColor="CardBorder"
-          rounded="11px"
-          w="auto"
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-        >
-          {PERIODS.map((p) => (
-            <option key={p.value} value={p.value}>
-              {tt(p.label)}
-            </option>
-          ))}
-        </Select>
-        <Button
-          size="sm"
-          variant="outline"
-          rounded="10px"
-          leftIcon={<ChakraIcon as={MdDownload} />}
-          isDisabled={!query.data}
-          onClick={() =>
-            query.data &&
-            downloadCsv(
-              `analytics-${guild}-${days}d-${new Date().toISOString().slice(0, 10)}.csv`,
-              analyticsToCsv(query.data)
-            )
-          }
-        >
-          {tt('Экспорт CSV')}
-        </Button>
+        <Flex gap={2} align="center" wrap="wrap">
+          {!premium && <PremiumUpsell label={tt('Больше истории и JSON — на Премиуме')} />}
+          <Select
+            bg="CardBackground"
+            border="1px solid"
+            borderColor="CardBorder"
+            rounded="11px"
+            w="auto"
+            value={effDays}
+            onChange={(e) => setDays(Number(e.target.value))}
+          >
+            {PERIODS.map((p) => (
+              <option key={p.value} value={p.value} disabled={p.premium && !premium}>
+                {tt(p.label)}
+                {p.premium && !premium ? ' · Premium' : ''}
+              </option>
+            ))}
+          </Select>
+          <Button
+            size="sm"
+            variant="outline"
+            rounded="10px"
+            leftIcon={<ChakraIcon as={MdDownload} />}
+            isDisabled={!query.data}
+            onClick={() =>
+              query.data &&
+              downloadCsv(
+                `analytics-${guild}-${effDays}d-${new Date().toISOString().slice(0, 10)}.csv`,
+                analyticsToCsv(query.data)
+              )
+            }
+          >
+            {tt('Экспорт CSV')}
+          </Button>
+          {premium && (
+            <Button
+              size="sm"
+              variant="outline"
+              rounded="10px"
+              leftIcon={<ChakraIcon as={MdDownload} />}
+              isDisabled={!query.data}
+              onClick={() =>
+                query.data &&
+                downloadBlob(
+                  `analytics-${guild}-${effDays}d-${new Date().toISOString().slice(0, 10)}.json`,
+                  analyticsToJson(query.data),
+                  'application/json;charset=utf-8;'
+                )
+              }
+            >
+              {tt('Экспорт JSON')}
+            </Button>
+          )}
+        </Flex>
       </Flex>
 
       <QueryStatus query={query} loading={<AnalyticsSkeleton />} error={tt('Не удалось загрузить аналитику.')}>
