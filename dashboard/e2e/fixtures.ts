@@ -187,6 +187,11 @@ export async function mockBackend(page: Page) {
       const feature = path.split('/features/')[1];
       return route.fulfill(json(FEATURE_PAYLOADS[feature] ?? {}));
     }
+    if (/\/backups\/\d+$/.test(path)) return route.fulfill(json({ data: { automod: { dryRun: true } } }));
+    if (path.endsWith('/backups')) return route.fulfill(json({ backups: [
+      { id: 2, kind: 'manual', createdAt: '2026-07-27T09:00:00Z' },
+      { id: 1, kind: 'auto', createdAt: '2026-07-26T03:00:00Z' },
+    ] }));
     if (path.includes('/custom-commands')) return route.fulfill(json({ commands: [{ name: 'rules', response: 'Be nice, {user.mention}!' }] }));
     if (path.endsWith('/stats')) return route.fulfill(json(STATS));
     if (path.endsWith('/moderation')) return route.fulfill(json(MODERATION));

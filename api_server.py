@@ -483,6 +483,27 @@ async def set_custom_commands(request: Request, guild_id: int, payload: CustomCo
     commands = [{"name": c.name, "response": c.response} for c in payload.commands]
     return await _rpc("set_custom_commands", guild_id=guild_id, commands=commands, **_actor(request))
 
+
+@app.get("/api/guild/{guild_id}/backups", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def list_config_backups(request: Request, guild_id: int):
+    """Premium: metadata for the guild's config backups."""
+    return await _rpc("list_config_backups", guild_id=guild_id)
+
+
+@app.get("/api/guild/{guild_id}/backups/{backup_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def get_config_backup(request: Request, guild_id: int, backup_id: int):
+    """Premium: the full snapshot for one backup (used to restore)."""
+    return await _rpc("get_config_backup", guild_id=guild_id, id=backup_id)
+
+
+@app.post("/api/guild/{guild_id}/backups", dependencies=[Depends(verify_api_key)])
+@limiter.limit("10/minute")
+async def create_config_backup(request: Request, guild_id: int):
+    """Premium: take a manual config backup."""
+    return await _rpc("create_config_backup", guild_id=guild_id, **_actor(request))
+
 @app.post("/api/guild/{guild_id}/appeals/config", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def set_ban_appeals(request: Request, guild_id: int, payload: BanAppealsConfigPayload):

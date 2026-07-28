@@ -332,6 +332,60 @@ export async function setCustomCommands(session: AccessToken, guild: string, com
   );
 }
 
+export type ConfigBackup = { id: number; kind: string; createdAt: string };
+
+/** Premium: metadata for the guild's config backups (newest first). */
+export async function fetchConfigBackups(session: AccessToken, guild: string) {
+  return await callReturn<{ backups: ConfigBackup[] }>(
+    `/api/guild/${guild}/backups`,
+    botRequest(session, { request: { method: 'GET' } })
+  );
+}
+
+/** Premium: the full snapshot for one backup (feature -> payload). */
+export async function fetchConfigBackup(session: AccessToken, guild: string, id: number) {
+  return await callReturn<{ data: Record<string, Record<string, unknown>> }>(
+    `/api/guild/${guild}/backups/${id}`,
+    botRequest(session, { request: { method: 'GET' } })
+  );
+}
+
+/** Premium: take a manual config backup. */
+export async function createConfigBackup(session: AccessToken, guild: string) {
+  return await callDefault(
+    `/api/guild/${guild}/backups`,
+    botRequest(session, { request: { method: 'POST' } })
+  );
+}
+
+/**
+ * Applies a set of feature payloads to a guild, merging each over the guild's
+ * current config so unspecified id fields are preserved. Returns the ids of
+ * features that failed. Shared by config import, multi-server sync and backup
+ * restore.
+ */
+export async function applyFeaturesToGuild(
+  session: AccessToken,
+  guild: string,
+  features: Record<string, Record<string, unknown>>
+): Promise<string[]> {
+  const failed: string[] = [];
+  for (const [feature, subset] of Object.entries(features)) {
+    try {
+      const current = await getFeature(session, guild, feature as keyof CustomFeatures);
+      await updateFeature(
+        session,
+        guild,
+        feature as keyof CustomFeatures,
+        JSON.stringify({ ...(current as Record<string, unknown>), ...subset })
+      );
+    } catch {
+      failed.push(feature);
+    }
+  }
+  return failed;
+}
+
 export type GuildEmoji = {
   id: string;
   name: string;

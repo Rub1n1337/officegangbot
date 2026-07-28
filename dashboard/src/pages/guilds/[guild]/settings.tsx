@@ -28,7 +28,7 @@ import {
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import { StyledChart } from '@/components/chart/StyledChart';
-import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload, MdFormatColorReset, MdDelete } from 'react-icons/md';
+import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload, MdFormatColorReset, MdDelete, MdRestore } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -36,9 +36,9 @@ import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { NextPageWithLayout } from '@/pages/_app';
-import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation, useGuilds, useMyBotGuilds, useCustomCommandsQuery, useSetCustomCommandsMutation } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation, useGuilds, useMyBotGuilds, useCustomCommandsQuery, useSetCustomCommandsMutation, useConfigBackupsQuery, useCreateBackupMutation, useRestoreBackupMutation } from '@/api/hooks';
 import { limitFor } from '@/config/limits';
-import { getFeature, updateFeature } from '@/api/bot';
+import { getFeature, updateFeature, applyFeaturesToGuild } from '@/api/bot';
 import { useSession } from '@/utils/auth/hooks';
 import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
 import { QueryStatus } from '@/components/panel/QueryPanel';
@@ -617,28 +617,10 @@ function ConfigTransfer({ guild, premium }: { guild: string; premium: boolean })
     setPendingImport(parsed.features);
   };
 
-  // Merge a portable feature-subset over a target guild's current payloads so id
-  // fields (channels, roles, exemptions) are preserved. Returns the failed ids.
-  const applyToGuild = async (
+  const applyToGuild = (
     targetGuild: string,
     features: Record<string, Record<string, unknown>>
-  ): Promise<string[]> => {
-    const failed: string[] = [];
-    for (const [feature, subset] of Object.entries(features)) {
-      try {
-        const current = await getFeature(session!, targetGuild, feature as keyof CustomFeatures);
-        await updateFeature(
-          session!,
-          targetGuild,
-          feature as keyof CustomFeatures,
-          JSON.stringify({ ...(current as Record<string, unknown>), ...subset })
-        );
-      } catch {
-        failed.push(feature);
-      }
-    }
-    return failed;
-  };
+  ) => applyFeaturesToGuild(session!, targetGuild, features);
 
   const runImport = async (features: Record<string, Record<string, unknown>>) => {
     if (!session) return;
@@ -1165,6 +1147,116 @@ function CustomCommandsCard({ guild, premium }: { guild: string; premium: boolea
   );
 }
 
+// Premium: config auto-backups + restore. Free servers see it locked.
+function BackupsCard({ guild, premium }: { guild: string; premium: boolean }) {
+  const tt = useText();
+  const query = useConfigBackupsQuery(guild, premium);
+  const createMut = useCreateBackupMutation();
+  const restoreMut = useRestoreBackupMutation();
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const backups = query.data?.backups ?? [];
+
+  return (
+    <Box bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="20px" p={{ base: 5, md: 6 }}>
+      <Flex align="center" gap={2} mb={1} wrap="wrap">
+        <Icon as={FaCrown} color="brand.200" boxSize="14px" />
+        <Text fontWeight="700">{tt('Бэкапы конфигурации')}</Text>
+        <Badge colorScheme="purple" rounded="full" px={2}>
+          {tt('Премиум')}
+        </Badge>
+      </Flex>
+      <Text fontSize="sm" color="TextSecondary" mb={4}>
+        {tt('Ежедневные снимки настроек сервера. Любой можно восстановить.')}
+      </Text>
+      {!premium ? (
+        <PremiumUpsell label={tt('Бэкапы — на Премиуме')} />
+      ) : (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={<Icon as={MdAdd} />}
+            isLoading={createMut.isLoading}
+            onClick={() => createMut.mutate({ guild })}
+          >
+            {tt('Сделать бэкап')}
+          </Button>
+          <Flex direction="column" gap={1.5} mt={3}>
+            {backups.length === 0 ? (
+              <Text fontSize="sm" color="TextSecondary">
+                {tt('Бэкапов пока нет.')}
+              </Text>
+            ) : (
+              backups.map((b) => (
+                <Flex
+                  key={b.id}
+                  align="center"
+                  justify="space-between"
+                  gap={2}
+                  bg="secondaryGray.100"
+                  _dark={{ bg: 'navy.700' }}
+                  rounded="12px"
+                  px={3}
+                  py={2}
+                >
+                  <Flex align="center" gap={2} minW={0}>
+                    <Text fontSize="sm" isTruncated>
+                      {new Date(b.createdAt).toLocaleString()}
+                    </Text>
+                    <Badge colorScheme={b.kind === 'manual' ? 'blue' : 'gray'} rounded="full" px={2}>
+                      {b.kind === 'manual' ? tt('вручную') : tt('авто')}
+                    </Badge>
+                  </Flex>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    leftIcon={<Icon as={MdRestore} />}
+                    isDisabled={restoreMut.isLoading}
+                    onClick={() => setConfirmId(b.id)}
+                    flexShrink={0}
+                  >
+                    {tt('Восстановить')}
+                  </Button>
+                </Flex>
+              ))
+            )}
+          </Flex>
+        </>
+      )}
+
+      <AlertDialog isOpen={confirmId != null} leastDestructiveRef={cancelRef} onClose={() => setConfirmId(null)} isCentered>
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="CardBackground" mx={4} rounded="16px">
+            <AlertDialogHeader>{tt('Восстановить из бэкапа?')}</AlertDialogHeader>
+            <AlertDialogBody>
+              <Text fontSize="sm">
+                {tt('Текущие настройки сервера будут заменены на снимок из этого бэкапа.')}
+              </Text>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} variant="ghost" onClick={() => setConfirmId(null)}>
+                {tt('Отмена')}
+              </Button>
+              <Button
+                colorScheme="brand"
+                ml={3}
+                onClick={() => {
+                  const id = confirmId!;
+                  setConfirmId(null);
+                  restoreMut.mutate({ guild, id });
+                }}
+              >
+                {tt('Восстановить')}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+    </Box>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -1239,6 +1331,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
         />
       )}
       {infoQuery.data && <CustomCommandsCard guild={guild} premium={!!infoQuery.data.premium} />}
+      {infoQuery.data && <BackupsCard guild={guild} premium={!!infoQuery.data.premium} />}
       <ConfigTransfer guild={guild} premium={!!infoQuery.data?.premium} />
     </Flex>
   );
