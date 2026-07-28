@@ -279,6 +279,17 @@ const EN: Record<string, string> = {
   'Импортировать настройки для:': 'Import settings for:',
   'Назначения каналов и ролей не затрагиваются.': 'Channel/role assignments are not affected.',
   'Импортировано:': 'Imported:',
+  'Синхронизация с другими серверами': 'Sync to your other servers',
+  'Примените настройки этого сервера к другим, где есть бот. Каналы и роли не переносятся.':
+    'Apply this server’s settings to your other servers with the bot. Channels and roles aren’t transferred.',
+  'Синхронизация — на Премиуме': 'Config sync on Premium',
+  'Нет других серверов с ботом.': 'No other servers with the bot.',
+  'Синхронизировать': 'Sync',
+  'Синхронизировать настройки?': 'Sync settings?',
+  'Настройки этого сервера будут применены к:': 'This server’s settings will be applied to:',
+  'Синхронизировано серверов:': 'Servers synced:',
+  'Синхронизировано с ошибками — не удалось:': 'Synced with errors — failed:',
+  'Не удалось синхронизировать — попробуйте ещё раз.': 'Sync failed — please try again.',
   'Импортировано с ошибками — не удалось:': 'Imported with errors — failed:',
 
   // --- Profile ------------------------------------------------------------------
