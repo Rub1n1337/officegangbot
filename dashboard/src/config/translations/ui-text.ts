@@ -395,6 +395,16 @@ const EN: Record<string, string> = {
   'Канал и текст правил': 'Rules channel & message',
   'Отложенные сообщения': 'Scheduled messages',
 
+  // --- Premium custom commands ------------------------------------------------
+  'Кастомные команды': 'Custom commands',
+  'Свои команды через /tag «имя». В ответе можно использовать {user.mention} и {server.name}.':
+    'Your own commands via /tag «name». Responses can use {user.mention} and {server.name}.',
+  'Кастомные команды — на Премиуме': 'Custom commands on Premium',
+  'имя команды': 'command name',
+  'Ответ': 'Response',
+  'Добавить команду': 'Add command',
+  'Сохранить': 'Save',
+  'Удалить': 'Delete',
   // --- Premium branding (Overview) --------------------------------------------
   'Оформление эмбедов': 'Embed branding',
   'Акцентный цвет эмбедов бота — уровни, меню ролей, тикеты, верификация.':

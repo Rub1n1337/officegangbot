@@ -30,6 +30,10 @@ class _BaseDB:
         # Per-guild premium status. Read on dashboard guild-info loads; TTL-
         # bounded and invalidated on set_premium. guild_id -> (bool, stored_at).
         self._premium_cache: Dict[int, tuple] = {}
+        # Per-guild custom /tag commands. Read on every /tag autocomplete
+        # keystroke, so cached; invalidated on replace_custom_commands.
+        # guild_id -> (list, stored_at).
+        self._custom_commands_cache: Dict[int, tuple] = {}
 
     async def connect(self) -> None:
         """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""

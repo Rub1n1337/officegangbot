@@ -308,6 +308,30 @@ export async function setGuildFooterText(session: AccessToken, guild: string, te
   );
 }
 
+export type CustomCommand = { name: string; response: string };
+
+/** The guild's premium custom /tag commands. */
+export async function fetchCustomCommands(session: AccessToken, guild: string) {
+  return await callReturn<{ commands: CustomCommand[] }>(
+    `/api/guild/${guild}/custom-commands`,
+    botRequest(session, { request: { method: 'GET' } })
+  );
+}
+
+/** Premium: replaces the guild's custom /tag commands. */
+export async function setCustomCommands(session: AccessToken, guild: string, commands: CustomCommand[]) {
+  return await callDefault(
+    `/api/guild/${guild}/custom-commands`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commands }),
+      },
+    })
+  );
+}
+
 export type GuildEmoji = {
   id: string;
   name: string;

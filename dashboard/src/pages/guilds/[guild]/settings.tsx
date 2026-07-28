@@ -14,8 +14,10 @@ import {
   Flex,
   Heading,
   Icon,
+  IconButton,
   Input,
   SimpleGrid,
+  Textarea,
   Skeleton,
   SkeletonText,
   Spacer,
@@ -26,7 +28,7 @@ import {
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import { StyledChart } from '@/components/chart/StyledChart';
-import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload, MdFormatColorReset } from 'react-icons/md';
+import { MdBolt, MdTune, MdAdd, MdArrowForward, MdDownload, MdUpload, MdFormatColorReset, MdDelete } from 'react-icons/md';
 import { FaCrown } from 'react-icons/fa';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -34,7 +36,8 @@ import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { NextPageWithLayout } from '@/pages/_app';
-import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation, useGuilds, useMyBotGuilds } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation, useGuilds, useMyBotGuilds, useCustomCommandsQuery, useSetCustomCommandsMutation } from '@/api/hooks';
+import { limitFor } from '@/config/limits';
 import { getFeature, updateFeature } from '@/api/bot';
 import { useSession } from '@/utils/auth/hooks';
 import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
@@ -1069,6 +1072,99 @@ function BrandingCard({
   );
 }
 
+// Premium: custom /tag commands editor. Free servers see it locked with an
+// Upgrade nudge; the bot rejects non-premium saves regardless.
+const CMD_CAP = limitFor('custom_commands', true);
+
+function CustomCommandsCard({ guild, premium }: { guild: string; premium: boolean }) {
+  const tt = useText();
+  const query = useCustomCommandsQuery(guild, premium);
+  const mutation = useSetCustomCommandsMutation();
+  const [rows, setRows] = useState<Array<{ name: string; response: string }>>([]);
+  const loaded = useRef(false);
+  useEffect(() => {
+    if (query.data && !loaded.current) {
+      setRows(query.data.commands ?? []);
+      loaded.current = true;
+    }
+  }, [query.data]);
+
+  const patch = (i: number, p: Partial<{ name: string; response: string }>) =>
+    setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...p } : row)));
+
+  return (
+    <Box bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="20px" p={{ base: 5, md: 6 }}>
+      <Flex align="center" gap={2} mb={1} wrap="wrap">
+        <Icon as={FaCrown} color="brand.200" boxSize="14px" />
+        <Text fontWeight="700">{tt('Кастомные команды')}</Text>
+        <Badge colorScheme="purple" rounded="full" px={2}>
+          {tt('Премиум')}
+        </Badge>
+      </Flex>
+      <Text fontSize="sm" color="TextSecondary" mb={4}>
+        {tt('Свои команды через /tag «имя». В ответе можно использовать {user.mention} и {server.name}.')}
+      </Text>
+      {!premium ? (
+        <PremiumUpsell label={tt('Кастомные команды — на Премиуме')} />
+      ) : (
+        <>
+          <Flex direction="column" gap={3}>
+            {rows.map((row, i) => (
+              <Flex key={i} gap={2} align="flex-start" wrap="wrap">
+                <Input
+                  size="sm"
+                  w={{ base: '100%', md: '170px' }}
+                  placeholder={tt('имя команды')}
+                  value={row.name}
+                  onChange={(e) => patch(i, { name: e.target.value })}
+                />
+                <Textarea
+                  size="sm"
+                  flex="1"
+                  minW="200px"
+                  rows={2}
+                  placeholder={tt('Ответ')}
+                  value={row.response}
+                  onChange={(e) => patch(i, { response: e.target.value })}
+                />
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  aria-label={tt('Удалить')}
+                  icon={<Icon as={MdDelete} />}
+                  onClick={() => setRows((r) => r.filter((_, idx) => idx !== i))}
+                />
+              </Flex>
+            ))}
+          </Flex>
+          <Flex gap={2} mt={rows.length ? 3 : 0} align="center" wrap="wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<Icon as={MdAdd} />}
+              isDisabled={rows.length >= CMD_CAP}
+              onClick={() => setRows((r) => [...r, { name: '', response: '' }])}
+            >
+              {tt('Добавить команду')}
+            </Button>
+            <Button
+              size="sm"
+              colorScheme="brand"
+              isLoading={mutation.isLoading}
+              onClick={() => mutation.mutate({ guild, commands: rows })}
+            >
+              {tt('Сохранить')}
+            </Button>
+            <Text fontSize="xs" color="TextSecondary">
+              {rows.length} / {CMD_CAP}
+            </Text>
+          </Flex>
+        </>
+      )}
+    </Box>
+  );
+}
+
 const GuildOverviewPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const infoQuery = useGuildInfoQuery(guild);
@@ -1142,6 +1238,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           footerText={infoQuery.data.footerText ?? null}
         />
       )}
+      {infoQuery.data && <CustomCommandsCard guild={guild} premium={!!infoQuery.data.premium} />}
       <ConfigTransfer guild={guild} premium={!!infoQuery.data?.premium} />
     </Flex>
   );
