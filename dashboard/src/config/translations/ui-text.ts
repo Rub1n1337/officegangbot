@@ -203,6 +203,9 @@ const EN: Record<string, string> = {
   'Тренды активности и модерации. Хитмап использует только агрегатные счётчики сообщений — содержимое, автор и время не хранятся.':
     'Activity and moderation trends. The heatmap uses only aggregate message counters — content, author and time are not stored.',
   'За 90 дней': 'Last 90 days',
+  'За 180 дней': 'Last 180 days',
+  'За год': 'Last year',
+  'Больше истории и JSON — на Премиуме': 'More history & JSON on Premium',
   'Действия модерации': 'Moderation actions',
   'Нарушения AutoMod': 'AutoMod violations',
   'Открыто тикетов': 'Tickets opened',

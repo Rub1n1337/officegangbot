@@ -788,7 +788,11 @@ class MyBot(commands.Bot):
     async def _rpc_get_analytics(self, guild_id, payload):
         if not self.db:
             return {"error": "Database unavailable"}
-        days = self._clamp_int(payload.get("days"), 30, 7, 90)
+        # Premium unlocks a longer history window; free is capped at 90 days.
+        # Enforced here so a crafted request can't exceed the free ceiling.
+        premium = await self.db.is_premium(guild_id)
+        max_days = 365 if premium else 90
+        days = self._clamp_int(payload.get("days"), 30, 7, max_days)
         return await self.db.get_analytics(guild_id, days)
 
     async def _rpc_get_audit(self, guild_id, payload):
