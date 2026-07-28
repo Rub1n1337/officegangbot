@@ -187,6 +187,7 @@ export async function mockBackend(page: Page) {
       const feature = path.split('/features/')[1];
       return route.fulfill(json(FEATURE_PAYLOADS[feature] ?? {}));
     }
+    if (path.includes('/custom-commands')) return route.fulfill(json({ commands: [{ name: 'rules', response: 'Be nice, {user.mention}!' }] }));
     if (path.endsWith('/stats')) return route.fulfill(json(STATS));
     if (path.endsWith('/moderation')) return route.fulfill(json(MODERATION));
     if (path.endsWith('/tickets')) return route.fulfill(json({ tickets: TICKETS }));

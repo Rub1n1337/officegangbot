@@ -298,6 +298,15 @@ class FooterTextPayload(BaseModel):
     text: Optional[str] = None
 
 
+class CustomCommand(BaseModel):
+    name: str
+    response: str
+
+
+class CustomCommandsPayload(BaseModel):
+    commands: list[CustomCommand] = []
+
+
 class BanAppealsConfigPayload(BaseModel):
     enabled: bool
 
@@ -458,6 +467,21 @@ async def set_footer_text(request: Request, guild_id: int, payload: FooterTextPa
     """Premium: set the guild's custom embed footer text (null/empty to clear)."""
     data = await _rpc("set_footer_text", guild_id=guild_id, text=payload.text, **_actor(request))
     return data
+
+
+@app.get("/api/guild/{guild_id}/custom-commands", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def get_custom_commands(request: Request, guild_id: int):
+    """Premium: the guild's custom /tag commands."""
+    return await _rpc("get_custom_commands", guild_id=guild_id)
+
+
+@app.post("/api/guild/{guild_id}/custom-commands", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def set_custom_commands(request: Request, guild_id: int, payload: CustomCommandsPayload):
+    """Premium: replace the guild's custom /tag commands."""
+    commands = [{"name": c.name, "response": c.response} for c in payload.commands]
+    return await _rpc("set_custom_commands", guild_id=guild_id, commands=commands, **_actor(request))
 
 @app.post("/api/guild/{guild_id}/appeals/config", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")

@@ -16,6 +16,7 @@ from core.db.tickets import _TicketsMixin
 from core.db.analytics import _AnalyticsMixin
 from core.db.appeals import _AppealsMixin
 from core.db.premium import _PremiumMixin
+from core.db.custom_commands import _CustomCommandsMixin
 
 __all__ = ["DatabaseManager", "ALLOWED_GUILD_SETTINGS"]
 
@@ -32,6 +33,7 @@ class DatabaseManager(
     _AnalyticsMixin,
     _AppealsMixin,
     _PremiumMixin,
+    _CustomCommandsMixin,
 ):
     """Async PostgreSQL manager with connection pooling via asyncpg.
     Initialize once at bot startup via ``connect()``, close the pool via

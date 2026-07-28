@@ -15,6 +15,7 @@ FREE_LIMITS = {
     "role_menus": 25,
     "reaction_roles": 100,
     "level_multipliers": 50,
+    "custom_commands": 0,
 }
 
 PREMIUM_LIMITS = {
@@ -25,6 +26,7 @@ PREMIUM_LIMITS = {
     "role_menus": 100,
     "reaction_roles": 400,
     "level_multipliers": 150,
+    "custom_commands": 15,
 }
 
 

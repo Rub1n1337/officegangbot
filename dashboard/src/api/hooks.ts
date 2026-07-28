@@ -25,6 +25,8 @@ import {
   setGuildLocale,
   setGuildEmbedColor,
   setGuildFooterText,
+  fetchCustomCommands,
+  setCustomCommands,
   updateFeature,
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
@@ -528,6 +530,46 @@ export function useSetFooterTextMutation() {
       onError() {
         toast({
           title: 'Failed to update embed footer',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+    }
+  );
+}
+
+export function useCustomCommandsQuery(guild: string, enabled: boolean) {
+  const { session } = useSession();
+  return useQuery(
+    ['custom-commands', guild],
+    () => fetchCustomCommands(session!!, guild),
+    { enabled: enabled && !!session }
+  );
+}
+
+export function useSetCustomCommandsMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+  return useMutation(
+    ({ guild, commands }: { guild: string; commands: { name: string; response: string }[] }) =>
+      setCustomCommands(session!!, guild, commands),
+    {
+      onSuccess(_, { guild }) {
+        client.invalidateQueries(['custom-commands', guild]);
+        client.invalidateQueries(['audit', guild]);
+        toast({
+          title: 'Custom commands saved',
+          status: 'success',
+          duration: 2500,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      },
+      onError() {
+        toast({
+          title: 'Failed to save custom commands',
           status: 'error',
           duration: 4000,
           isClosable: true,

@@ -28,6 +28,7 @@ from core.permissions import bot_can_act_on, role_is_assignable
 from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules, validate_pattern
 from core.limits import limit_for, limit_error
+from core.custom_commands import sanitize_commands
 from core.discord_utils import guild_accent_color, apply_branded_footer
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
@@ -490,6 +491,7 @@ class MyBot(commands.Bot):
             "get_guild_info", "get_guild_stats", "get_guild_roles", "get_guild_channels",
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale", "set_embed_color", "set_footer_text",
+            "get_custom_commands", "set_custom_commands",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
             "get_analytics", "set_ban_appeals", "decide_ban_appeal",
@@ -518,6 +520,8 @@ class MyBot(commands.Bot):
             "set_locale": self._rpc_set_locale,
             "set_embed_color": self._rpc_set_embed_color,
             "set_footer_text": self._rpc_set_footer_text,
+            "get_custom_commands": self._rpc_get_custom_commands,
+            "set_custom_commands": self._rpc_set_custom_commands,
             "search_members": self._rpc_search_members,
             "get_member": self._rpc_get_member,
             "moderate_member": self._rpc_moderate_member,
@@ -1006,6 +1010,23 @@ class MyBot(commands.Bot):
         await self.db.set_guild_setting(guild_id, "premium_footer_text", text)
         await self._record_audit(guild_id, payload, "set_footer_text", detail=text or "cleared")
         return {"success": True, "text": text}
+
+    async def _rpc_get_custom_commands(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        return {"commands": await self.db.get_custom_commands(guild_id)}
+
+    async def _rpc_set_custom_commands(self, guild_id, payload):
+        """Premium: replace the guild's custom /tag commands. Rejected for
+        non-premium guilds; the list is sanitized and capped server-side."""
+        if not self.db:
+            return {"error": "Database unavailable"}
+        if not await self.db.is_premium(guild_id):
+            return {"error": "Premium required"}
+        rows = sanitize_commands(payload.get("commands") or [], limit_for("custom_commands", True))
+        await self.db.replace_custom_commands(guild_id, rows)
+        await self._record_audit(guild_id, payload, "set_custom_commands", detail=str(len(rows)))
+        return {"commands": rows}
 
     async def _rpc_search_members(self, guild_id, payload):
         guild = self.get_guild(guild_id)

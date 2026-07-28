@@ -487,6 +487,17 @@ CREATE TABLE IF NOT EXISTS guild_premium (
 );
 ALTER TABLE guild_premium ENABLE ROW LEVEL SECURITY;
 
+-- Premium: custom /tag commands. Each row is one named response for a guild;
+-- surfaced in Discord via the single /tag <name> command (with autocomplete).
+CREATE TABLE IF NOT EXISTS custom_commands (
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    response TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (guild_id, name)
+);
+ALTER TABLE custom_commands ENABLE ROW LEVEL SECURITY;
+
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
 -- this closes the auto-exposed Supabase/PostgREST API to the anon key.
@@ -508,3 +519,4 @@ ALTER TABLE automod_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE level_multiplier_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE level_seasons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guild_premium ENABLE ROW LEVEL SECURITY;
+ALTER TABLE custom_commands ENABLE ROW LEVEL SECURITY;
