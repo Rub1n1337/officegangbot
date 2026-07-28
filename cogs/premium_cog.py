@@ -20,9 +20,29 @@ class PremiumCog(commands.Cog, name="💎 Premium"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._reconcile.start()
+        self._daily_backup.start()
 
     def cog_unload(self):
         self._reconcile.cancel()
+        self._daily_backup.cancel()
+
+    @tasks.loop(hours=24)
+    async def _daily_backup(self):
+        """Premium config auto-backup: one snapshot per premium guild per day
+        (deduped — a no-change day is skipped by create_config_backup)."""
+        if not self.bot.db:
+            return
+        for guild in list(self.bot.guilds):
+            try:
+                if await self.bot.db.is_premium(guild.id):
+                    data = await self.bot._snapshot_config(guild.id)
+                    await self.bot.db.create_config_backup(guild.id, "auto", data)
+            except Exception:
+                logger.exception(f"Daily config backup failed for guild {guild.id}")
+
+    @_daily_backup.before_loop
+    async def _before_backup(self):
+        await self.bot.wait_until_ready()
 
     async def _sync(self, entitlement: discord.Entitlement) -> None:
         """Mirror one entitlement into guild_premium (only our guild-sub SKU)."""

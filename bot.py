@@ -258,6 +258,18 @@ class MyBot(commands.Bot):
                 bad.append((rid_int, f"@{role.name}"))
         return bad
 
+    async def _snapshot_config(self, guild_id: int) -> dict:
+        """A full snapshot of the guild's feature config (feature -> payload),
+        used for premium config backups. Reuses _get_feature_payload so the
+        stored shape is exactly what update_feature accepts on restore."""
+        out = {}
+        for feature in self.KNOWN_FEATURES:
+            try:
+                out[feature] = await self._get_feature_payload(guild_id, feature)
+            except Exception:
+                logger.exception(f"Config snapshot failed for {feature} in guild {guild_id}")
+        return out
+
     async def _get_feature_payload(self, guild_id: int, feature: str) -> dict:
         if not self.db:
             return {"error": "Database unavailable"}
@@ -492,6 +504,7 @@ class MyBot(commands.Bot):
             "get_guild_emojis", "get_feature", "enable_feature", "disable_feature", "update_feature",
             "get_moderation", "delete_warning", "set_locale", "set_embed_color", "set_footer_text",
             "get_custom_commands", "set_custom_commands",
+            "list_config_backups", "get_config_backup", "create_config_backup",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
             "get_analytics", "set_ban_appeals", "decide_ban_appeal",
@@ -522,6 +535,9 @@ class MyBot(commands.Bot):
             "set_footer_text": self._rpc_set_footer_text,
             "get_custom_commands": self._rpc_get_custom_commands,
             "set_custom_commands": self._rpc_set_custom_commands,
+            "list_config_backups": self._rpc_list_config_backups,
+            "get_config_backup": self._rpc_get_config_backup,
+            "create_config_backup": self._rpc_create_config_backup,
             "search_members": self._rpc_search_members,
             "get_member": self._rpc_get_member,
             "moderate_member": self._rpc_moderate_member,
@@ -1027,6 +1043,34 @@ class MyBot(commands.Bot):
         await self.db.replace_custom_commands(guild_id, rows)
         await self._record_audit(guild_id, payload, "set_custom_commands", detail=str(len(rows)))
         return {"commands": rows}
+
+    async def _rpc_list_config_backups(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        return {"backups": await self.db.list_config_backups(guild_id)}
+
+    async def _rpc_get_config_backup(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        try:
+            backup_id = int(payload.get("id"))
+        except (TypeError, ValueError):
+            return {"error": "Invalid backup id"}
+        data = await self.db.get_config_backup(guild_id, backup_id)
+        if data is None:
+            return {"error": "Backup not found"}
+        return {"data": data}
+
+    async def _rpc_create_config_backup(self, guild_id, payload):
+        """Premium: take a manual config snapshot. Rejected for non-premium."""
+        if not self.db:
+            return {"error": "Database unavailable"}
+        if not await self.db.is_premium(guild_id):
+            return {"error": "Premium required"}
+        data = await self._snapshot_config(guild_id)
+        backup_id = await self.db.create_config_backup(guild_id, "manual", data)
+        await self._record_audit(guild_id, payload, "create_config_backup", detail=str(backup_id))
+        return {"backups": await self.db.list_config_backups(guild_id)}
 
     async def _rpc_search_members(self, guild_id, payload):
         guild = self.get_guild(guild_id)

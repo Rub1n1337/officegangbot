@@ -27,6 +27,10 @@ import {
   setGuildFooterText,
   fetchCustomCommands,
   setCustomCommands,
+  fetchConfigBackups,
+  fetchConfigBackup,
+  createConfigBackup,
+  applyFeaturesToGuild,
   updateFeature,
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
@@ -575,6 +579,51 @@ export function useSetCustomCommandsMutation() {
           isClosable: true,
           position: 'bottom-right',
         });
+      },
+    }
+  );
+}
+
+export function useConfigBackupsQuery(guild: string, enabled: boolean) {
+  const { session } = useSession();
+  return useQuery(
+    ['config-backups', guild],
+    () => fetchConfigBackups(session!!, guild),
+    { enabled: enabled && !!session }
+  );
+}
+
+export function useCreateBackupMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+  return useMutation(({ guild }: { guild: string }) => createConfigBackup(session!!, guild), {
+    onSuccess(_, { guild }) {
+      client.invalidateQueries(['config-backups', guild]);
+      toast({ title: 'Backup created', status: 'success', duration: 2500, isClosable: true, position: 'bottom-right' });
+    },
+    onError() {
+      toast({ title: 'Failed to create backup', status: 'error', duration: 4000, isClosable: true, position: 'bottom-right' });
+    },
+  });
+}
+
+export function useRestoreBackupMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+  return useMutation(
+    async ({ guild, id }: { guild: string; id: number }) => {
+      const backup = await fetchConfigBackup(session!!, guild, id);
+      const failed = await applyFeaturesToGuild(session!!, guild, backup.data ?? {});
+      if (failed.length > 0) throw new Error(failed.join(', '));
+    },
+    {
+      onSuccess(_, { guild }) {
+        client.invalidateQueries(['feature', guild]);
+        client.invalidateQueries(['audit', guild]);
+        toast({ title: 'Backup restored', status: 'success', duration: 2500, isClosable: true, position: 'bottom-right' });
+      },
+      onError() {
+        toast({ title: 'Failed to restore backup', status: 'error', duration: 4000, isClosable: true, position: 'bottom-right' });
       },
     }
   );

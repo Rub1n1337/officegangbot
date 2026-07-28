@@ -498,6 +498,18 @@ CREATE TABLE IF NOT EXISTS custom_commands (
 );
 ALTER TABLE custom_commands ENABLE ROW LEVEL SECURITY;
 
+-- Premium: config auto-backups. Each row is a full snapshot of the guild's
+-- feature config (JSON), taken daily and on demand; the oldest are pruned.
+CREATE TABLE IF NOT EXISTS config_backups (
+    id BIGSERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT 'auto',
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_config_backups_guild ON config_backups(guild_id, created_at DESC);
+ALTER TABLE config_backups ENABLE ROW LEVEL SECURITY;
+
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
 -- this closes the auto-exposed Supabase/PostgREST API to the anon key.
@@ -520,3 +532,4 @@ ALTER TABLE level_multiplier_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE level_seasons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guild_premium ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_commands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config_backups ENABLE ROW LEVEL SECURITY;

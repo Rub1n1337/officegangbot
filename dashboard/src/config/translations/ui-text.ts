@@ -395,6 +395,19 @@ const EN: Record<string, string> = {
   'Канал и текст правил': 'Rules channel & message',
   'Отложенные сообщения': 'Scheduled messages',
 
+  // --- Premium config backups ------------------------------------------------
+  'Бэкапы конфигурации': 'Config backups',
+  'Ежедневные снимки настроек сервера. Любой можно восстановить.':
+    'Daily snapshots of your server config. Restore any of them.',
+  'Бэкапы — на Премиуме': 'Config backups on Premium',
+  'Сделать бэкап': 'Back up now',
+  'Бэкапов пока нет.': 'No backups yet.',
+  'вручную': 'manual',
+  'авто': 'auto',
+  'Восстановить': 'Restore',
+  'Восстановить из бэкапа?': 'Restore from backup?',
+  'Текущие настройки сервера будут заменены на снимок из этого бэкапа.':
+    'Your current server config will be replaced with this backup’s snapshot.',
   // --- Premium custom commands ------------------------------------------------
   'Кастомные команды': 'Custom commands',
   'Свои команды через /tag «имя». В ответе можно использовать {user.mention} и {server.name}.':
