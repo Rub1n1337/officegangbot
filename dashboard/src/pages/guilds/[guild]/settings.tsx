@@ -9,6 +9,8 @@ import {
   Box,
   Button,
   ButtonGroup,
+  Checkbox,
+  Divider,
   Flex,
   Heading,
   Icon,
@@ -32,7 +34,7 @@ import Link from 'next/link';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { PremiumUpsell } from '@/components/PremiumUpsell';
 import { NextPageWithLayout } from '@/pages/_app';
-import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation } from '@/api/hooks';
+import { client, useGuildInfoQuery, useGuildStatsQuery, useSetLocaleMutation, useSetEmbedColorMutation, useSetFooterTextMutation, useEnableFeatureMutation, useGuilds, useMyBotGuilds } from '@/api/hooks';
 import { getFeature, updateFeature } from '@/api/bot';
 import { useSession } from '@/utils/auth/hooks';
 import { buildExport, parseImport, TRANSFER_FEATURES } from '@/utils/config-transfer';
@@ -543,12 +545,28 @@ function BotLanguage({ guild, locale }: { guild: string; locale: string }) {
 // rules). Channel/role assignments never transfer — on import the portable
 // subset is merged over this guild's current config and saved through the
 // normal validated update path, so ids stay untouched.
-function ConfigTransfer({ guild }: { guild: string }) {
+function ConfigTransfer({ guild, premium }: { guild: string; premium: boolean }) {
   const { session } = useSession();
   const tt = useText();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState<'export' | 'import' | null>(null);
+  const [busy, setBusy] = useState<'export' | 'import' | 'sync' | null>(null);
+
+  // Premium: sync this server's portable config to the admin's OTHER servers
+  // where the bot is present.
+  const guildsQ = useGuilds();
+  const botGuildsQ = useMyBotGuilds();
+  const present = new Set((botGuildsQ.data?.guilds ?? []).map((g) => g.id));
+  const syncTargets = (guildsQ.data ?? []).filter((g) => g.id !== guild && present.has(g.id));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmSync, setConfirmSync] = useState(false);
+  const syncCancelRef = useRef<HTMLButtonElement>(null);
+  const toggleTarget = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   const notify = (title: string, status: 'success' | 'error' | 'warning') =>
     toast({ title, status, duration: 5000, isClosable: true, position: 'bottom' });
@@ -596,19 +614,19 @@ function ConfigTransfer({ guild }: { guild: string }) {
     setPendingImport(parsed.features);
   };
 
-  const runImport = async (features: Record<string, Record<string, unknown>>) => {
-    if (!session) return;
-    const names = Object.keys(features).join(', ');
-    setBusy('import');
+  // Merge a portable feature-subset over a target guild's current payloads so id
+  // fields (channels, roles, exemptions) are preserved. Returns the failed ids.
+  const applyToGuild = async (
+    targetGuild: string,
+    features: Record<string, Record<string, unknown>>
+  ): Promise<string[]> => {
     const failed: string[] = [];
     for (const [feature, subset] of Object.entries(features)) {
       try {
-        // Merge over the guild's current payload so id fields (channels, roles,
-        // exemptions) are preserved exactly as they are.
-        const current = await getFeature(session, guild, feature as keyof CustomFeatures);
+        const current = await getFeature(session!, targetGuild, feature as keyof CustomFeatures);
         await updateFeature(
-          session,
-          guild,
+          session!,
+          targetGuild,
           feature as keyof CustomFeatures,
           JSON.stringify({ ...(current as Record<string, unknown>), ...subset })
         );
@@ -616,6 +634,14 @@ function ConfigTransfer({ guild }: { guild: string }) {
         failed.push(feature);
       }
     }
+    return failed;
+  };
+
+  const runImport = async (features: Record<string, Record<string, unknown>>) => {
+    if (!session) return;
+    const names = Object.keys(features).join(', ');
+    setBusy('import');
+    const failed = await applyToGuild(guild, features);
     client.invalidateQueries(['feature', guild]);
     if (failed.length === 0) {
       notify(`${tt('Импортировано:')} ${names}.`, 'success');
@@ -623,6 +649,39 @@ function ConfigTransfer({ guild }: { guild: string }) {
       notify(`${tt('Импортировано с ошибками — не удалось:')} ${failed.join(', ')}.`, 'warning');
     }
     setBusy(null);
+  };
+
+  const doSync = async () => {
+    if (!session || selected.size === 0) return;
+    setBusy('sync');
+    try {
+      // Build this server's portable config once, then apply it to each target.
+      const entries = await Promise.all(
+        TRANSFER_FEATURES.map(async (f) => [
+          f,
+          await getFeature(session, guild, f as keyof CustomFeatures),
+        ] as const)
+      );
+      const features = buildExport(
+        Object.fromEntries(entries) as Record<string, Record<string, unknown>>
+      ).features;
+      const targets = syncTargets.filter((g) => selected.has(g.id));
+      const failedGuilds: string[] = [];
+      for (const t of targets) {
+        const failed = await applyToGuild(t.id, features);
+        if (failed.length > 0) failedGuilds.push(t.name);
+      }
+      if (failedGuilds.length === 0) {
+        notify(`${tt('Синхронизировано серверов:')} ${targets.length}.`, 'success');
+      } else {
+        notify(`${tt('Синхронизировано с ошибками — не удалось:')} ${failedGuilds.join(', ')}.`, 'warning');
+      }
+      setSelected(new Set());
+    } catch {
+      notify(tt('Не удалось синхронизировать — попробуйте ещё раз.'), 'error');
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -665,6 +724,51 @@ function ConfigTransfer({ guild }: { guild: string }) {
         />
       </Flex>
 
+      <Divider my={4} />
+      <Flex align="center" gap={2} wrap="wrap">
+        <Heading size="sm">{tt('Синхронизация с другими серверами')}</Heading>
+        <Badge colorScheme="purple" rounded="full" px={2} display="inline-flex" alignItems="center" gap={1}>
+          <Icon as={FaCrown} boxSize="11px" />
+          {tt('Премиум')}
+        </Badge>
+      </Flex>
+      <Flex align="center" gap={2} mt={1} mb={3} wrap="wrap">
+        <Text fontSize="sm" color="TextSecondary">
+          {tt('Примените настройки этого сервера к другим, где есть бот. Каналы и роли не переносятся.')}
+        </Text>
+        {!premium && <PremiumUpsell label={tt('Синхронизация — на Премиуме')} />}
+      </Flex>
+      {premium &&
+        (syncTargets.length === 0 ? (
+          <Text fontSize="sm" color="TextSecondary">
+            {tt('Нет других серверов с ботом.')}
+          </Text>
+        ) : (
+          <Box>
+            <Flex direction="column" gap={1.5} mb={3}>
+              {syncTargets.map((g) => (
+                <Checkbox
+                  key={g.id}
+                  isChecked={selected.has(g.id)}
+                  onChange={() => toggleTarget(g.id)}
+                  isDisabled={busy != null}
+                >
+                  {g.name}
+                </Checkbox>
+              ))}
+            </Flex>
+            <Button
+              size="sm"
+              colorScheme="brand"
+              isLoading={busy === 'sync'}
+              isDisabled={busy != null || selected.size === 0}
+              onClick={() => setConfirmSync(true)}
+            >
+              {tt('Синхронизировать')}
+            </Button>
+          </Box>
+        ))}
+
       <AlertDialog
         isOpen={pendingImport != null}
         leastDestructiveRef={importCancelRef}
@@ -699,6 +803,45 @@ function ConfigTransfer({ guild }: { guild: string }) {
                 }}
               >
                 {tt('Импортировать')}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
+      <AlertDialog
+        isOpen={confirmSync}
+        leastDestructiveRef={syncCancelRef}
+        onClose={() => setConfirmSync(false)}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="CardBackground" mx={4} rounded="16px">
+            <AlertDialogHeader>{tt('Синхронизировать настройки?')}</AlertDialogHeader>
+            <AlertDialogBody>
+              <Text fontSize="sm">
+                {tt('Настройки этого сервера будут применены к:')}{' '}
+                <Text as="span" fontWeight="600">
+                  {syncTargets.filter((g) => selected.has(g.id)).map((g) => g.name).join(', ')}
+                </Text>
+              </Text>
+              <Text fontSize="sm" color="TextSecondary" mt={2}>
+                {tt('Назначения каналов и ролей не затрагиваются.')}
+              </Text>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={syncCancelRef} variant="ghost" onClick={() => setConfirmSync(false)}>
+                {tt('Отмена')}
+              </Button>
+              <Button
+                colorScheme="brand"
+                ml={3}
+                onClick={() => {
+                  setConfirmSync(false);
+                  void doSync();
+                }}
+              >
+                {tt('Синхронизировать')}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -999,7 +1142,7 @@ const GuildOverviewPage: NextPageWithLayout = () => {
           footerText={infoQuery.data.footerText ?? null}
         />
       )}
-      <ConfigTransfer guild={guild} />
+      <ConfigTransfer guild={guild} premium={!!infoQuery.data?.premium} />
     </Flex>
   );
 };
