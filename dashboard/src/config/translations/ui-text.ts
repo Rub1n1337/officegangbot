@@ -408,6 +408,21 @@ const EN: Record<string, string> = {
   'Восстановить из бэкапа?': 'Restore from backup?',
   'Текущие настройки сервера будут заменены на снимок из этого бэкапа.':
     'Your current server config will be replaced with this backup’s snapshot.',
+  // --- Commands manager -------------------------------------------------------
+  'КОМАНДЫ': 'COMMANDS',
+  'Команды': 'Commands',
+  'Включайте, выключайте и ограничивайте команды по каналам и ролям.':
+    'Enable, disable and restrict commands by channel and role.',
+  'Права': 'Perms',
+  'Права команды': 'Command permissions',
+  'Разрешённые каналы': 'Allowed channels',
+  'Игнорируемые каналы': 'Ignored channels',
+  'Разрешённые роли': 'Allowed roles',
+  'Игнорируемые роли': 'Ignored roles',
+  'Администраторы всегда обходят эти ограничения.':
+    'Admins always bypass these restrictions.',
+  'Не удалось загрузить команды.': 'Failed to load commands.',
+  'Команд пока нет.': 'No commands yet.',
   // --- Premium custom commands ------------------------------------------------
   'Кастомные команды': 'Custom commands',
   'Свои команды через /tag «имя». В ответе можно использовать {user.mention} и {server.name}.':

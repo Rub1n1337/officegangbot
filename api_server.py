@@ -307,6 +307,15 @@ class CustomCommandsPayload(BaseModel):
     commands: list[CustomCommand] = []
 
 
+class CommandOverridePayload(BaseModel):
+    command: str
+    enabled: bool = True
+    allowedChannels: list[str] = []
+    ignoredChannels: list[str] = []
+    allowedRoles: list[str] = []
+    ignoredRoles: list[str] = []
+
+
 class BanAppealsConfigPayload(BaseModel):
     enabled: bool
 
@@ -503,6 +512,26 @@ async def get_config_backup(request: Request, guild_id: int, backup_id: int):
 async def create_config_backup(request: Request, guild_id: int):
     """Premium: take a manual config backup."""
     return await _rpc("create_config_backup", guild_id=guild_id, **_actor(request))
+
+
+@app.get("/api/guild/{guild_id}/commands", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def get_commands(request: Request, guild_id: int):
+    """The command registry + the guild's per-command overrides."""
+    return await _rpc("get_commands", guild_id=guild_id)
+
+
+@app.post("/api/guild/{guild_id}/commands", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def set_command_override(request: Request, guild_id: int, payload: CommandOverridePayload):
+    """Set one command's override (enable/disable + channel/role gates)."""
+    return await _rpc(
+        "set_command_override", guild_id=guild_id,
+        command=payload.command, enabled=payload.enabled,
+        allowedChannels=payload.allowedChannels, ignoredChannels=payload.ignoredChannels,
+        allowedRoles=payload.allowedRoles, ignoredRoles=payload.ignoredRoles,
+        **_actor(request),
+    )
 
 @app.post("/api/guild/{guild_id}/appeals/config", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")

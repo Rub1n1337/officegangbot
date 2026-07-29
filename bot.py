@@ -29,6 +29,7 @@ from core.content_filter import normalize_domain
 from core.automod_rules import sanitize_rules, validate_pattern
 from core.limits import limit_for, limit_error
 from core.custom_commands import sanitize_commands
+from core.command_gate import command_allowed
 from core.discord_utils import guild_accent_color, apply_branded_footer
 from core.leveling import sanitize_multiplier
 from core.role_menu import build_menu_body
@@ -88,6 +89,12 @@ class MyBot(commands.Bot):
 
         # Set up the global error handler for slash commands
         self.tree.on_error = self.on_app_command_error
+
+        # Per-command gate (dashboard Commands page): a global check on both the
+        # slash and prefix paths. Fail-open + admins bypass, so it can only ever
+        # block a command that was explicitly restricted.
+        self.tree.interaction_check = self._command_interaction_check
+        self.add_check(self._command_prefix_check)
 
         # Acknowledge every slash interaction early (see _auto_defer) so slow
         # DB work in a command body can't blow Discord's 3-second ACK window.
@@ -257,6 +264,68 @@ class MyBot(commands.Bot):
             ):
                 bad.append((rid_int, f"@{role.name}"))
         return bad
+
+    _COMMAND_CATEGORY_EXCLUDE = ("owner", "dev", "test")
+
+    def _command_registry(self) -> list:
+        """Configurable commands as [{name, category, description}] — walks the
+        app-command tree, skipping group containers and owner/dev cogs."""
+        out = []
+        for cmd in self.tree.walk_commands():
+            if isinstance(cmd, app_commands.Group):
+                continue
+            try:
+                binding = getattr(cmd, "binding", None)
+                category = getattr(binding, "qualified_name", None) or "Other"
+                if any(x in category.lower() for x in self._COMMAND_CATEGORY_EXCLUDE):
+                    continue
+                out.append({
+                    "name": cmd.qualified_name,
+                    "category": category,
+                    "description": (cmd.description or "")[:100],
+                })
+            except Exception:
+                continue
+        out.sort(key=lambda c: (c["category"], c["name"]))
+        return out
+
+    async def _command_interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Global gate for slash commands (fail-open, admins bypass). Returns
+        False to block; the CheckFailure is turned into a friendly message by
+        on_app_command_error."""
+        try:
+            if interaction.guild is None or not self.db or interaction.command is None:
+                return True
+            member = interaction.user
+            if isinstance(member, discord.Member) and member.guild_permissions.administrator:
+                return True
+            overrides = await self.db.get_command_overrides(interaction.guild.id)
+            override = overrides.get(interaction.command.qualified_name)
+            if override is None:
+                return True
+            role_ids = [r.id for r in getattr(member, "roles", [])]
+            return command_allowed(override, channel_id=interaction.channel_id, role_ids=role_ids)
+        except Exception:
+            logger.exception("Command gate (slash) failed — allowing")
+            return True
+
+    async def _command_prefix_check(self, ctx) -> bool:
+        """Global gate for prefix commands. The slash side of a hybrid command is
+        already handled by the interaction check above (ctx.interaction set)."""
+        try:
+            if ctx.guild is None or not self.db or ctx.command is None or ctx.interaction is not None:
+                return True
+            if ctx.author.guild_permissions.administrator:
+                return True
+            overrides = await self.db.get_command_overrides(ctx.guild.id)
+            override = overrides.get(ctx.command.qualified_name)
+            if override is None:
+                return True
+            role_ids = [r.id for r in getattr(ctx.author, "roles", [])]
+            return command_allowed(override, channel_id=ctx.channel.id, role_ids=role_ids)
+        except Exception:
+            logger.exception("Command gate (prefix) failed — allowing")
+            return True
 
     async def _snapshot_config(self, guild_id: int) -> dict:
         """A full snapshot of the guild's feature config (feature -> payload),
@@ -505,6 +574,7 @@ class MyBot(commands.Bot):
             "get_moderation", "delete_warning", "set_locale", "set_embed_color", "set_footer_text",
             "get_custom_commands", "set_custom_commands",
             "list_config_backups", "get_config_backup", "create_config_backup",
+            "get_commands", "set_command_override",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
             "get_analytics", "set_ban_appeals", "decide_ban_appeal",
@@ -538,6 +608,8 @@ class MyBot(commands.Bot):
             "list_config_backups": self._rpc_list_config_backups,
             "get_config_backup": self._rpc_get_config_backup,
             "create_config_backup": self._rpc_create_config_backup,
+            "get_commands": self._rpc_get_commands,
+            "set_command_override": self._rpc_set_command_override,
             "search_members": self._rpc_search_members,
             "get_member": self._rpc_get_member,
             "moderate_member": self._rpc_moderate_member,
@@ -1071,6 +1143,41 @@ class MyBot(commands.Bot):
         backup_id = await self.db.create_config_backup(guild_id, "manual", data)
         await self._record_audit(guild_id, payload, "create_config_backup", detail=str(backup_id))
         return {"backups": await self.db.list_config_backups(guild_id)}
+
+    async def _rpc_get_commands(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        return {
+            "commands": self._command_registry(),
+            "overrides": await self.db.get_command_overrides(guild_id),
+        }
+
+    async def _rpc_set_command_override(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        command = payload.get("command")
+        if not command or command not in {c["name"] for c in self._command_registry()}:
+            return {"error": "Unknown command"}
+
+        def _ids(raw):
+            out = []
+            for value in (raw or [])[:50]:
+                try:
+                    out.append(int(value))
+                except (TypeError, ValueError):
+                    continue
+            return out
+
+        await self.db.set_command_override(
+            guild_id, command,
+            enabled=bool(payload.get("enabled", True)),
+            allowed_channels=_ids(payload.get("allowedChannels")),
+            ignored_channels=_ids(payload.get("ignoredChannels")),
+            allowed_roles=_ids(payload.get("allowedRoles")),
+            ignored_roles=_ids(payload.get("ignoredRoles")),
+        )
+        await self._record_audit(guild_id, payload, "set_command_override", target=command)
+        return {"overrides": await self.db.get_command_overrides(guild_id)}
 
     async def _rpc_search_members(self, guild_id, payload):
         guild = self.get_guild(guild_id)
@@ -1809,6 +1916,10 @@ class MyBot(commands.Bot):
         elif isinstance(error, app_commands.BotMissingPermissions):
             perms = ", ".join(error.missing_permissions)
             await interaction.response.send_message(f"❌ I'm missing the following permissions: `{perms}`", ephemeral=True)
+        elif isinstance(error, app_commands.CheckFailure):
+            # Blocked by the per-command gate (or another check) — a plain message.
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ This command isn’t allowed here.", ephemeral=True)
         else:
             logger.error(f"Unhandled slash command error: {error}", exc_info=True)
             if not interaction.response.is_done():

@@ -546,6 +546,20 @@ CREATE TABLE IF NOT EXISTS giveaway_entries (
 ALTER TABLE giveaways ENABLE ROW LEVEL SECURITY;
 ALTER TABLE giveaway_entries ENABLE ROW LEVEL SECURITY;
 
+-- Per-command overrides: disable a command or restrict it to/from channels and
+-- roles for a guild. A missing row = default (enabled, no restrictions).
+CREATE TABLE IF NOT EXISTS command_overrides (
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    command TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    allowed_channels BIGINT[] NOT NULL DEFAULT '{}',
+    ignored_channels BIGINT[] NOT NULL DEFAULT '{}',
+    allowed_roles BIGINT[] NOT NULL DEFAULT '{}',
+    ignored_roles BIGINT[] NOT NULL DEFAULT '{}',
+    PRIMARY KEY (guild_id, command)
+);
+ALTER TABLE command_overrides ENABLE ROW LEVEL SECURITY;
+
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
 -- this closes the auto-exposed Supabase/PostgREST API to the anon key.

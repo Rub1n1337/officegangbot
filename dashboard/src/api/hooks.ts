@@ -31,6 +31,8 @@ import {
   fetchConfigBackup,
   createConfigBackup,
   applyFeaturesToGuild,
+  fetchCommands,
+  setCommandOverride,
   updateFeature,
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
@@ -624,6 +626,39 @@ export function useRestoreBackupMutation() {
       },
       onError() {
         toast({ title: 'Failed to restore backup', status: 'error', duration: 4000, isClosable: true, position: 'bottom-right' });
+      },
+    }
+  );
+}
+
+export function useCommandsQuery(guild: string) {
+  const { session } = useSession();
+  return useQuery(['commands', guild], () => fetchCommands(session!!, guild), { enabled: !!session });
+}
+
+export function useSetCommandOverrideMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+  return useMutation(
+    (body: {
+      guild: string;
+      command: string;
+      enabled: boolean;
+      allowedChannels: string[];
+      ignoredChannels: string[];
+      allowedRoles: string[];
+      ignoredRoles: string[];
+    }) => {
+      const { guild, ...rest } = body;
+      return setCommandOverride(session!!, guild, rest);
+    },
+    {
+      onSuccess(_, { guild }) {
+        client.invalidateQueries(['commands', guild]);
+        client.invalidateQueries(['audit', guild]);
+      },
+      onError() {
+        toast({ title: 'Failed to save command', status: 'error', duration: 4000, isClosable: true, position: 'bottom-right' });
       },
     }
   );
