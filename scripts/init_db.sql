@@ -342,6 +342,10 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS premium_embed_color BIGINT;
 -- Premium: custom footer text on branded embeds. Free guilds get a small
 -- "via OfficeGangBot" attribution instead; premium with NULL here = no footer.
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS premium_footer_text TEXT;
+-- Starboard: messages that reach `starboard_threshold` ⭐ reactions are reposted
+-- to `starboard_channel_id`. NULL channel = disabled.
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS starboard_channel_id BIGINT;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS starboard_threshold INTEGER DEFAULT 3;
 -- AutoMod content-filter config (invite/link blocking).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_invites BOOLEAN DEFAULT FALSE;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_links BOOLEAN DEFAULT FALSE;
@@ -525,6 +529,15 @@ CREATE TABLE IF NOT EXISTS giveaways (
 );
 CREATE INDEX IF NOT EXISTS idx_giveaways_due ON giveaways(ended, ends_at);
 CREATE INDEX IF NOT EXISTS idx_giveaways_message ON giveaways(message_id);
+-- Starboard: maps an original message to its posted starboard entry, so the
+-- entry can be updated/removed as ⭐ counts change.
+CREATE TABLE IF NOT EXISTS starboard_posts (
+    message_id BIGINT PRIMARY KEY,
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    starboard_message_id BIGINT NOT NULL,
+    star_count INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE starboard_posts ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS giveaway_entries (
     giveaway_id BIGINT NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL,

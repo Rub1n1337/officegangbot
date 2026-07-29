@@ -19,6 +19,7 @@ from core.db.premium import _PremiumMixin
 from core.db.custom_commands import _CustomCommandsMixin
 from core.db.backups import _BackupsMixin
 from core.db.giveaways import _GiveawaysMixin
+from core.db.starboard import _StarboardMixin
 
 __all__ = ["DatabaseManager", "ALLOWED_GUILD_SETTINGS"]
 
@@ -38,6 +39,7 @@ class DatabaseManager(
     _CustomCommandsMixin,
     _BackupsMixin,
     _GiveawaysMixin,
+    _StarboardMixin,
 ):
     """Async PostgreSQL manager with connection pooling via asyncpg.
     Initialize once at bot startup via ``connect()``, close the pool via
