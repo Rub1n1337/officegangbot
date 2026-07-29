@@ -37,6 +37,7 @@ const PAGES: Array<{ name: string; path: string; expect: RegExp }> = [
   { name: 'Members', path: `/guilds/${GUILD_ID}/members`, expect: /Search & moderation|Поиск и модерация/ },
   { name: 'Tickets', path: `/guilds/${GUILD_ID}/tickets`, expect: /Support|Поддержка/ },
   { name: 'Analytics', path: `/guilds/${GUILD_ID}/analytics`, expect: /Trends & moderation|Тренды и модерация/ },
+  { name: 'Commands', path: `/guilds/${GUILD_ID}/commands`, expect: /Enable, disable and restrict|Включайте, выключайте/ },
   { name: 'Audit log', path: `/guilds/${GUILD_ID}/audit`, expect: /Dashboard activity|Активность дашборда/ },
   { name: 'Server picker', path: '/user/home', expect: /Pick a server|Выберите сервер/ },
   { name: 'Profile', path: '/user/profile', expect: /Discord account|Аккаунт Discord/ },

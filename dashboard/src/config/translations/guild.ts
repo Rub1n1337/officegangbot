@@ -23,6 +23,7 @@ export const guild = createI18n(provider, {
       tickets: 'Tickets',
       audit: 'Audit log',
       analytics: 'Analytics',
+      commands: 'Commands',
     },
   },
   ru: {
@@ -46,6 +47,7 @@ export const guild = createI18n(provider, {
       tickets: 'Тикеты',
       audit: 'Журнал',
       analytics: 'Аналитика',
+      commands: 'Команды',
     },
   },
 });

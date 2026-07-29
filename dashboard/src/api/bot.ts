@@ -358,6 +358,49 @@ export async function createConfigBackup(session: AccessToken, guild: string) {
   );
 }
 
+export type CommandInfo = { name: string; category: string; description: string };
+export type CommandOverride = {
+  enabled: boolean;
+  allowed_channels: number[];
+  ignored_channels: number[];
+  allowed_roles: number[];
+  ignored_roles: number[];
+};
+export type CommandsData = { commands: CommandInfo[]; overrides: Record<string, CommandOverride> };
+
+/** The command registry + this guild's per-command overrides. */
+export async function fetchCommands(session: AccessToken, guild: string) {
+  return await callReturn<CommandsData>(
+    `/api/guild/${guild}/commands`,
+    botRequest(session, { request: { method: 'GET' } })
+  );
+}
+
+/** Set one command's override (enable/disable + channel/role gates). */
+export async function setCommandOverride(
+  session: AccessToken,
+  guild: string,
+  body: {
+    command: string;
+    enabled: boolean;
+    allowedChannels: string[];
+    ignoredChannels: string[];
+    allowedRoles: string[];
+    ignoredRoles: string[];
+  }
+) {
+  return await callDefault(
+    `/api/guild/${guild}/commands`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    })
+  );
+}
+
 /**
  * Applies a set of feature payloads to a guild, merging each over the guild's
  * current config so unspecified id fields are preserved. Returns the ids of

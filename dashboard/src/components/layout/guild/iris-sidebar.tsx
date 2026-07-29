@@ -13,6 +13,7 @@ import {
   MdInsights,
   MdHistory,
   MdSettings,
+  MdTerminal,
 } from 'react-icons/md';
 import { avatarUrl } from '@/api/discord';
 import { ServerPicker } from './ServerPicker';
@@ -121,6 +122,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
     { href: guildId && `/guilds/${guildId}/tickets`, icon: MdConfirmationNumber, label: t.bn.tickets, route: '/guilds/[guild]/tickets', badge: openTickets },
     { href: guildId && `/guilds/${guildId}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
     { href: guildId && `/guilds/${guildId}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
+    { href: guildId && `/guilds/${guildId}/commands`, icon: MdTerminal, label: t.bn.commands, route: '/guilds/[guild]/commands' },
   ];
 
   return (

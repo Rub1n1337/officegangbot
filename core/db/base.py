@@ -34,6 +34,10 @@ class _BaseDB:
         # keystroke, so cached; invalidated on replace_custom_commands.
         # guild_id -> (list, stored_at).
         self._custom_commands_cache: Dict[int, tuple] = {}
+        # Per-guild command overrides (enable/disable + channel/role gates). Read
+        # on every command, so cached; invalidated on set_command_override.
+        # guild_id -> (dict, stored_at).
+        self._command_overrides_cache: Dict[int, tuple] = {}
 
     async def connect(self) -> None:
         """Creates the asyncpg connection pool. Call this in bot.setup_hook()."""
