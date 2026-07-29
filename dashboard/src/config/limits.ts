@@ -10,6 +10,7 @@ export const FREE_LIMITS = {
   reaction_roles: 100,
   level_multipliers: 50,
   custom_commands: 0,
+  giveaways: 2,
 } as const;
 
 export const PREMIUM_LIMITS = {
@@ -21,6 +22,7 @@ export const PREMIUM_LIMITS = {
   reaction_roles: 400,
   level_multipliers: 150,
   custom_commands: 15,
+  giveaways: 20,
 } as const;
 
 export type LimitResource = keyof typeof FREE_LIMITS;

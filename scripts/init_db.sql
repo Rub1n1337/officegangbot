@@ -510,6 +510,29 @@ CREATE TABLE IF NOT EXISTS config_backups (
 CREATE INDEX IF NOT EXISTS idx_config_backups_guild ON config_backups(guild_id, created_at DESC);
 ALTER TABLE config_backups ENABLE ROW LEVEL SECURITY;
 
+-- Giveaways: a button-entry giveaway per row; entries live in giveaway_entries.
+CREATE TABLE IF NOT EXISTS giveaways (
+    id BIGSERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    channel_id BIGINT NOT NULL,
+    message_id BIGINT,
+    prize TEXT NOT NULL,
+    winners_count INT NOT NULL DEFAULT 1,
+    ends_at TIMESTAMPTZ NOT NULL,
+    ended BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_giveaways_due ON giveaways(ended, ends_at);
+CREATE INDEX IF NOT EXISTS idx_giveaways_message ON giveaways(message_id);
+CREATE TABLE IF NOT EXISTS giveaway_entries (
+    giveaway_id BIGINT NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL,
+    PRIMARY KEY (giveaway_id, user_id)
+);
+ALTER TABLE giveaways ENABLE ROW LEVEL SECURITY;
+ALTER TABLE giveaway_entries ENABLE ROW LEVEL SECURITY;
+
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
 -- this closes the auto-exposed Supabase/PostgREST API to the anon key.
