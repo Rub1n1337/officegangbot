@@ -5,6 +5,9 @@ import {
   Flex,
   Heading,
   Icon,
+  Input,
+  InputGroup,
+  InputLeftElement,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -20,7 +23,7 @@ import {
 import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { MdTune } from 'react-icons/md';
+import { MdSearch, MdTune } from 'react-icons/md';
 import getGuildLayout from '@/components/layout/guild/get-guild-layout';
 import { NextPageWithLayout } from '@/pages/_app';
 import { useCommandsQuery, useSetCommandOverrideMutation } from '@/api/hooks';
@@ -28,6 +31,7 @@ import { QueryStatus } from '@/components/panel/QueryPanel';
 import { ChannelMultiSelectForm } from '@/components/forms/ChannelSelect';
 import { RoleMultiSelectForm } from '@/components/forms/RoleSelect';
 import { useText } from '@/config/translations/ui-text';
+import { useFormText } from '@/config/translations/form-text';
 import type { CommandInfo, CommandOverride } from '@/api/bot';
 
 const DEFAULT_OVERRIDE: CommandOverride = {
@@ -51,11 +55,10 @@ function CommandCard({
 }) {
   const tt = useText();
   const mutation = useSetCommandOverrideMutation();
-  const restricted =
-    override.allowed_channels.length > 0 ||
-    override.ignored_channels.length > 0 ||
-    override.allowed_roles.length > 0 ||
-    override.ignored_roles.length > 0;
+  // # = channels, @ = roles — Discord's own shorthand, so the pill reads at a
+  // glance in any language without a plural rule.
+  const chCount = override.allowed_channels.length + override.ignored_channels.length;
+  const roleCount = override.allowed_roles.length + override.ignored_roles.length;
 
   const toggle = () =>
     mutation.mutate({
@@ -68,23 +71,59 @@ function CommandCard({
       ignoredRoles: override.ignored_roles.map(String),
     });
 
+  const pill = {
+    variant: 'subtle',
+    colorScheme: 'purple',
+    rounded: 'full',
+    px: 2,
+    fontSize: '11px',
+    flexShrink: 0,
+  } as const;
+
   return (
     <Box bg="CardBackground" border="1px solid" borderColor="CardBorder" rounded="16px" p={4}>
       <Flex align="center" gap={2}>
-        <Text fontWeight="700" fontSize="15px" isTruncated>
+        <Text
+          fontWeight="700"
+          fontSize="15px"
+          isTruncated
+          minW={0}
+          color={override.enabled ? undefined : 'TextSecondary'}
+        >
           /{cmd.name}
         </Text>
-        {restricted && (
-          <Icon as={MdTune} boxSize="14px" color="brand.200" title="restricted" />
+        {chCount > 0 && (
+          <Badge {...pill} title={tt('Каналы')}>
+            #{chCount}
+          </Badge>
         )}
-        <Switch ml="auto" isChecked={override.enabled} onChange={toggle} isDisabled={mutation.isLoading} colorScheme="brand" />
+        {roleCount > 0 && (
+          <Badge {...pill} title={tt('Роли')}>
+            @{roleCount}
+          </Badge>
+        )}
+        <Switch
+          ml="auto"
+          aria-label={`/${cmd.name}`}
+          isChecked={override.enabled}
+          onChange={toggle}
+          isDisabled={mutation.isLoading}
+          colorScheme="brand"
+        />
       </Flex>
       {cmd.description && (
         <Text fontSize="13px" color="TextSecondary" mt={1} noOfLines={2}>
           {cmd.description}
         </Text>
       )}
-      <Button size="xs" variant="ghost" leftIcon={<Icon as={MdTune} />} mt={2} onClick={onEdit}>
+      <Button
+        size="xs"
+        variant="outline"
+        borderColor="CardBorder"
+        leftIcon={<Icon as={MdTune} />}
+        mt={2}
+        onClick={onEdit}
+      >
         {tt('Права')}
       </Button>
     </Box>
@@ -166,7 +205,9 @@ const CommandsPage: NextPageWithLayout = () => {
   const guild = useRouter().query.guild as string;
   const query = useCommandsQuery(guild);
   const tt = useText();
+  const ft = useFormText();
   const [category, setCategory] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<CommandInfo | null>(null);
 
   const commands = useMemo(() => query.data?.commands ?? [], [query.data]);
@@ -176,7 +217,16 @@ const CommandsPage: NextPageWithLayout = () => {
     [commands]
   );
   const active = category ?? categories[0] ?? null;
-  const shown = commands.filter((c) => c.category === active);
+
+  // A query searches every command by name/description; an empty query falls
+  // back to the active category tab.
+  const q = search.trim().toLowerCase();
+  const searching = q.length > 0;
+  const shown = commands.filter((c) =>
+    searching
+      ? c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q)
+      : c.category === active
+  );
 
   return (
     <Flex direction="column" gap={5}>
@@ -192,7 +242,19 @@ const CommandsPage: NextPageWithLayout = () => {
         </Text>
       </Box>
 
-      {categories.length > 0 && (
+      <InputGroup maxW={{ base: 'full', md: '320px' }}>
+        <InputLeftElement pointerEvents="none">
+          <Icon as={MdSearch} color="TextSecondary" />
+        </InputLeftElement>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={tt('Поиск команды…')}
+          bg="CardBackground"
+        />
+      </InputGroup>
+
+      {!searching && categories.length > 0 && (
         <Flex gap={2} wrap="wrap">
           {categories.map((c) => (
             <Button
@@ -203,7 +265,7 @@ const CommandsPage: NextPageWithLayout = () => {
               borderColor="CardBorder"
               onClick={() => setCategory(c)}
             >
-              {c}
+              {ft(c)}
             </Button>
           ))}
         </Flex>
@@ -233,7 +295,7 @@ const CommandsPage: NextPageWithLayout = () => {
         </SimpleGrid>
         {shown.length === 0 && (
           <Text fontSize="sm" color="TextSecondary">
-            {tt('Команд пока нет.')}
+            {searching ? tt('Ничего не найдено.') : tt('Команд пока нет.')}
           </Text>
         )}
       </QueryStatus>

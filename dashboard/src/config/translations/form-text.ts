@@ -357,6 +357,37 @@ const RU: Record<string, string> = {
   'Auto-role (optional)': 'Авто-роль (необязательно)',
   'Automatically given to every member when they join.':
     'Автоматически выдаётся каждому участнику при входе.',
+
+  // --- Command categories ---------------------------------------------------
+  // These come from the bot's cog names at runtime (not a literal ft('…') call),
+  // so the i18n-keys static scan can't see them — keep this list in sync with
+  // the `name=` on each cog in cogs/*.py. A new/unmapped cog falls back to its
+  // English name, which is the acceptable default.
+  '🛡️ Moderation': '🛡️ Модерация',
+  '💬 General': '💬 Основные',
+  '⭐ Levels': '⭐ Уровни',
+  '🎫 Tickets': '🎫 Тикеты',
+  '🚨 Anti-Raid': '🚨 Анти-рейд',
+  '🛡️ AutoMod': '🛡️ Авто-модерация',
+  '🔧 Channel Tools': '🔧 Инструменты каналов',
+  '⚙️ Configuration': '⚙️ Настройки',
+  '🏷️ Custom Commands': '🏷️ Свои команды',
+  '🚫 Filter': '🚫 Фильтр',
+  '🎉 Giveaways': '🎉 Розыгрыши',
+  '🛠️ Server Setup': '🛠️ Настройка сервера',
+  '❓ Help': '❓ Помощь',
+  '🌐 Language': '🌐 Язык',
+  '🧰 Mod Tools': '🧰 Инструменты модератора',
+  '💎 Premium': '💎 Премиум',
+  'Reaction Roles': 'Реакции-роли',
+  '📅 Scheduled Messages': '📅 Отложенные сообщения',
+  '⭐ Starboard': '⭐ Starboard',
+  '⏱️ Timed Events': '⏱️ Таймеры',
+  '🛠️ Utility': '🛠️ Утилиты',
+  '✅ Verification': '✅ Верификация',
+  '⚠️ Warnings': '⚠️ Предупреждения',
+  '👋 Welcome System': '👋 Приветствия',
+  Other: 'Другое',
 };
 
 export function useFormText() {
