@@ -423,6 +423,8 @@ const EN: Record<string, string> = {
     'Admins always bypass these restrictions.',
   'Не удалось загрузить команды.': 'Failed to load commands.',
   'Команд пока нет.': 'No commands yet.',
+  'Поиск команды…': 'Search a command…',
+  'Каналы': 'Channels',
   // --- Premium custom commands ------------------------------------------------
   'Кастомные команды': 'Custom commands',
   'Свои команды через /tag «имя». В ответе можно использовать {user.mention} и {server.name}.':

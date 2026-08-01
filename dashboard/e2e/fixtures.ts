@@ -195,10 +195,13 @@ export async function mockBackend(page: Page) {
     if (path.includes('/custom-commands')) return route.fulfill(json({ commands: [{ name: 'rules', response: 'Be nice, {user.mention}!' }] }));
     if (path.endsWith('/commands')) return route.fulfill(json({
       commands: [
-        { name: 'ban', category: '🔨 Moderation', description: 'Ban a member from the server.' },
-        { name: 'ping', category: 'General', description: 'Check the bot response time.' },
+        { name: 'ban', category: '🛡️ Moderation', description: 'Ban a member from the server.' },
+        { name: 'ping', category: '💬 General', description: 'Check the bot response time.' },
       ],
-      overrides: { ping: { enabled: false, allowed_channels: [], ignored_channels: [], allowed_roles: [], ignored_roles: [] } },
+      overrides: {
+        ping: { enabled: false, allowed_channels: [], ignored_channels: [], allowed_roles: [], ignored_roles: [] },
+        ban: { enabled: true, allowed_channels: ['1', '2'], ignored_channels: [], allowed_roles: ['5'], ignored_roles: [] },
+      },
     }));
     if (path.endsWith('/stats')) return route.fulfill(json(STATS));
     if (path.endsWith('/moderation')) return route.fulfill(json(MODERATION));
