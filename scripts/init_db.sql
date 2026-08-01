@@ -577,6 +577,32 @@ CREATE INDEX IF NOT EXISTS idx_invite_joins_inviter ON invite_joins(guild_id, in
 CREATE INDEX IF NOT EXISTS idx_invite_joins_member ON invite_joins(guild_id, member_id);
 ALTER TABLE invite_joins ENABLE ROW LEVEL SECURITY;
 
+-- Polls: a button poll per row (options as a text array); each vote is a
+-- (poll_id, user_id, option_index) row so single/multi-choice share storage.
+CREATE TABLE IF NOT EXISTS polls (
+    id BIGSERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    channel_id BIGINT NOT NULL,
+    message_id BIGINT,
+    question TEXT NOT NULL,
+    options TEXT[] NOT NULL,
+    allow_multi BOOLEAN NOT NULL DEFAULT FALSE,
+    ends_at TIMESTAMPTZ,
+    closed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_polls_due ON polls(closed, ends_at);
+CREATE INDEX IF NOT EXISTS idx_polls_message ON polls(message_id);
+CREATE TABLE IF NOT EXISTS poll_votes (
+    poll_id BIGINT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL,
+    option_index INT NOT NULL,
+    PRIMARY KEY (poll_id, user_id, option_index)
+);
+ALTER TABLE polls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE poll_votes ENABLE ROW LEVEL SECURITY;
+
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;
 -- this closes the auto-exposed Supabase/PostgREST API to the anon key.
