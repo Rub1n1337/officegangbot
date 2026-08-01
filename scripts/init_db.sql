@@ -346,6 +346,7 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS premium_footer_text TEXT;
 -- to `starboard_channel_id`. NULL channel = disabled.
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS starboard_channel_id BIGINT;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS starboard_threshold INTEGER DEFAULT 3;
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS invite_log_channel_id BIGINT;
 -- AutoMod content-filter config (invite/link blocking).
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_invites BOOLEAN DEFAULT FALSE;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS automod_block_links BOOLEAN DEFAULT FALSE;
@@ -559,6 +560,22 @@ CREATE TABLE IF NOT EXISTS command_overrides (
     PRIMARY KEY (guild_id, command)
 );
 ALTER TABLE command_overrides ENABLE ROW LEVEL SECURITY;
+
+-- Invite tracking: one row per member join, attributed to the invite used and
+-- its creator. left_at is stamped when the member later leaves, so the
+-- leaderboard can discount invites that didn't stick.
+CREATE TABLE IF NOT EXISTS invite_joins (
+    id BIGSERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    member_id BIGINT NOT NULL,
+    inviter_id BIGINT,
+    invite_code TEXT,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    left_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_invite_joins_inviter ON invite_joins(guild_id, inviter_id);
+CREATE INDEX IF NOT EXISTS idx_invite_joins_member ON invite_joins(guild_id, member_id);
+ALTER TABLE invite_joins ENABLE ROW LEVEL SECURITY;
 
 -- Security: enable RLS (deny-all, no policies) on all tables. The bot connects
 -- directly as the postgres role and bypasses RLS, so its behavior is unchanged;

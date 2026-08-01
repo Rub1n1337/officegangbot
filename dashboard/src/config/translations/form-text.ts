@@ -372,6 +372,7 @@ const RU: Record<string, string> = {
   '🔧 Channel Tools': '🔧 Инструменты каналов',
   '⚙️ Configuration': '⚙️ Настройки',
   '🏷️ Custom Commands': '🏷️ Свои команды',
+  '📨 Invite Tracker': '📨 Инвайт-трекер',
   '🚫 Filter': '🚫 Фильтр',
   '🎉 Giveaways': '🎉 Розыгрыши',
   '🛠️ Server Setup': '🛠️ Настройка сервера',

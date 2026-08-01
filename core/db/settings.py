@@ -20,7 +20,7 @@ ALLOWED_GUILD_SETTINGS = frozenset({
     'verification_role_id', 'ban_appeals_enabled', 'enabled_features',
     'antiraid_min_account_age_days', 'antiraid_ping_role_id',
     'locale', 'premium_embed_color', 'premium_footer_text',
-    'starboard_channel_id', 'starboard_threshold',
+    'starboard_channel_id', 'starboard_threshold', 'invite_log_channel_id',
     'automod_block_invites', 'automod_block_links',
     'automod_allowed_domains', 'automod_spam_count', 'automod_spam_window',
     'automod_mention_limit', 'automod_block_mass_mentions',
