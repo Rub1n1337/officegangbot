@@ -381,6 +381,7 @@ const RU: Record<string, string> = {
   '🧰 Mod Tools': '🧰 Инструменты модератора',
   '💎 Premium': '💎 Премиум',
   'Reaction Roles': 'Реакции-роли',
+  '📊 Polls': '📊 Опросы',
   '📅 Scheduled Messages': '📅 Отложенные сообщения',
   '⭐ Starboard': '⭐ Starboard',
   '⏱️ Timed Events': '⏱️ Таймеры',
