@@ -575,6 +575,7 @@ class MyBot(commands.Bot):
             "get_custom_commands", "set_custom_commands",
             "list_config_backups", "get_config_backup", "create_config_backup",
             "get_commands", "set_command_override",
+            "get_invites", "set_invite_log",
             "search_members", "get_member", "moderate_member", "get_audit",
             "get_tickets", "get_ticket_transcript", "search_tickets",
             "get_analytics", "set_ban_appeals", "decide_ban_appeal",
@@ -610,6 +611,8 @@ class MyBot(commands.Bot):
             "create_config_backup": self._rpc_create_config_backup,
             "get_commands": self._rpc_get_commands,
             "set_command_override": self._rpc_set_command_override,
+            "get_invites": self._rpc_get_invites,
+            "set_invite_log": self._rpc_set_invite_log,
             "search_members": self._rpc_search_members,
             "get_member": self._rpc_get_member,
             "moderate_member": self._rpc_moderate_member,
@@ -1178,6 +1181,38 @@ class MyBot(commands.Bot):
         )
         await self._record_audit(guild_id, payload, "set_command_override", target=command)
         return {"overrides": await self.db.get_command_overrides(guild_id)}
+
+    async def _rpc_get_invites(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        guild = self.get_guild(guild_id)
+        rows = await self.db.get_invite_leaderboard(guild_id, 25)
+        leaderboard = []
+        for r in rows:
+            member = guild.get_member(r["inviter_id"]) if guild else None
+            leaderboard.append({
+                "inviterId": str(r["inviter_id"]),
+                "name": member.display_name if member else f"User {r['inviter_id']}",
+                "avatar": member.display_avatar.url if member else None,
+                "joined": r["joined"],
+                "left": r["left"],
+                "net": r["net"],
+            })
+        log_channel = await self.db.get_guild_setting(guild_id, "invite_log_channel_id")
+        return {"leaderboard": leaderboard, "logChannelId": str(log_channel) if log_channel else None}
+
+    async def _rpc_set_invite_log(self, guild_id, payload):
+        if not self.db:
+            return {"error": "Database unavailable"}
+        value = None
+        if payload.get("channelId"):
+            try:
+                value = _validate_discord_id(payload.get("channelId"))
+            except ValueError as e:
+                return {"error": str(e)}
+        await self.db.set_guild_setting(guild_id, "invite_log_channel_id", value)
+        await self._record_audit(guild_id, payload, "set_invite_log", detail=str(value) if value else "off")
+        return {"logChannelId": str(value) if value else None}
 
     async def _rpc_search_members(self, guild_id, payload):
         guild = self.get_guild(guild_id)

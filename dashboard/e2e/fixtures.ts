@@ -203,6 +203,14 @@ export async function mockBackend(page: Page) {
         ban: { enabled: true, allowed_channels: ['1', '2'], ignored_channels: [], allowed_roles: ['5'], ignored_roles: [] },
       },
     }));
+    if (path.endsWith('/invites/log')) return route.fulfill(json({ logChannelId: '900' }));
+    if (path.endsWith('/invites')) return route.fulfill(json({
+      leaderboard: [
+        { inviterId: '10', name: 'mod', avatar: null, joined: 12, left: 2, net: 10 },
+        { inviterId: '20', name: 'helper', avatar: null, joined: 5, left: 0, net: 5 },
+      ],
+      logChannelId: null,
+    }));
     if (path.endsWith('/stats')) return route.fulfill(json(STATS));
     if (path.endsWith('/moderation')) return route.fulfill(json(MODERATION));
     if (path.endsWith('/tickets')) return route.fulfill(json({ tickets: TICKETS }));

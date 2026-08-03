@@ -33,6 +33,8 @@ import {
   applyFeaturesToGuild,
   fetchCommands,
   setCommandOverride,
+  fetchInvites,
+  setInviteLog,
   updateFeature,
 } from '@/api/bot';
 import type { ModeratePayload } from '@/api/bot';
@@ -659,6 +661,29 @@ export function useSetCommandOverrideMutation() {
       },
       onError() {
         toast({ title: 'Failed to save command', status: 'error', duration: 4000, isClosable: true, position: 'bottom-right' });
+      },
+    }
+  );
+}
+
+export function useInvitesQuery(guild: string) {
+  const { session } = useSession();
+  return useQuery(['invites', guild], () => fetchInvites(session!!, guild), { enabled: !!session });
+}
+
+export function useSetInviteLogMutation() {
+  const { session } = useSession();
+  const toast = useToast();
+  return useMutation(
+    (body: { guild: string; channelId: string | null }) =>
+      setInviteLog(session!!, body.guild, body.channelId),
+    {
+      onSuccess(_, { guild }) {
+        client.invalidateQueries(['invites', guild]);
+        client.invalidateQueries(['audit', guild]);
+      },
+      onError() {
+        toast({ title: 'Failed to save', status: 'error', duration: 4000, isClosable: true, position: 'bottom-right' });
       },
     }
   );

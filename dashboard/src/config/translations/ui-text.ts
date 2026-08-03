@@ -425,6 +425,20 @@ const EN: Record<string, string> = {
   'Команд пока нет.': 'No commands yet.',
   'Поиск команды…': 'Search a command…',
   'Каналы': 'Channels',
+  // --- Invite tracker ---------------------------------------------------------
+  'ИНВАЙТ-ТРЕКЕР': 'INVITE TRACKER',
+  'Инвайт-трекер': 'Invite tracker',
+  'Кто приводит людей на сервер — и куда постить анонсы о заходах.':
+    'Who brings people to the server — and where to announce joins.',
+  'Канал анонсов заходов': 'Join-announce channel',
+  'Каждый заход постится сюда с указанием пригласившего.':
+    'Every join is posted here, crediting who invited them.',
+  'Топ пригласивших': 'Top inviters',
+  'зашло': 'joined',
+  'ушло': 'left',
+  'инвайтов': 'invites',
+  'Пока никого не отследили.': 'No invites tracked yet.',
+  'Не удалось загрузить инвайты.': 'Failed to load invites.',
   // --- Premium custom commands ------------------------------------------------
   'Кастомные команды': 'Custom commands',
   'Свои команды через /tag «имя». В ответе можно использовать {user.mention} и {server.name}.':
