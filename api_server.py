@@ -533,6 +533,26 @@ async def set_command_override(request: Request, guild_id: int, payload: Command
         **_actor(request),
     )
 
+@app.get("/api/guild/{guild_id}/invites", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def get_invites(request: Request, guild_id: int):
+    """Invite leaderboard + the join-announce channel."""
+    return await _rpc("get_invites", guild_id=guild_id)
+
+
+class InviteLogPayload(BaseModel):
+    channelId: Optional[str] = None
+
+
+@app.post("/api/guild/{guild_id}/invites/log", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def set_invite_log(request: Request, guild_id: int, payload: InviteLogPayload):
+    """Set (or clear, when channelId is null) the join-announce channel."""
+    return await _rpc(
+        "set_invite_log", guild_id=guild_id, channelId=payload.channelId, **_actor(request)
+    )
+
+
 @app.post("/api/guild/{guild_id}/appeals/config", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def set_ban_appeals(request: Request, guild_id: int, payload: BanAppealsConfigPayload):

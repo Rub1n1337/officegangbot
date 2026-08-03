@@ -14,6 +14,7 @@ import {
   MdHistory,
   MdSettings,
   MdTerminal,
+  MdMarkEmailRead,
 } from 'react-icons/md';
 import { avatarUrl } from '@/api/discord';
 import { ServerPicker } from './ServerPicker';
@@ -123,6 +124,7 @@ export function IrisSidebar({ onNavigate }: { onNavigate?: () => void }) {
     { href: guildId && `/guilds/${guildId}/audit`, icon: MdHistory, label: t.bn.audit, route: '/guilds/[guild]/audit' },
     { href: guildId && `/guilds/${guildId}/analytics`, icon: MdInsights, label: t.bn.analytics, route: '/guilds/[guild]/analytics' },
     { href: guildId && `/guilds/${guildId}/commands`, icon: MdTerminal, label: t.bn.commands, route: '/guilds/[guild]/commands' },
+    { href: guildId && `/guilds/${guildId}/invites`, icon: MdMarkEmailRead, label: t.bn.invites, route: '/guilds/[guild]/invites' },
   ];
 
   return (

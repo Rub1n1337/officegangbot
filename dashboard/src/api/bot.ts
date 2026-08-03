@@ -401,6 +401,38 @@ export async function setCommandOverride(
   );
 }
 
+export type InviteLeaderboardEntry = {
+  inviterId: string;
+  name: string;
+  avatar: string | null;
+  joined: number;
+  left: number;
+  net: number;
+};
+export type InvitesData = { leaderboard: InviteLeaderboardEntry[]; logChannelId: string | null };
+
+/** The invite leaderboard + this guild's join-announce channel. */
+export async function fetchInvites(session: AccessToken, guild: string) {
+  return await callReturn<InvitesData>(
+    `/api/guild/${guild}/invites`,
+    botRequest(session, { request: { method: 'GET' } })
+  );
+}
+
+/** Set (or clear, with null) the join-announce channel. */
+export async function setInviteLog(session: AccessToken, guild: string, channelId: string | null) {
+  return await callDefault(
+    `/api/guild/${guild}/invites/log`,
+    botRequest(session, {
+      request: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId }),
+      },
+    })
+  );
+}
+
 /**
  * Applies a set of feature payloads to a guild, merging each over the guild's
  * current config so unspecified id fields are preserved. Returns the ids of
